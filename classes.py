@@ -116,20 +116,23 @@ class Track(Shape):
     # initializes the track with size, point spacing, visibility, and screen size
     def __init__(self, size, point_spacing, visible, screen_size=(800, 600)):
         super().__init__(coo=(size[0] * point_spacing // 2, size[1] * point_spacing // 2), size=size, angle=0)
-        self.screen_size = screen_size
-        self.visible = visible
-        self.point_spacing = point_spacing
-        self._center = (self.screen_size[0] // 2, self.screen_size[1] // 2)
+        self.__screen_size = screen_size
+        self.__visible = visible
+        self.__point_spacing = point_spacing
+        self._center = (self.__screen_size[0] // 2, self.__screen_size[1] // 2)
 
         # create the matrix of points and walls
+        self.wall = Wall()
+        self.default = Default()
+
         self.matrix = []
         for i in range(size[0]):
             linha = []
             for j in range(size[1]):
                 if i == 0 or i == size[0] - 1 or j == 0 or j == size[1] - 1:
-                    linha.append(Wall())
+                    linha.append(self.wall)
                 else:
-                    linha.append(Default())
+                    linha.append(self.default)
             self.matrix.append(linha)
 
     # sets a point in the track to a specific type
@@ -144,23 +147,23 @@ class Track(Shape):
     # draws the track on the surface
     def draw(self, surface):
         # get the indexes of the points in the matrix
-        x0_col, y0_row = int(self._x // self.point_spacing), int(self._y // self.point_spacing)
+        x0_col, y0_row = int(self._x // self.__point_spacing), int(self._y // self.__point_spacing)
 
         # calculate the distance from the center of screen
         d = (self._center[0] - self._x, self._center[1] - self._y)
 
         # get all lines and columns in the visible range
-        points = self.points_in_circle(x0_col, y0_row)
+        points = self.__points_in_circle(x0_col, y0_row)
 
         # draw the points
         for i, j in points:
 
             # calculate the coordinates of the points
-            x = i * self.point_spacing + d[0]
-            y = j * self.point_spacing + d[1]
+            x = i * self.__point_spacing + d[0]
+            y = j * self.__point_spacing + d[1]
 
             # rotate the points around the pivot
-            x, y = self.rotate_point((x, y))
+            x, y = self.__rotate_point((x, y))
 
             # draw the points 
             self.matrix[i][j].set_coordinates((x, y))
@@ -168,14 +171,14 @@ class Track(Shape):
             self.matrix[i][j].draw(surface)
 
     # returns the points within a circle
-    def points_in_circle(self, x0, y0):
+    def __points_in_circle(self, x0, y0):
         rows, cols = self._size
         x, y = np.ogrid[:rows, :cols]
         dist_sq = (x - x0) ** 2 + (y - y0) ** 2
-        return np.argwhere(dist_sq <= self.visible ** 2)
+        return np.argwhere(dist_sq <= self.__visible ** 2)
 
     # rotates a point around a pivot
-    def rotate_point(self, coo):
+    def __rotate_point(self, coo):
         ox, oy = self._pivot
         translated_x = coo[0] - ox
         translated_y = coo[1] - oy
@@ -184,16 +187,164 @@ class Track(Shape):
         return rotated_x + ox, rotated_y + oy
 
 class Display(Shape):
-    # initializes the display
-    def __init__(self, coo=(0, 0, 0), color=(200, 200, 200), size=300):
-        super().__init__(coo, color, size)
+    __len_data = 100
+    __saturation = 100
 
-    # draws the display as a rectangle
+    # initializes the display
+    def __init__(self, coo=(0, 0), size=(10, 10), color=(75, 75, 75), horizontal_div=6, vertical_div=2.2):
+        self.__max_value = self.__saturation
+        self.__min_value = -self.__saturation
+        middle = (size[0] // horizontal_div, int(size[1] // vertical_div))
+        offset = (size[1] - 2 * middle[1]) / 2
+        coo = (coo[0] - middle[0] - size[0] // (horizontal_div / 2) + offset, coo[1] - middle[1])
+        super().__init__(coo, color, (size[0] // (horizontal_div / 2), int(size[1] // (vertical_div / 2))))
+
+        self.__graph_data = {}
+        self.__graph_colors = {}
+
+    # adds a new graph with a specific line name
+    def add_graph(self, graph_name):
+        if graph_name not in self.__graph_data:
+            self.__graph_data[graph_name] = {}
+            self.__graph_colors[graph_name] = {}
+
+    # removes a graph from the display
+    def remove_graph(self, graph_name):
+        if graph_name in self.__graph_data:
+            del self.__graph_data[graph_name]
+            del self.__graph_colors[graph_name]
+
+    # adds a new line to an existing graph
+    def add_line_to_graph(self, graph_name, line_name, color=(0, 200, 0)):
+        if graph_name in self.__graph_data:
+            self.__graph_data[graph_name][line_name] = [0 for _ in range(self.__len_data)]
+            self.__graph_colors[graph_name][line_name] = color
+
+    # updates the data for a specific line in a graph
+    def update_graph_data(self, graph_name, line_name, new_value):
+        if graph_name in self.__graph_data and line_name in self.__graph_data[graph_name]:
+            self.__graph_data[graph_name][line_name].append(new_value)
+            if len(self.__graph_data[graph_name][line_name]) > self.__len_data:
+                self.__graph_data[graph_name][line_name].pop(0)
+
+    # draws the display as a rectangle with rounded corners, including graphs and text
     def draw(self, surface):
-        pygame.draw.rect(surface, self._color, (self._x, self._y, self._size, self._size))
+        # draw the display rectangle with rounded corners
+        rect = pygame.Rect(self._x, self._y, self._size[0], self._size[1])
+        pygame.draw.rect(surface, self._color, rect, border_radius=15)
+
+        # calculate the sections for graphs
+        graph_height = self._size[1] // len(self.__graph_data) if self.__graph_data else self._size[1]
+
+        # draw each graph
+        for idx, (graph_name, lines) in enumerate(self.__graph_data.items()):
+            self.draw_graph(
+                surface,
+                lines,
+                (
+                    self._x + 15,
+                    self._y + idx * graph_height + 15,
+                    self._size[0] - 30,
+                    graph_height - 30
+                ),
+                graph_name
+            )
+
+    # draw grid lines
+    def __draw_grid(self, surface, graph_width, graph_height, graph_x, graph_y):
+        grid_color = (200, 200, 200)
+        for i in range(15, graph_width -15, max(1, graph_width // 10)):
+            pygame.draw.line(surface, grid_color, (graph_x + i, graph_y), (graph_x + i, graph_y + graph_height))
+        for i in range(15, graph_height -15, max(1, graph_height // 5)):
+            pygame.draw.line(surface, grid_color, (graph_x, graph_y + i), (graph_x + graph_width, graph_y + i))
+
+    # draw axis values
+    def __draw_axis_values(self, surface, graph_height, graph_x, graph_y):
+        font = pygame.font.Font(None, 20)
+        num_divisions = 5
+        for i in range(num_divisions + 1):
+            value = self.__max_value - (i * (self.__max_value - self.__min_value) // num_divisions)
+            y_pos = graph_y + (i * graph_height // num_divisions)
+            label = font.render(str(value), True, (0, 0, 0))
+            surface.blit(label, (graph_x - 45, y_pos - 10))
+
+    # draw title 
+    def __draw_title(self, surface, title, graph_width, graph_x, graph_y):
+        font = pygame.font.Font(None, 20)
+        title_label = font.render(title, True, (0, 0, 0))
+        offset = len(title) * 2
+        surface.blit(title_label, (graph_x + graph_width // 2 - offset, graph_y + 10))
+
+    # draw each line in the graph
+    def __draw_graph_separate(self, surface, lines, title, graph_width, graph_height, graph_x, graph_y):
+        for line_name, data in lines.items():
+            normalized_data = [
+                graph_height - (graph_height * (value - self.__min_value) / (self.__max_value - self.__min_value))
+                for value in data
+            ]
+            step_width = graph_width / len(data)
+            color = self.__graph_colors[title][line_name]
+
+            for i in range(len(normalized_data) - 1):
+                x1 = graph_x + i * step_width
+                y1 = graph_y + normalized_data[i]
+                x2 = graph_x + (i + 1) * step_width
+                # draw the horizontal step
+                pygame.draw.line(surface, color, (x1, y1), (x2, y1), 2)
+                # draw the vertical connection to the next step
+                pygame.draw.line(surface, color, (x2, y1), (x2, graph_y + normalized_data[i + 1]), 2)
+
+    # draw legend
+    def __draw_legend(self, surface, graph_x, graph_y, title):
+        legend_x = graph_x + 10
+        legend_y = graph_y + 15
+        font = pygame.font.Font(None, 20)
+        for idx, (line_name, color) in enumerate(self.__graph_colors[title].items()):
+            pygame.draw.rect(surface, color, (legend_x, legend_y + idx * 20, 10, 10))
+            legend_label = font.render(line_name, True, (0, 0, 0))
+            surface.blit(legend_label, (legend_x + 15, legend_y + idx * 20 - 5))
+
+    # helper function to draw a graph with multiple lines
+    def draw_graph(self, surface, lines, rect, title):
+        graph_width, graph_height = int(rect[2]), int(rect[3])
+        graph_x, graph_y = int(rect[0]), int(rect[1])
+
+        # draw white background for the graph
+        pygame.draw.rect(surface, (255, 255, 255), (graph_x, graph_y, graph_width, graph_height), border_radius=10)
+
+        # draw grid lines
+        self.__draw_grid(surface, graph_width, graph_height, graph_x, graph_y)
+
+        # draw axes values
+        self.__draw_axis_values(surface, graph_height, graph_x, graph_y)
+
+        # draw title
+        self.__draw_title(surface, title, graph_width, graph_x, graph_y)
+
+        # draw each line in the graph
+        self.__draw_graph_separate(surface, lines, title, graph_width, graph_height, graph_x, graph_y)
+
+        # draw legend
+        self.__draw_legend(surface, graph_x, graph_y, title)
+
+class Statistics(Shape):
+    def __init__(self, screen=(800, 600), color=(0, 200, 0), size=10, angle=0):
+        self.text = "FPS: ___ "
+        coo = (screen[0] - len(self.text)//2, screen[1] - 0.95*screen[1])
+        super().__init__(coo, color, size, angle)
+        self.font = pygame.font.Font(None, 36)  # Initialize the font once
+
+    def set_text(self, text):
+        self.text = text
+        self._x = self._x
+
+    def draw(self, surface):
+        text_surface = self.font.render(self.text, True, self._color)
+        surface.blit(text_surface, (self._x, self._y))
+
 
 class Simulator:
-    __background = (200, 200, 200)
+    __background = (255, 255, 255)
 
     # initializes the simulator
     def __init__(self, width=800, height=600):
@@ -205,6 +356,13 @@ class Simulator:
         self.__running  = True
         self.__FPS      = 60
         self.__objects  = []
+
+    # set and get FPS
+    def set_FPS(self, FPS):
+        self.__FPS = FPS
+    
+    def get_FPS(self):
+        return self.__FPS
 
     # returns the window size
     def get_window_size(self):
