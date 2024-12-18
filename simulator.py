@@ -11,7 +11,7 @@ track = Track((100, 100), 150, 5)
 simulator.add(track)
 
 # Add the car
-car = Car(simulator.get_center(), center=(1.36, 1.7))
+car = Car(simulator.get_center(), center=(1.3, 1.7))
 simulator.add(car)
 
 # Set the center of the track and the pivot relative to the center of the car
@@ -23,8 +23,17 @@ display = Display(simulator.get_center(), simulator.get_window_size())
 simulator.add(display)
 
 # Create a Statistic object
-statistic = Statistics(simulator.get_center())
-simulator.add(statistic)
+FPS_position = (0.01*simulator.get_center()[0], 1.95*simulator.get_center()[1])
+fps = Statistics(FPS_position)
+simulator.add(fps)
+
+Coordenada_position = (1.75*simulator.get_center()[0], 1.95*simulator.get_center()[1])
+coordenada = Statistics(Coordenada_position)
+simulator.add(coordenada)
+
+# Create a Compass
+compass = Compass((1.85*simulator.get_center()[0], 1.75*simulator.get_center()[1]))
+simulator.add(compass)
 
 # Add graphs with specific lines and colors
 display.add_graph("wheels")
@@ -66,6 +75,10 @@ while simulator.is_running():
 
     # update the world
     track.step(dx, dy, theta)
+    compass.set_angle(-track.get_angle() - math.pi/2)
+
+    # update coordenada
+    coordenada.set_text("X: " + str(round(track.get_center()[0], 1)) + " Y: " + str(round(track.get_center()[1], 1)))
 
     # Generate random data for the graphs
     random_left = random.randint(-50, 50)
@@ -86,6 +99,11 @@ while simulator.is_running():
 
     counter += 1
     if time.time() - tempo > 1:
-        statistic.set_text("FPS: " + str(counter))
+        fps.set_text("FPS: " + str(counter))
+        if counter < 60:
+            fps.set_color((200, 0, 0))
+        else:
+            fps.set_color((0, 200, 0))
+
         counter = 0
         tempo = time.time()

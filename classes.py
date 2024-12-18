@@ -16,6 +16,9 @@ class Shape:
     def get_center(self):
         return self._x, self._y
 
+    def get_angle(self):
+        return self._angle
+
     # rotates the shape by a given angle
     def __rotate(self, angle):
         self._angle += angle
@@ -44,6 +47,10 @@ class Shape:
     # sets the angle of the shape
     def set_angle(self, angle):
         self._angle = angle
+
+    # chenge the color of the shape
+    def set_color(self, color):
+        self._color = color
 
     # rotates the shape around the origin
     def rotate_around_origin(self, theta):
@@ -191,11 +198,11 @@ class Display(Shape):
     __saturation = 100
 
     # initializes the display
-    def __init__(self, coo=(0, 0), size=(10, 10), color=(75, 75, 75), horizontal_div=6, vertical_div=2.2):
+    def __init__(self, coo=(0, 0), size=(10, 10), color=(75, 75, 75), horizontal_div=8, vertical_div=2.2):
         self.__max_value = self.__saturation
         self.__min_value = -self.__saturation
         middle = (size[0] // horizontal_div, int(size[1] // vertical_div))
-        offset = (size[1] - 2 * middle[1]) / 2
+        offset = (size[1] - 2.5 * middle[1])
         coo = (coo[0] - middle[0] - size[0] // (horizontal_div / 2) + offset, coo[1] - middle[1])
         super().__init__(coo, color, (size[0] // (horizontal_div / 2), int(size[1] // (vertical_div / 2))))
 
@@ -328,11 +335,11 @@ class Display(Shape):
         self.__draw_legend(surface, graph_x, graph_y, title)
 
 class Statistics(Shape):
-    def __init__(self, screen=(800, 600), color=(0, 200, 0), size=10, angle=0):
-        self.text = "FPS: ___ "
-        coo = (screen[0] - len(self.text)//2, screen[1] - 0.95*screen[1])
+    def __init__(self, coo=(800, 600), color=(0, 200, 0), size=10, angle=0):
+        self.text = "_____"
+        #coo = (screen[0] - len(self.text)//2, screen[1] - 0.95*screen[1])
         super().__init__(coo, color, size, angle)
-        self.font = pygame.font.Font(None, 36)  # Initialize the font once
+        self.font = pygame.font.Font(None, 24)  # Initialize the font once
 
     def set_text(self, text):
         self.text = text
@@ -342,6 +349,51 @@ class Statistics(Shape):
         text_surface = self.font.render(self.text, True, self._color)
         surface.blit(text_surface, (self._x, self._y))
 
+class Compass(Shape):
+    def __init__(self, coo, color=(0, 0, 0), size=40, angle=0):
+        #coo = (coo[0] - 2 * size, coo[1] - 2 * size)
+        super().__init__(coo, color, size, angle)
+
+    def draw(self, surface):
+        # Draw the outer circle
+        pygame.draw.circle(surface, self._color, (self._x, self._y), self._size, 2)
+
+        # Points for the star
+        star_points = []
+        num_points = 8  # 4 major (N, E, S, W) and 4 minor (NE, SE, SW, NW)
+        for i in range(num_points):
+            angle = self._angle + (math.pi / 4) * i
+            radius = self._size if i % 2 == 0 else self._size * 0.4
+            x = self._x + radius * math.cos(angle)
+            y = self._y + radius * math.sin(angle)
+            star_points.append((x, y))
+
+        # Draw the star
+        pygame.draw.polygon(surface, self._color, star_points, 2)
+
+        # Draw cardinal direction labels
+        directions = {
+            "N": (0, -1),
+            "E": (1, 0),
+            "S": (0, 1),
+            "W": (-1, 0),
+        }
+
+        font = pygame.font.Font(None, 24)
+        for direction, (dx, dy) in directions.items():
+            end_x = self._x + dx * self._size * 1.3
+            end_y = self._y + dy * self._size * 1.3
+            color = self._color
+            if direction in ["N"]:
+                color = (200, 0, 0)
+            text_surface = font.render(direction, True, color)
+            text_rect = text_surface.get_rect(center=(end_x, end_y))
+            surface.blit(text_surface, text_rect)
+
+        # Draw a line indicating the current angle
+        pointer_x = self._x + self._size * math.cos(self._angle)
+        pointer_y = self._y + self._size * math.sin(self._angle)
+        pygame.draw.line(surface, (255, 0, 0), (self._x, self._y), (pointer_x, pointer_y), 3)
 
 class Simulator:
     __background = (255, 255, 255)
