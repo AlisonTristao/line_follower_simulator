@@ -2,190 +2,247 @@ import pygame
 import math
 import numpy as np
 
+import pygame
+import math
+import numpy as np
+
 class Shape:
-    # initializes shape with coordinates, color, size, and angle
+    """
+    represents a basic geometric shape with position, color, size, and angle
+    """
     def __init__(self, coo, color=None, size=None, angle=0):
-        self._x     = coo[0]
-        self._y     = coo[1]
+        """
+        initializes the shape
+        args:
+            coo (tuple): coordinates of the shape (x, y)
+            color (tuple): color of the shape in rgb format
+            size (int): size of the shape
+            angle (float): initial angle in radians
+        """
+        self._x = coo[0]
+        self._y = coo[1]
         self._angle = angle
         self._color = color
-        self._size  = size
+        self._size = size
         self._pivot = (0, 0)
 
-    # returns the center coordinates
     def get_center(self):
+        # returns the center coordinates of the shape
         return self._x, self._y
 
     def get_angle(self):
+        # returns the current angle of the shape
         return self._angle
 
-    # rotates the shape by a given angle
-    def __rotate(self, angle):
-        self._angle += angle
+    def set_angle(self, angle):
+        # sets a new angle for the shape
+        self._angle = angle
 
-    # sets the pivot point for rotations
+    def set_coordinates(self, coo):
+        # sets new coordinates for the shape
+        self._x, self._y = coo
+
+    def set_color(self, color):
+        # sets a new color for the shape
+        self._color = color
+
     def set_pivot(self, pivot):
+        # sets the pivot point for rotations
         self._pivot = pivot
 
-    # moves the shape by dx and dy, considering rotation
-    def __move(self, dx, dy):
+    def step(self, dx, dy, angle):
+        # moves and rotates the shape
+        self._rotate(angle)
+        self._move(dx, dy)
+
+    def _rotate(self, angle):
+        # rotates the shape by the given angle
+        self._angle += angle
+
+    def _move(self, dx, dy):
+        # moves the shape by dx and dy considering rotation
         s = dx * math.cos(-self._angle) - dy * math.sin(-self._angle)
         dy = dx * math.sin(-self._angle) + dy * math.cos(-self._angle)
         dx = s
         self._x += dx
         self._y += dy
 
-    # moves and rotates the shape
-    def step(self, dx, dy, angle):
-        self.__rotate(angle)
-        self.__move(dx, dy)
-
-    # sets the coordinates of the shape
-    def set_coordinates(self, coo):
-        self._x, self._y = coo
-
-    # sets the angle of the shape
-    def set_angle(self, angle):
-        self._angle = angle
-
-    # chenge the color of the shape
-    def set_color(self, color):
-        self._color = color
-
-    # rotates the shape around the origin
     def rotate_around_origin(self, theta):
+        # rotates the shape around the origin by theta radians
         x_new = self._x * math.cos(theta) - self._y * math.sin(theta)
         y_new = self._x * math.sin(theta) + self._y * math.cos(theta)
         self._x, self._y = x_new, y_new
 
-    # rotates the shape around a pivot point
     def rotate_around_pivot(self, pivot, theta):
+        # rotates the shape around a given pivot point by theta radians
         ox, oy = pivot
         translated_x = self._x - ox
         translated_y = self._y - oy
-
         rotated_x = translated_x * math.cos(theta) - translated_y * math.sin(theta)
         rotated_y = translated_x * math.sin(theta) + translated_y * math.cos(theta)
-
         self._x = rotated_x + ox
         self._y = rotated_y + oy
 
-    # draws the shape on a surface (to be implemented by subclasses)
     def draw(self, surface):
-        raise NotImplementedError("This method should be implemented by subclasses.")
+        # raises an error because it must be implemented by subclasses
+        raise NotImplementedError("this method should be implemented by subclasses.")
 
 class Car(Shape):
-    # initializes the car with coordinates, color, size, and angle
+    """
+    represents the car in the simulator
+    """
     def __init__(self, coo, color=(255, 0, 0), size=30, angle=30, center=(1, 2)):
+        """
+        initializes the car
+        args:
+            coo (tuple): initial coordinates of the car
+            color (tuple): color of the car in rgb format
+            size (int): size of the car
+            angle (float): initial angle in degrees
+            center (tuple): center position multiplier for car positioning
+        """
         super().__init__(coo, color, size, angle)
-        self._x = center[0] * coo[0] + math.cos(math.sin(angle))
+        self._x = center[0] * coo[0] + math.cos(math.radians(angle))
         self._y = center[1] * coo[1]
-        self.get_vertices()
+        self._vertices = []
+        self._calculate_vertices()
 
-    # calculates the vertices of the car
-    def get_vertices(self):
+    def _calculate_vertices(self):
+        # calculates the vertices of the car for rendering
         angle_rad = math.radians(self._angle)
         half_size = self._size
-        vertices = [
+        self._vertices = [
             (self._x + half_size * math.cos(angle_rad), self._y + half_size * math.sin(angle_rad)),
             (self._x + half_size * math.cos(angle_rad - 2.094), self._y + half_size * math.sin(angle_rad - 2.094)),
             (self._x + half_size * math.cos(angle_rad + 2.094), self._y + half_size * math.sin(angle_rad + 2.094)),
         ]
-        self._vertices = vertices
 
-    # draws the car on a surface
     def draw(self, surface):
+        # draws the car as a polygon on the given surface
         pygame.draw.polygon(surface, self._color, self._vertices)
 
+    def step(self, dx, dy, angle):
+        """
+        updates the car's position and rotation
+        args:
+            dx (float): change in x direction
+            dy (float): change in y direction
+            angle (float): change in angle in radians
+        """
+        super().step(dx, dy, angle)
+        self._calculate_vertices()
+
 class Default(Shape):
-    # initializes a default shape
+    """
+    represents a default object on the track
+    """
     def __init__(self, coo=(0, 0, 0), color=(50, 50, 50), size=2):
+        """
+        initializes a default object
+        args:
+            coo (tuple): coordinates of the object
+            color (tuple): color of the object in rgb format
+            size (int): size of the object
+        """
         super().__init__(coo, color, size)
 
-    # draws a default shape as a circle
     def draw(self, surface):
-        pygame.draw.circle(surface, self._color, (self._x, self._y), self._size)
+        # draws the default object as a circle on the given surface
+        pygame.draw.circle(surface, self._color, (int(self._x), int(self._y)), self._size)
 
 class Wall(Shape):
-    # initializes a wall
+    """
+    represents a wall on the track
+    """
     def __init__(self, coo=(0, 0, 0), color=(100, 100, 100), size=70):
+        """
+        initializes a wall object
+        args:
+            coo (tuple): coordinates of the wall
+            color (tuple): color of the wall in rgb format
+            size (int): size of the wall
+        """
         super().__init__(coo, color, size)
 
-    # draws the wall as a rotated rectangle
     def draw(self, surface):
+        # draws the wall as a rotated rectangle on the given surface
         temp_surface = pygame.Surface((self._size, self._size), pygame.SRCALPHA)
         temp_surface.fill(self._color)
         rotated_surface = pygame.transform.rotate(temp_surface, math.degrees(self._angle))
-        rotated_rect = rotated_surface.get_rect(center=(self._x, self._y))
+        rotated_rect = rotated_surface.get_rect(center=(int(self._x), int(self._y)))
         surface.blit(rotated_surface, rotated_rect)
 
 class Track(Shape):
-    # initializes the track with size, point spacing, visibility, and screen size
+    """
+    represents the track of the simulator with a matrix of points and walls
+    """
     def __init__(self, size, point_spacing, visible, screen_size=(800, 600)):
+        """
+        initializes the track
+        args:
+            size (tuple): size of the track grid (rows, columns)
+            point_spacing (int): spacing between points in the grid
+            visible (int): radius of visibility for the track points
+            screen_size (tuple): dimensions of the screen
+        """
         super().__init__(coo=(size[0] * point_spacing // 2, size[1] * point_spacing // 2), size=size, angle=0)
         self.__screen_size = screen_size
         self.__visible = visible
         self.__point_spacing = point_spacing
         self._center = (self.__screen_size[0] // 2, self.__screen_size[1] // 2)
 
-        # create the matrix of points and walls
+        # initializes the matrix of points and walls
         self.wall = Wall()
         self.default = Default()
+        self.matrix = self._create_matrix(size)
 
-        self.matrix = []
+    def _create_matrix(self, size):
+        # creates the initial matrix of track objects
+        matrix = []
         for i in range(size[0]):
-            linha = []
+            row = []
             for j in range(size[1]):
-                if i == 0 or i == size[0] - 1 or j == 0 or j == size[1] - 1:
-                    linha.append(self.wall)
-                else:
-                    linha.append(self.default)
-            self.matrix.append(linha)
+                row.append(self.wall if i in (0, size[0] - 1) or j in (0, size[1] - 1) else self.default)
+            matrix.append(row)
+        return matrix
 
-    # sets a point in the track to a specific type
     def set_obj(self, row, col, obj_type):
+        # sets a specific object in the matrix at the given row and column
         if 0 <= row < self._size[0] and 0 <= col < self._size[1]:
             self.matrix[row][col] = obj_type
 
-    # sets the center of the track
     def set_center(self, coo):
+        # sets the center of the track
         self._center = coo
 
-    # draws the track on the surface
     def draw(self, surface):
-        # get the indexes of the points in the matrix
+        """
+        draws the track on the given surface
+        args:
+            surface (pygame.Surface): the surface to draw on
+        """
         x0_col, y0_row = int(self._x // self.__point_spacing), int(self._y // self.__point_spacing)
-
-        # calculate the distance from the center of screen
         d = (self._center[0] - self._x, self._center[1] - self._y)
-
-        # get all lines and columns in the visible range
         points = self.__points_in_circle(x0_col, y0_row)
 
-        # draw the points
         for i, j in points:
-
-            # calculate the coordinates of the points
             x = i * self.__point_spacing + d[0]
             y = j * self.__point_spacing + d[1]
+            x, y = self._rotate_point((x, y))
 
-            # rotate the points around the pivot
-            x, y = self.__rotate_point((x, y))
-
-            # draw the points 
             self.matrix[i][j].set_coordinates((x, y))
             self.matrix[i][j].set_angle(-self._angle)
             self.matrix[i][j].draw(surface)
 
-    # returns the points within a circle
     def __points_in_circle(self, x0, y0):
+        # returns the points within a circle of visibility
         rows, cols = self._size
         x, y = np.ogrid[:rows, :cols]
         dist_sq = (x - x0) ** 2 + (y - y0) ** 2
         return np.argwhere(dist_sq <= self.__visible ** 2)
 
-    # rotates a point around a pivot
-    def __rotate_point(self, coo):
+    def _rotate_point(self, coo):
+        # rotates a point around the track's pivot
         ox, oy = self._pivot
         translated_x = coo[0] - ox
         translated_y = coo[1] - oy
@@ -198,16 +255,25 @@ class Display(Shape):
     __saturation = 100
 
     # initializes the display
-    def __init__(self, coo=(0, 0), size=(10, 10), color=(75, 75, 75), horizontal_div=8, vertical_div=2.2):
+    def __init__(self, coo=(0, 0), size=(10, 10), color=(75, 75, 75), horizontal_div=3, vertical_div=1.1):
+        # limits of y axis
         self.__max_value = self.__saturation
         self.__min_value = -self.__saturation
-        middle = (size[0] // horizontal_div, int(size[1] // vertical_div))
-        offset = (size[1] - 2.5 * middle[1])
-        coo = (coo[0] - middle[0] - size[0] // (horizontal_div / 2) + offset, coo[1] - middle[1])
-        super().__init__(coo, color, (size[0] // (horizontal_div / 2), int(size[1] // (vertical_div / 2))))
+
+        # center and deslocation of display
+        middle = (size[0] // horizontal_div, int(size[1] // (2*vertical_div)))
+        offset = 40
+        print(offset)
+        
+        coo = (coo[0] - (middle[0]//2 * horizontal_div) + offset, coo[1] - middle[1])
+        super().__init__(coo, color, (size[0] // (horizontal_div), int(size[1] // (vertical_div))))
 
         self.__graph_data = {}
         self.__graph_colors = {}
+
+    # define time of the x axis
+    def set_time(self, fps):
+        self.__len_data = int(fps)
 
     # adds a new graph with a specific line name
     def add_graph(self, graph_name):
@@ -271,7 +337,7 @@ class Display(Shape):
         num_divisions = 5
         for i in range(num_divisions + 1):
             value = self.__max_value - (i * (self.__max_value - self.__min_value) // num_divisions)
-            y_pos = graph_y + (i * graph_height // num_divisions)
+            y_pos = graph_y + ((i+0.35) * graph_height // (1.1*num_divisions))
             label = font.render(str(value), True, (0, 0, 0))
             surface.blit(label, (graph_x - 45, y_pos - 10))
 
@@ -335,19 +401,35 @@ class Display(Shape):
         self.__draw_legend(surface, graph_x, graph_y, title)
 
 class Statistics(Shape):
-    def __init__(self, coo=(800, 600), color=(0, 200, 0), size=10, angle=0):
-        self.text = "_____"
-        #coo = (screen[0] - len(self.text)//2, screen[1] - 0.95*screen[1])
+    """
+    represents statistical text information displayed on the simulator
+    """
+    def __init__(self, coo=(800, 600), color=(0, 200, 0), size=100, angle=0):
+        """
+        initializes the statistics display
+        args:
+            coo (tuple): coordinates of the statistics text
+            color (tuple): color of the text in rgb format
+            size (int): size of the text object (unused here but inherited)
+            angle (float): rotation angle of the text (unused here but inherited)
+        """
         super().__init__(coo, color, size, angle)
-        self.font = pygame.font.Font(None, 24)  # Initialize the font once
+        self.text = "_____"
+        self.font = pygame.font.Font(None, 24)
 
     def set_text(self, text):
+        # updates the text to be displayed
         self.text = text
-        self._x = self._x
 
     def draw(self, surface):
+        """
+        draws the text on the given surface
+        args:
+            surface (pygame.Surface): the surface to draw on
+        """
         text_surface = self.font.render(self.text, True, self._color)
-        surface.blit(text_surface, (self._x, self._y))
+        x = self._x - text_surface.get_width()
+        surface.blit(text_surface, (x, self._y))
 
 class Compass(Shape):
     def __init__(self, coo, color=(0, 0, 0), size=40, angle=0):
@@ -396,64 +478,90 @@ class Compass(Shape):
         pygame.draw.line(surface, (255, 0, 0), (self._x, self._y), (pointer_x, pointer_y), 3)
 
 class Simulator:
-    __background = (255, 255, 255)
-
-    # initializes the simulator
-    def __init__(self, width=800, height=600):
+    """
+    represents the simulator environment for the line follower
+    """
+    def __init__(self, win='FULL', FPS=160):
+        """
+        initializes the simulator environment
+        args:
+            win (str): window size mode ('FULL', 'MEDIUM', 'SMALL')
+            FPS (int): frames per second for the simulator
+        """
         pygame.init()
-        self.__width    = width
-        self.__height   = height
-        self.__screen   = pygame.display.set_mode((self.__width, self.__height))
-        self.__clock    = pygame.time.Clock()
-        self.__running  = True
-        self.__FPS      = 60
-        self.__objects  = []
 
-    # set and get FPS
-    def set_FPS(self, FPS):
+        # set the window size based on mode
+        if win == 'FULL':
+            info = pygame.display.Info()
+            width = info.current_w
+            height = info.current_h
+            self.__screen = pygame.display.set_mode((width, height), pygame.FULLSCREEN | pygame.HWSURFACE)
+        elif win == 'MEDIUM':
+            width = 1400
+            height = 800
+            self.__screen = pygame.display.set_mode((width, height))
+        elif win == 'SMALL':
+            width = 800
+            height = 600
+            self.__screen = pygame.display.set_mode((width, height))
+
+        pygame.display.set_caption("SIMULATOR")
+        self.__clock = pygame.time.Clock()
+
+        self.__width = width
+        self.__height = height
+        self.__running = True
         self.__FPS = FPS
-    
+        self.__objects = []
+
+    def set_FPS(self, FPS):
+        # sets the frames per second for the simulator
+        self.__FPS = FPS
+
     def get_FPS(self):
+        # returns the current frames per second
         return self.__FPS
 
-    # returns the window size
     def get_window_size(self):
+        # returns the size of the simulator window
         return self.__width, self.__height
 
-    # returns the center of the window
     def get_center(self):
+        # returns the center coordinates of the simulator window
         return self.__width // 2, self.__height // 2
 
-    # checks if the simulator is running
     def is_running(self):
+        # checks if the simulator is still running
         return self.__running
 
-    # stops the simulator
     def stop_running(self):
+        # stops the simulator from running
         self.__running = False
 
-    # adds an object to the simulator
     def add(self, obj):
+        # adds an object to the simulator environment
         self.__objects.append(obj)
 
-    # removes an object from the simulator
     def remove(self, obj):
+        # removes an object from the simulator environment
         self.__objects.remove(obj)
 
-    # verifies if there are objects to update or draw
     def __verify_objects(self):
+        # verifies if there are objects to update or draw
         return len(self.__objects) > 0
 
-    # draws all objects on the screen
     def draw(self):
+        # draws all objects on the simulator screen
         if not self.__verify_objects():
             return
-        self.__screen.fill(self.__background)
+        self.__screen.fill((255, 255, 255))  # background color
         for obj in self.__objects:
             obj.draw(self.__screen)
 
-    # performs a simulation step
     def step(self):
+        """
+        performs a simulation step by updating and rendering objects
+        """
         self.draw()
         pygame.display.flip()
         self.__clock.tick(self.__FPS)
