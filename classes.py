@@ -91,7 +91,7 @@ class Car(Shape):
     """
     represents the car in the simulator
     """
-    def __init__(self, coo, color=(255, 0, 0), size=30, angle=30, center=(1, 2)):
+    def __init__(self, coo, color=(255, 0, 0), size=50, angle=30, center=(1, 2)):
         """
         initializes the car
         args:
@@ -172,6 +172,102 @@ class Wall(Shape):
         rotated_rect = rotated_surface.get_rect(center=(int(self._x), int(self._y)))
         surface.blit(rotated_surface, rotated_rect)
 
+class Cluster(Shape):
+    """
+    Represents a cluster of points on the track
+    """
+    def __init__(self, coo=(0, 0), color=(0, 0, 0), size=10, angle=0):
+        """
+        initializes the cluster object
+        args:
+            coo (tuple): coordinates of the cluster
+            color (tuple): color of the cluster in rgb format
+            size (int): size of the cluster
+            angle (float): initial angle of the cluster in radians
+        """
+        super().__init__(coo, color, size, angle)
+        self.__points_arr = [] 
+
+    def add_point(self, point):
+        self.__points_arr.append(point)
+
+    def draw(self, surface):
+        """
+        draws the cluster on the given surface
+        args:
+            surface (pygame.Surface): the surface to draw on
+        """
+        for point in self.__points_arr:
+            point_ = self._rotate_point(point)
+            pygame.draw.circle(surface, self._color, (point_[0] + self._x, point_[1] + self._y), self._size)
+
+    def _rotate_point(self, coo):
+        # rotates a point around the origin
+        rotated_x = coo[0] * math.cos(-self._angle) - coo[1] * math.sin(-self._angle)
+        rotated_y = coo[0] * math.sin(-self._angle) + coo[1] * math.cos(-self._angle)
+        return rotated_x, rotated_y
+    
+    def get_points(self):
+        return self.__points_arr
+
+class MiniMap(Shape):
+    """
+    Represents a minimap object on the simulator
+    """
+    def __init__(self, coo, size, color=(250, 250, 250)):
+        """
+        Initializes the minimap object.
+        Args:
+            coo (tuple): Coordinates of the minimap.
+            size (tuple): Size of the minimap.
+            color (tuple): Color of the minimap in RGB format.
+        """
+        super().__init__(coo, color, size)
+        self._width, self._height = size
+        self._points = []  # Lista de pontos no formato [(x, y)]
+        self._player = (0, 0)
+
+    def add_point(self, point):
+        self._points.append(point)
+
+    def set_player_position(self, player):
+        self._player = player
+
+    def draw(self, surface):
+        # coordinates and dimensions of the minimap rectangle
+        rect_x = self._x - self._width // 2
+        rect_y = self._y - self._height // 2
+        rect_width = self._width
+        rect_height = self._height
+
+        border_color = (100, 100, 100)
+        border_width = 1
+
+        # draw border
+        pygame.draw.rect(surface, border_color,
+                         (rect_x, rect_y, rect_width, rect_height), border_width)
+
+        # draw background
+        pygame.draw.rect(surface, self._color,
+                         (rect_x + border_width, rect_y + border_width,
+                          rect_width - 2 * border_width, rect_height - 2 * border_width))
+
+
+        # draw track
+        point_color = (0, 0, 0)
+        for px, py in self._points:
+            # normalize the point coordinates
+            x = int(self._x + px * (self._width // 2))
+            y = int(self._y + py * (self._height // 2))
+            pygame.draw.circle(surface, point_color, (x, y), 1)
+
+        # draw player position
+        player_color = (200, 0, 0)
+        x = int(self._x + self._player[0] * (self._width // 2))
+        y = int(self._y - self._player[1] * (self._height // 2))
+
+        pygame.draw.circle(surface, player_color, (x, y), 5)
+
 class Track(Shape):
     """
     represents the track of the simulator with a matrix of points and walls
@@ -185,11 +281,11 @@ class Track(Shape):
             visible (int): radius of visibility for the track points
             screen_size (tuple): dimensions of the screen
         """
-        super().__init__(coo=(size[0] * point_spacing // 2, size[1] * point_spacing // 2), size=size, angle=0)
+        super().__init__(coo=(size[0] * point_spacing // 1.1, size[1] * point_spacing // 2), size=size, angle=0)
         self.__screen_size = screen_size
         self.__visible = visible
         self.__point_spacing = point_spacing
-        self._center = (self.__screen_size[0] // 2, self.__screen_size[1] // 2)
+        self._center = (0, 0) #(self.__screen_size[0] // 1.5, self.__screen_size[1] // 2)
 
         # initializes the matrix of points and walls
         self.wall = Wall()
@@ -206,10 +302,10 @@ class Track(Shape):
             matrix.append(row)
         return matrix
 
-    def set_obj(self, row, col, obj_type):
+    def set_obj(self, row, col, obj):
         # sets a specific object in the matrix at the given row and column
         if 0 <= row < self._size[0] and 0 <= col < self._size[1]:
-            self.matrix[row][col] = obj_type
+            self.matrix[row][col] = obj
 
     def set_center(self, coo):
         # sets the center of the track
@@ -251,11 +347,23 @@ class Track(Shape):
         return rotated_x + ox, rotated_y + oy
 
 class Display(Shape):
+    """
+    represents a display for the simulator with graphs and text
+    """
     __len_data = 100
     __saturation = 100
 
     # initializes the display
     def __init__(self, coo=(0, 0), size=(10, 10), color=(75, 75, 75), horizontal_div=3, vertical_div=1.1):
+        """
+        initializes the display
+        args:
+            coo (tuple): coordinates of the display
+            size (tuple): size of the display
+            color (tuple): color of the display in rgb format
+            horizontal_div (int): number of horizontal divisions
+            vertical_div (int): number of vertical divisions
+        """
         # limits of y axis
         self.__max_value = self.__saturation
         self.__min_value = -self.__saturation
@@ -263,7 +371,6 @@ class Display(Shape):
         # center and deslocation of display
         middle = (size[0] // horizontal_div, int(size[1] // (2*vertical_div)))
         offset = 40
-        print(offset)
         
         coo = (coo[0] - (middle[0]//2 * horizontal_div) + offset, coo[1] - middle[1])
         super().__init__(coo, color, (size[0] // (horizontal_div), int(size[1] // (vertical_div))))
@@ -379,6 +486,9 @@ class Display(Shape):
 
     # helper function to draw a graph with multiple lines
     def draw_graph(self, surface, lines, rect, title):
+        """
+        draw a graph with multiple lines on the given surface
+        """
         graph_width, graph_height = int(rect[2]), int(rect[3])
         graph_x, graph_y = int(rect[0]), int(rect[1])
 
@@ -416,6 +526,11 @@ class Statistics(Shape):
         super().__init__(coo, color, size, angle)
         self.text = "_____"
         self.font = pygame.font.Font(None, 24)
+        self._offset = 1
+
+    def set_offset(self, offset):
+        # sets the offset for the text
+        self._offset = offset 
 
     def set_text(self, text):
         # updates the text to be displayed
@@ -428,11 +543,22 @@ class Statistics(Shape):
             surface (pygame.Surface): the surface to draw on
         """
         text_surface = self.font.render(self.text, True, self._color)
-        x = self._x - text_surface.get_width()
+        x = self._x - text_surface.get_width() // self._offset
         surface.blit(text_surface, (x, self._y))
 
 class Compass(Shape):
+    """
+    represents a compass object on the simulator
+    """
     def __init__(self, coo, color=(0, 0, 0), size=40, angle=0):
+        """
+        initializes the compass object
+        args:
+            coo (tuple): coordinates of the compass object
+            color (tuple): color of the compass in rgb format
+            size (int): size of the compass object
+            angle (float): initial angle of the compass in radians
+        """
         #coo = (coo[0] - 2 * size, coo[1] - 2 * size)
         super().__init__(coo, color, size, angle)
 

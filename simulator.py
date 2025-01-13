@@ -2,117 +2,179 @@ import pygame
 import random
 import time
 from classes import *
+from track_generator import *
 
-# Configuração inicial do simulador
-def setup_simulator():
-    simulator = Simulator('MEDIUM', 60)
-    track = Track((100, 100), 200, 4)
-    simulator.add(track)
-
-    car = Car(simulator.get_center(), center=(1.36, 1.4))
-    simulator.add(car)
-
-    track.set_center(car.get_center())
-    track.set_pivot(car.get_center())
-
-    display = Display(simulator.get_center(), simulator.get_window_size())
-    simulator.add(display)
-
-    FPS_position = (1.99*simulator.get_center()[0], 0.01*simulator.get_center()[1])
-    fps = Statistics(FPS_position)
-    simulator.add(fps)
-
-    coordenate_position = (1.99*simulator.get_center()[0], 1.95*simulator.get_center()[1])
-    coordenate = Statistics(coordenate_position)
-    simulator.add(coordenate)
-
-    compass = Compass((1.85*simulator.get_center()[0], 1.75*simulator.get_center()[1]))
-    simulator.add(compass)
-
-    setup_display_graphs(display)
-
-    return simulator, track, display, car, fps, coordenate, compass
-
-# Configuração dos gráficos da interface
-def setup_display_graphs(display):
-    display.add_graph("wheels")
-    display.add_line_to_graph("wheels", "left", color=(0, 200, 0))
-    display.add_line_to_graph("wheels", "right", color=(200, 0, 0))
-
-    display.add_graph("speed")
-    display.add_line_to_graph("speed", "vm", color=(0, 0, 200))
-
-    display.add_graph("omega")
-    display.add_line_to_graph("omega", "ω", color=(200, 200, 0))
-
-# Loop principal do simulador
-def main_loop(simulator, track, display, fps, coordenate, compass):
-    tempo = time.time()
-    counter = 0
-
-    while simulator.is_running():
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                simulator.stop_running()
-
-        handle_input(track)
-
-        update_compass_and_coordinates(track, compass, coordenate)
+class SimulatorController:
+    def __init__(self, fps=120, length=100, width=100, scale=200, render=5):
+        self.FPS = fps
+        self.LENGTH = length
+        self.WIDTH = width
+        self.SCALE = scale
+        self.RENDER = render
         
-        update_random_graph_data(display)
+        self.simulator = Simulator('FULL', self.FPS)
+        self.track = None
+        self.minimap = None
+        self.display = None
+        self.car = None
+        self.fps_display = None
+        self.coordinates_display = None
+        self.compass = None
+        
+        self._setup_simulator()
 
-        counter, tempo = update_fps(simulator, fps, tempo, counter)
+    def _setup_simulator(self):
+        # generate trajectory
+        x_track, y_track = generate_track(CIRCLE, noise_level=0.05, checkpoints=100, resolution=50, track_rad=40)
 
-        simulator.step()
+        # create the track
+        self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
+        processed_points = set()
+        for i in range(-self.LENGTH // 2, self.LENGTH // 2):
+            for j in range(-self.WIDTH // 2, self.WIDTH // 2):
+                index = points_in_square(i, j, (self.LENGTH + self.WIDTH) / self.SCALE, x_track, y_track)
+                if len(index) > 0:
+                    cluster = Cluster()
+                    for k in index:
+                        if (x_track[k], y_track[k]) not in processed_points:
+                            x = (x_track[k] - i) * self.SCALE
+                            y = (y_track[k] - j) * self.SCALE
+                            cluster.add_point((x, y))
+                            processed_points.add((x_track[k], y_track[k]))
+                    self.track.set_obj(i + self.LENGTH // 2, j + self.WIDTH // 2, cluster)
+        self.simulator.add(self.track)
 
-# Tratamento de entrada de teclado
-def handle_input(track):
-    keys = pygame.key.get_pressed()
-    dx, dy = 0, 0
-    theta = 0
+        # create minimap
+        minimap_position = (0.9 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1])
+        self.minimap = MiniMap(minimap_position, (200, 150))
+        for k in range(0, len(x_track), self.SCALE // 10):
+            self.minimap.add_point((2 * x_track[k] / self.LENGTH, 2 * y_track[k] / self.WIDTH))
+        self.simulator.add(self.minimap)
 
-    if keys[pygame.K_LEFT]:
-        dx = -2
-    if keys[pygame.K_RIGHT]:
-        dx = 2
-    if keys[pygame.K_UP]:
-        dy = -2
-    if keys[pygame.K_DOWN]:
-        dy = 2
-    if keys[pygame.K_a]:
-        theta = 0.01
-    if keys[pygame.K_d]:
-        theta = -0.01
+        # create car
+        self.car = Car(self.simulator.get_center(), center=(1.36, 1.4))
+        self.simulator.add(self.car)
 
-    track.step(dx, dy, theta)
+        # set track properties
+        self.track.set_coordinates(((x_track[0] + self.LENGTH//2) * self.SCALE, (y_track[0] + self.WIDTH//2) * self.SCALE))
+        self.track.set_center(self.car.get_center())
+        self.track.set_pivot(self.car.get_center())
 
-# Atualização da bússola e coordenadas
-def update_compass_and_coordinates(track, compass, coordenate):
-    compass.set_angle(-track.get_angle() - math.pi/2)
-    coordenate.set_text(f"X: {round(track.get_center()[0], 1)} Y: {round(track.get_center()[1], 1)}")
+        # create display
+        self.display = Display(self.simulator.get_center(), self.simulator.get_window_size())
+        self.simulator.add(self.display)
+        self._setup_display_graphs()
 
-# Atualização dos dados aleatórios para os gráficos
-def update_random_graph_data(display):
-    random_left = random.randint(-50, 50)
-    random_right = random.randint(-50, 50)
-    random_vm = random.randint(-50, 50)
-    random_ω = random.randint(-50, 50)
+        # create statistics displays
+        FPS_position = (1.99 * self.simulator.get_center()[0], 0.01 * self.simulator.get_center()[1])
+        self.fps_display = Statistics(FPS_position)
+        self.simulator.add(self.fps_display)
 
-    display.update_graph_data("wheels", "left", random_left)
-    display.update_graph_data("wheels", "right", random_right)
-    display.update_graph_data("speed", "vm", random_vm)
-    display.update_graph_data("omega", "ω", random_ω)
+        coordinates_position = (1.85 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1])
+        self.coordinates_display = Statistics(coordinates_position)
+        self.coordinates_display.set_offset(2)
+        self.simulator.add(self.coordinates_display)
 
-# Atualização do FPS
-def update_fps(simulator, fps, tempo, counter):
-    current_time = time.time()
-    if current_time - tempo >= 1:
-        fps.set_text(f"FPS: {counter}")
-        fps.set_color((0, 200, 0) if counter >= simulator.get_FPS() else (200, 0, 0))
-        counter = 0
-        tempo = current_time
-    return counter + 1, tempo
+        # create compass
+        self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.8 * self.simulator.get_center()[1]))
+        self.simulator.add(self.compass)
+
+    def _setup_display_graphs(self):
+        self.display.add_graph("wheels")
+        self.display.add_line_to_graph("wheels", "left", color=(0, 200, 0))
+        self.display.add_line_to_graph("wheels", "right", color=(200, 0, 0))
+
+        self.display.add_graph("speed")
+        self.display.add_line_to_graph("speed", "vm", color=(0, 0, 200))
+
+        self.display.add_graph("omega")
+        self.display.add_line_to_graph("omega", "ω", color=(200, 200, 0))
+
+    def update_graps(self, wheels, speed, omega):
+        """
+        update the graphs with the given values.
+        """
+        self.display.update_graph_data("wheels", "left", wheels[0])
+        self.display.update_graph_data("wheels", "right", wheels[1])
+        self.display.update_graph_data("speed", "vm", speed)
+        self.display.update_graph_data("omega", "ω", omega)
+
+    def update_FPS(self, fps):
+        """
+        update the FPS display with the given value.
+        """
+        self.fps_display.set_text(f"FPS: {fps}")
+
+    def step(self, dx, dy, angle):
+        """
+        perform one simulation step with given movement and rotation inputs.
+        """
+        self.track.step(dx, dy, angle)
+
+        # update compass and coordinates
+        self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
+        self.coordinates_display.set_text(
+            f"x: {round(self.track.get_center()[0], 1)} y: {round(self.track.get_center()[1], 1)}"
+        )
+
+        # update minimap position
+        self.minimap.set_player_position(
+            (2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1,
+             -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1)
+        )
+
+        # render the simulator
+        self.simulator.step()
+
+    def stop(self):
+        """
+        stop the simulator.
+        """
+        self.simulator.stop_running()
 
 if __name__ == "__main__":
-    simulator, track, display, car, fps, coordenate, compass = setup_simulator()
-    main_loop(simulator, track, display, fps, coordenate, compass)
+    simulator = SimulatorController()
+
+    running = True
+    counter = 0
+    timer = time.time()
+    while running:
+        dx, dy, angle = 0, 0, 0
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                running = False
+
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    running = False
+
+        keys = pygame.key.get_pressed()
+
+        if keys[pygame.K_LEFT]:
+            dx = 5
+        if keys[pygame.K_RIGHT]:
+            dx = -5
+        if keys[pygame.K_UP]:
+            dy = -5
+        if keys[pygame.K_DOWN]:
+            dy = 5
+        if keys[pygame.K_a]:
+            angle = 0.01
+        if keys[pygame.K_d]:
+            angle = -0.01
+
+        # update graphs with random data
+        random_left = random.randint(-50, 50)
+        random_right = random.randint(-50, 50)
+        random_vm = random.randint(-50, 50)
+        random_ω = random.randint(-50, 50)
+
+        simulator.update_graps((random_left, random_right), random_vm, random_ω)
+        simulator.step(dx, dy, angle)
+
+        if time.time() - timer > 1:
+            simulator.update_FPS(counter)
+            counter = 0
+            timer = time.time()
+
+        counter += 1
