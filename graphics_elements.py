@@ -149,6 +149,7 @@ class Default(Shape):
     def draw(self, surface):
         # draws the default object as a circle on the given surface
         pygame.draw.circle(surface, self._color, (int(self._x), int(self._y)), self._size)
+        #pass
 
 class Wall(Shape):
     """
@@ -214,7 +215,7 @@ class MiniMap(Shape):
     """
     Represents a minimap object on the simulator
     """
-    def __init__(self, coo, size, color=(250, 250, 250)):
+    def __init__(self, coo, size, color=(255, 255, 255)):
         """
         Initializes the minimap object.
         Args:
@@ -244,8 +245,8 @@ class MiniMap(Shape):
         border_width = 1
 
         # draw border
-        pygame.draw.rect(surface, border_color,
-                         (rect_x, rect_y, rect_width, rect_height), border_width)
+        #pygame.draw.rect(surface, border_color,
+        #                 (rect_x, rect_y, rect_width, rect_height), border_width)
 
         # draw background
         pygame.draw.rect(surface, self._color,
@@ -621,7 +622,7 @@ class Simulator:
             info = pygame.display.Info()
             width = info.current_w
             height = info.current_h
-            self.__screen = pygame.display.set_mode((width, height), pygame.FULLSCREEN | pygame.HWSURFACE)
+            self.__screen = pygame.display.set_mode((width, height),  pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
         elif win == 'MEDIUM':
             width = 1400
             height = 800

@@ -1,11 +1,11 @@
 import pygame
 import random
 import time
-from classes import *
+from graphics_elements import *
 from track_generator import *
 
 class SimulatorController:
-    def __init__(self, fps=120, length=100, width=100, scale=200, render=5):
+    def __init__(self, fps=120, length=100, width=100, scale=300, render=4):
         self.FPS = fps
         self.LENGTH = length
         self.WIDTH = width
@@ -25,7 +25,7 @@ class SimulatorController:
 
     def _setup_simulator(self):
         # generate trajectory
-        x_track, y_track = generate_track(CIRCLE, noise_level=0.05, checkpoints=100, resolution=50, track_rad=40)
+        x_track, y_track = generate_track(LEMNISCATE, noise_level=0.2, checkpoints=50, resolution=500, track_rad=40)
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
@@ -103,7 +103,7 @@ class SimulatorController:
         """
         update the FPS display with the given value.
         """
-        self.fps_display.set_text(f"FPS: {fps}")
+        self.fps_display.set_text(f"fps: {fps}")
 
     def step(self, dx, dy, angle):
         """
@@ -136,9 +136,10 @@ if __name__ == "__main__":
     simulator = SimulatorController()
 
     running = True
-    counter = 0
     timer = time.time()
+    fps = 0
     while running:
+        timer = time.time()
         dx, dy, angle = 0, 0, 0
         for event in pygame.event.get():
             if event.type == pygame.QUIT:
@@ -151,9 +152,9 @@ if __name__ == "__main__":
         keys = pygame.key.get_pressed()
 
         if keys[pygame.K_LEFT]:
-            dx = 5
-        if keys[pygame.K_RIGHT]:
             dx = -5
+        if keys[pygame.K_RIGHT]:
+            dx = 5
         if keys[pygame.K_UP]:
             dy = -5
         if keys[pygame.K_DOWN]:
@@ -168,13 +169,14 @@ if __name__ == "__main__":
         random_right = random.randint(-50, 50)
         random_vm = random.randint(-50, 50)
         random_ω = random.randint(-50, 50)
-
         simulator.update_graps((random_left, random_right), random_vm, random_ω)
+
+        # render the simulator
         simulator.step(dx, dy, angle)
 
-        if time.time() - timer > 1:
-            simulator.update_FPS(counter)
-            counter = 0
-            timer = time.time()
+        # fix the fps
+        while (time.time() - timer) < 1/simulator.FPS:
+            pass
 
-        counter += 1
+        # update the fps count
+        simulator.update_FPS("{:.1f}".format(1/(time.time() - timer)))
