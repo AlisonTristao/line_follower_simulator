@@ -91,7 +91,10 @@ class car_dinamics:
     
     def omega(self):
         return round(self._omega() * self._gain_Omega, 2)
+    
+    def getWheels(self):
+        return self._ml.get_y(), self._mr.get_y()
 
     def step(self, u1, u2, q1=0, q2=0):
         self._ml.step(u1, q1), self._mr.step(u2, q2)
-        return self.speed(), self.omega()
+        #return self.speed(), self.omega()
