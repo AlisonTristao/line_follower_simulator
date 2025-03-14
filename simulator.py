@@ -135,9 +135,13 @@ class SimulatorController:
 if __name__ == "__main__":
     simulator = SimulatorController()
 
+    # graph frequency atualization Hz
+    graph_freq = 48
+    graph_frames = simulator.FPS//graph_freq
+
     running = True
     timer = time.time()
-    fps = 0
+    counter = 0
     while running:
         timer = time.time()
         dx, dy, angle = 0, 0, 0
@@ -164,12 +168,15 @@ if __name__ == "__main__":
         if keys[pygame.K_d]:
             angle = -0.01
 
-        # update graphs with random data
-        random_left = random.randint(-50, 50)
-        random_right = random.randint(-50, 50)
-        random_vm = random.randint(-50, 50)
-        random_ω = random.randint(-50, 50)
-        simulator.update_graps((random_left, random_right), random_vm, random_ω)
+        # update graphs with random data if the frame is a multiple of graph_frames
+        if counter % graph_frames == 0:
+            random_left = random.randint(-50, 50)
+            random_right = random.randint(-50, 50)
+            random_vm = random.randint(-50, 50)
+            random_ω = random.randint(-50, 50)
+            simulator.update_graps((random_left, random_right), random_vm, random_ω)
+            if counter == 120:
+                counter = 0
 
         # render the simulator
         simulator.step(dx, dy, angle)
@@ -180,3 +187,4 @@ if __name__ == "__main__":
 
         # update the fps count
         simulator.update_FPS("{:.1f}".format(1/(time.time() - timer)))
+        counter += 1
