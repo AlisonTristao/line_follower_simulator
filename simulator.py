@@ -6,7 +6,7 @@ from track_generator import *
 from car_dynamics import *
 
 class SimulatorController:
-    def __init__(self, fps=60, length=100, width=100, scale=200, render=5, sensor_distante=100):
+    def __init__(self, fps=60, length=100, width=100, scale=200, render=5, sensor_distante=50):
         self.FPS = fps
         self.LENGTH = length
         self.WIDTH = width
@@ -28,7 +28,7 @@ class SimulatorController:
 
     def _setup_simulator(self):
         # generate trajectory
-        x_track, y_track = generate_track(CIRCLE, noise_level=0.2, checkpoints=50, resolution=150, track_rad=40)
+        x_track, y_track = generate_track(LEMNISCATE, noise_level=0.5, checkpoints=24, resolution=500, track_rad=30)
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
@@ -178,20 +178,6 @@ def step_simulation(v1, v2):
     angle = omega*z
     dx = -speed*math.sin(angle)*z
     dy = -speed*math.cos(angle)*z
-
-    keys = pygame.key.get_pressed()
-    if keys[pygame.K_LEFT]:
-        dx = -0.1
-    if keys[pygame.K_RIGHT]:
-        dx = 0.1
-    if keys[pygame.K_UP]:
-        dy = -0.1
-    if keys[pygame.K_DOWN]:
-        dy = 0.1
-    if keys[pygame.K_a]:
-        angle = 0.01
-    if keys[pygame.K_d]:
-        angle = -0.01
 
     # render the simulator
     line = simulator.step(dx, dy, angle)

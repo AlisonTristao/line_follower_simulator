@@ -17,21 +17,22 @@ def calculate_postion(line):
 
     return mediam - len(line)/2
 
+sample_time = 1/60
 u = 0
-kp = 0.15
-kd = 0.02
+kp = 0.2
+kd = 0.03
 last_error = 0
 running = True
 while running:
-    line = abs(1 - step_simulation(80 +u, 80 -u)/255)
+    line = abs(1 - step_simulation(90 +u, 90 -u)/255)
 
     # --- calculate control here --- #
     point = calculate_postion(line)
     error = 0 - point
 
-    u = kp * error + kd * (error - last_error)
+    u = kp * error + kd * (error - last_error)/sample_time
 
-    last_error = point
+    last_error = error
     if line is False:
         running = False
 

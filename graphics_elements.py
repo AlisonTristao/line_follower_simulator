@@ -95,7 +95,7 @@ class Car(Shape):
     """
     represents the car in the simulator
     """
-    def __init__(self, coo, color=(255, 0, 0), size=50, angle=30, center=(1, 2)):
+    def __init__(self, coo, color=(255, 0, 0), size=35, angle=30, center=(1, 2)):
         """
         initializes the car
         args:
@@ -181,7 +181,7 @@ class Cluster(Shape):
     """
     Represents a cluster of points on the track
     """
-    def __init__(self, coo=(0, 0), color=(0, 0, 0), size=10, angle=0):
+    def __init__(self, coo=(0, 0), color=(0, 0, 0), size=8, angle=0):
         """
         initializes the cluster object
         args:
@@ -613,7 +613,7 @@ class LineSensor(Shape):
     """
     represents a line sensor object on the simulator
     """
-    def __init__(self, coo, color=(150, 150, 150), size=200, angle=0):
+    def __init__(self, coo, color=(150, 150, 150), size=80, angle=0):
         """
         initializes the line sensor object
         args:

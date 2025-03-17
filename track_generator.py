@@ -18,8 +18,8 @@ def circle_checkpoints(ckeckpoints_number, track_radius, noise):
         y = track_radius * math.sin(t)
 
         # Add noise to points
-        x += random.uniform(noise/3, noise)
-        y += random.uniform(noise/3, noise)
+        x += random.uniform(noise/2, noise)
+        y += random.uniform(noise/2, noise)
 
         checkpoints.append((x, y))
     
