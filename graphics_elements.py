@@ -50,6 +50,10 @@ class Shape:
         # sets the pivot point for rotations
         self._pivot = pivot
 
+    def get_pivot(self):
+        # returns the pivot point for rotations
+        return self._pivot
+
     def step(self, dx, dy, angle):
         # moves and rotates the shape
         self._rotate(angle)
@@ -283,10 +287,10 @@ class Track(Shape):
             screen_size (tuple): dimensions of the screen
         """
         super().__init__(coo=(size[0] * point_spacing // 1.1, size[1] * point_spacing // 2), size=size, angle=0)
-        self.__screen_size = screen_size
+        self.screen_size = screen_size
         self.__visible = visible
         self.__point_spacing = point_spacing
-        self._center = (0, 0) #(self.__screen_size[0] // 1.5, self.__screen_size[1] // 2)
+        self._center = (0, 0) #(self.screen_size[0] // 1.5, self.screen_size[1] // 2)
 
         # initializes the matrix of points and walls
         self.wall = Wall()
@@ -528,6 +532,7 @@ class Statistics(Shape):
         self.text = "_____"
         self.font = pygame.font.Font(None, 24)
         self._offset = 1
+        self.font = pygame.font.SysFont("courier", 15, bold=True)
 
     def set_offset(self, offset):
         # sets the offset for the text
@@ -604,6 +609,41 @@ class Compass(Shape):
         pointer_y = self._y + self._size * math.sin(self._angle)
         pygame.draw.line(surface, (255, 0, 0), (self._x, self._y), (pointer_x, pointer_y), 3)
 
+class LineSensor(Shape):
+    """
+    represents a line sensor object on the simulator
+    """
+    def __init__(self, coo, color=(150, 150, 150), size=200, angle=0):
+        """
+        initializes the line sensor object
+        args:
+            coo (tuple): coordinates of the line sensor object
+            color (tuple): color of the line sensor in rgb format
+            size (int): size of the line sensor object
+            angle (float): initial angle of the line sensor in radians
+        """
+        super().__init__(coo, color, size, angle)
+
+    def draw(self, surface):
+        # Draw the line sensor as a line
+        end_x = self._x + self._size/2
+        end_y = self._y
+        begin_x = self._x - self._size/2
+        begin_y = self._y
+        pygame.draw.line(surface, self._color, (begin_x, begin_y), (end_x, end_y), 2)
+
+    def get_y(self):
+        # returns the y coordinate of the line sensor
+        return self._y
+    
+    def get_x(self):
+        # returns the x coordinate of the line sensor
+        return self._x
+    
+    def get_size(self):
+        # returns the size of the line sensor
+        return self._size
+
 class Simulator:
     """
     represents the simulator environment for the line follower
@@ -622,15 +662,15 @@ class Simulator:
             info = pygame.display.Info()
             width = info.current_w
             height = info.current_h
-            self.__screen = pygame.display.set_mode((width, height),  pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+            self.screen = pygame.display.set_mode((width, height),  pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
         elif win == 'MEDIUM':
             width = 1400
             height = 800
-            self.__screen = pygame.display.set_mode((width, height))
+            self.screen = pygame.display.set_mode((width, height))
         elif win == 'SMALL':
             width = 800
             height = 600
-            self.__screen = pygame.display.set_mode((width, height))
+            self.screen = pygame.display.set_mode((width, height))
 
         pygame.display.set_caption("SIMULATOR")
         self.__clock = pygame.time.Clock()
@@ -681,9 +721,9 @@ class Simulator:
         # draws all objects on the simulator screen
         if not self.__verify_objects():
             return
-        self.__screen.fill((255, 255, 255))  # background color
+        self.screen.fill((255, 255, 255))  # background color
         for obj in self.__objects:
-            obj.draw(self.__screen)
+            obj.draw(self.screen)
 
     def step(self):
         """

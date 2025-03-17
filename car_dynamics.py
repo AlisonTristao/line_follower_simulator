@@ -33,7 +33,7 @@ class motor:
         self.saturate()
     
 class car_dinamics:
-    def __init__(self, z=0.1,  wheels_radius=0.02, wheels_distance=0.1, wheels_RPM=3000, noise=0):
+    def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, noise=0):
         self._wheels_radius = wheels_radius
         self._wheels_distance = wheels_distance
         self._wheels_RPM = wheels_RPM/100
@@ -49,7 +49,7 @@ class car_dinamics:
         # constants
         self.ke = 1
         self.kq = 1
-        accommodation_time = 1.5
+        accommodation_time = 1.0
         self.tau = accommodation_time/5
 
         # motor objects

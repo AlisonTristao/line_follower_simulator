@@ -3,15 +3,17 @@ import random
 import time
 from graphics_elements import *
 from track_generator import *
+from car_dynamics import *
 
 class SimulatorController:
-    def __init__(self, fps=120, length=100, width=100, scale=300, render=4):
+    def __init__(self, fps=60, length=100, width=100, scale=200, render=5, sensor_distante=100):
         self.FPS = fps
         self.LENGTH = length
         self.WIDTH = width
         self.SCALE = scale
         self.RENDER = render
-        
+        self.sensor_distante = sensor_distante
+
         self.simulator = Simulator('FULL', self.FPS)
         self.track = None
         self.minimap = None
@@ -20,12 +22,13 @@ class SimulatorController:
         self.fps_display = None
         self.coordinates_display = None
         self.compass = None
-        
+        self.line_sensor = None
+
         self._setup_simulator()
 
     def _setup_simulator(self):
         # generate trajectory
-        x_track, y_track = generate_track(LEMNISCATE, noise_level=0.2, checkpoints=50, resolution=500, track_rad=40)
+        x_track, y_track = generate_track(CIRCLE, noise_level=0.2, checkpoints=50, resolution=150, track_rad=40)
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
@@ -70,14 +73,19 @@ class SimulatorController:
         self.fps_display = Statistics(FPS_position)
         self.simulator.add(self.fps_display)
 
+        # create coordinates display
         coordinates_position = (1.85 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1])
         self.coordinates_display = Statistics(coordinates_position)
         self.coordinates_display.set_offset(2)
         self.simulator.add(self.coordinates_display)
 
         # create compass
-        self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.8 * self.simulator.get_center()[1]))
+        self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1]))
         self.simulator.add(self.compass)
+
+        # create line sensor
+        self.line_sensor = LineSensor((self.car.get_center()[0], self.car.get_center()[1] - self.sensor_distante))
+        self.simulator.add(self.line_sensor)
 
     def _setup_display_graphs(self):
         self.display.add_graph("wheels")
@@ -109,12 +117,14 @@ class SimulatorController:
         """
         perform one simulation step with given movement and rotation inputs.
         """
+        dx *= self.SCALE
+        dy *= self.SCALE
         self.track.step(dx, dy, angle)
 
         # update compass and coordinates
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
         self.coordinates_display.set_text(
-            f"x: {round(self.track.get_center()[0], 1)} y: {round(self.track.get_center()[1], 1)}"
+            f"x: {round(self.track.get_center()[0] / 200 + 1, 2):.2f} y: {round(self.track.get_center()[1] / 200 + 1, 2):.2f}"
         )
 
         # update minimap position
@@ -126,65 +136,71 @@ class SimulatorController:
         # render the simulator
         self.simulator.step()
 
+        # return the sensor value
+        linha = self.simulator.screen.subsurface((self.line_sensor.get_x() - self.line_sensor.get_size()/2, self.line_sensor.get_y() -1, self.line_sensor.get_size(), 1))
+        linha_array = pygame.surfarray.pixels3d(linha)
+        linha_pb = linha_array.mean(axis=2)  # Calcula a média no eixo das cores (R, G, B)
+        linha_pb = np.array(linha_pb[:, 0], dtype=np.uint8)  # Remove dimensão extra do eixo Y
+        return linha_pb
+
     def stop(self):
         """
         stop the simulator.
         """
         self.simulator.stop_running()
 
-if __name__ == "__main__":
-    simulator = SimulatorController()
+simulator = SimulatorController()
+z = (1/simulator.FPS)
+car = car_dinamics(z=z)
 
-    # graph frequency atualization Hz
-    graph_freq = 48
-    graph_frames = simulator.FPS//graph_freq
-
-    running = True
+def step_simulation(v1, v2):
     timer = time.time()
-    counter = 0
-    while running:
-        timer = time.time()
-        dx, dy, angle = 0, 0, 0
-        for event in pygame.event.get():
-            if event.type == pygame.QUIT:
-                running = False
+    
+    car.step(v1, v2)
 
-            if event.type == pygame.KEYDOWN:
-                if event.key == pygame.K_ESCAPE:
-                    running = False
+    for event in pygame.event.get():
+        if event.type == pygame.QUIT:
+            return False
 
-        keys = pygame.key.get_pressed()
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_ESCAPE:
+                return False
 
-        if keys[pygame.K_LEFT]:
-            dx = -5
-        if keys[pygame.K_RIGHT]:
-            dx = 5
-        if keys[pygame.K_UP]:
-            dy = -5
-        if keys[pygame.K_DOWN]:
-            dy = 5
-        if keys[pygame.K_a]:
-            angle = 0.01
-        if keys[pygame.K_d]:
-            angle = -0.01
+    # get the car values
+    speed = car.speed()
+    omega = car.omega()
+    ml = car._ml.get_y()
+    mr = car._mr.get_y()
+    
+    simulator.update_graps((ml, mr), car.speed_norm(), car.omega_norm())
 
-        # update graphs with random data if the frame is a multiple of graph_frames
-        if counter % graph_frames == 0:
-            random_left = random.randint(-50, 50)
-            random_right = random.randint(-50, 50)
-            random_vm = random.randint(-50, 50)
-            random_ω = random.randint(-50, 50)
-            simulator.update_graps((random_left, random_right), random_vm, random_ω)
-            if counter == 120:
-                counter = 0
+    # calculate space
+    angle = omega*z
+    dx = -speed*math.sin(angle)*z
+    dy = -speed*math.cos(angle)*z
 
-        # render the simulator
-        simulator.step(dx, dy, angle)
+    keys = pygame.key.get_pressed()
+    if keys[pygame.K_LEFT]:
+        dx = -0.1
+    if keys[pygame.K_RIGHT]:
+        dx = 0.1
+    if keys[pygame.K_UP]:
+        dy = -0.1
+    if keys[pygame.K_DOWN]:
+        dy = 0.1
+    if keys[pygame.K_a]:
+        angle = 0.01
+    if keys[pygame.K_d]:
+        angle = -0.01
 
-        # fix the fps
-        while (time.time() - timer) < 1/simulator.FPS:
-            pass
+    # render the simulator
+    line = simulator.step(dx, dy, angle)
 
-        # update the fps count
-        simulator.update_FPS("{:.1f}".format(1/(time.time() - timer)))
-        counter += 1
+    # fix the fps
+    while (time.time() - timer) < 1/simulator.FPS:
+        pass
+
+    # update the fps count
+    simulator.update_FPS("{:.1f}".format(1/(time.time() - timer)))
+
+    return line
