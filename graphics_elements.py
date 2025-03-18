@@ -181,7 +181,7 @@ class Cluster(Shape):
     """
     Represents a cluster of points on the track
     """
-    def __init__(self, coo=(0, 0), color=(0, 0, 0), size=8, angle=0):
+    def __init__(self, coo=(0, 0), color=(0, 0, 0), size=5, angle=0):
         """
         initializes the cluster object
         args:
@@ -369,6 +369,8 @@ class Display(Shape):
             horizontal_div (int): number of horizontal divisions
             vertical_div (int): number of vertical divisions
         """
+        self.font = pygame.font.SysFont("courier", 15, bold=True)
+
         # limits of y axis
         self.__max_value = self.__saturation
         self.__min_value = -self.__saturation
@@ -445,12 +447,11 @@ class Display(Shape):
 
     # draw axis values
     def __draw_axis_values(self, surface, graph_height, graph_x, graph_y):
-        font = pygame.font.Font(None, 20)
         num_divisions = 5
         for i in range(num_divisions + 1):
             value = self.__max_value - (i * (self.__max_value - self.__min_value) // num_divisions)
             y_pos = graph_y + ((i+0.35) * graph_height // (1.1*num_divisions))
-            label = font.render(str(value), True, (0, 0, 0))
+            label = self.font.render(str(value), True, (0, 0, 0))
             surface.blit(label, (graph_x - 45, y_pos - 10))
 
     # draw title 
@@ -483,10 +484,9 @@ class Display(Shape):
     def __draw_legend(self, surface, graph_x, graph_y, title):
         legend_x = graph_x + 10
         legend_y = graph_y + 15
-        font = pygame.font.Font(None, 20)
         for idx, (line_name, color) in enumerate(self.__graph_colors[title].items()):
             pygame.draw.rect(surface, color, (legend_x, legend_y + idx * 20, 10, 10))
-            legend_label = font.render(line_name, True, (0, 0, 0))
+            legend_label = self.font.render(line_name, True, (0, 0, 0))
             surface.blit(legend_label, (legend_x + 15, legend_y + idx * 20 - 5))
 
     # helper function to draw a graph with multiple lines

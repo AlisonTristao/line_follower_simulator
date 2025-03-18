@@ -6,7 +6,7 @@ from track_generator import *
 from car_dynamics import *
 
 class SimulatorController:
-    def __init__(self, fps=60, length=100, width=100, scale=200, render=5, sensor_distante=50):
+    def __init__(self, fps=60, length=150, width=150, scale=600, render=3, sensor_distante=50):
         self.FPS = fps
         self.LENGTH = length
         self.WIDTH = width
@@ -28,7 +28,7 @@ class SimulatorController:
 
     def _setup_simulator(self):
         # generate trajectory
-        x_track, y_track = generate_track(CIRCLE, noise_level=0.5, checkpoints=24, resolution=500, track_rad=30)
+        x_track, y_track = generate_track(CIRCLE, noise_level=0.5, checkpoints=36, resolution=1000, track_rad=30)
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
@@ -58,6 +58,10 @@ class SimulatorController:
         self.car = Car(self.simulator.get_center(), center=(1.36, 1.4))
         self.simulator.add(self.car)
 
+        # create line sensor
+        self.line_sensor = LineSensor((self.car.get_center()[0], self.car.get_center()[1] - self.sensor_distante))
+        self.simulator.add(self.line_sensor)
+
         # set track properties
         self.track.set_coordinates(((x_track[0] + self.LENGTH//2) * self.SCALE, (y_track[0] + self.WIDTH//2) * self.SCALE))
         self.track.set_center(self.car.get_center())
@@ -82,10 +86,6 @@ class SimulatorController:
         # create compass
         self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1]))
         self.simulator.add(self.compass)
-
-        # create line sensor
-        self.line_sensor = LineSensor((self.car.get_center()[0], self.car.get_center()[1] - self.sensor_distante))
-        self.simulator.add(self.line_sensor)
 
     def _setup_display_graphs(self):
         self.display.add_graph("wheels")
