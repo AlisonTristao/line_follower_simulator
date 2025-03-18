@@ -28,7 +28,7 @@ class SimulatorController:
 
     def _setup_simulator(self):
         # generate trajectory
-        x_track, y_track = generate_track(LEMNISCATE, noise_level=0.5, checkpoints=24, resolution=500, track_rad=30)
+        x_track, y_track = generate_track(CIRCLE, noise_level=0.5, checkpoints=24, resolution=500, track_rad=30)
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
