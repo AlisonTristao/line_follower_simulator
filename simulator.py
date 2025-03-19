@@ -35,6 +35,7 @@ class SimulatorController:
     def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke=1, kq=1, accommodation_time=1.0):
         z = 1/self.FPS
         self.car = car_dynamics(z, wheels_radius, wheels_distance, wheels_RPM, ke, kq, accommodation_time)
+        self.car_draw.set_size(self.car.get_size()*self.SCALE)
 
     def _setup_simulator(self):
         # generate trajectory

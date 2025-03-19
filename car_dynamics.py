@@ -121,3 +121,6 @@ class car_dynamics:
     def step(self, u1, u2, q1=0, q2=0):
         self._ml.step(u1, q1), self._mr.step(u2, q2)
         #return self.speed(), self.omega()
+
+    def get_size(self):
+        return self._wheels_distance

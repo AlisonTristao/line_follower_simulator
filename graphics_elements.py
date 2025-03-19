@@ -121,6 +121,11 @@ class Car(Shape):
             (self._x + half_size * math.cos(angle_rad + 2.094), self._y + half_size * math.sin(angle_rad + 2.094)),
         ]
 
+    def set_size(self, size):
+        # sets a new size for the car
+        self._size = size
+        self._calculate_vertices()
+
     def draw(self, surface):
         # draws the car as a polygon on the given surface
         pygame.draw.polygon(surface, self._color, self._vertices)
