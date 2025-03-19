@@ -8,13 +8,12 @@ wheels_RPM          = 3000 # RPM
 # motor constants
 ke                  = 1.0 # static gain of V1 => (y = ke * v) * RPM/60 => Hz
 accommodation_time  = 1.0 # seconds
-noise               = 0.1 # noise between the motors
 
 # setup the simulation
 start_simulation()
 
 # setup the car dynamics
-set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, noise, ke, accommodation_time)
+set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time)
 
 # --- insert your code here --- #
 v1 = 10

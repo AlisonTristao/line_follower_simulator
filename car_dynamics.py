@@ -33,7 +33,7 @@ class motor:
         self.saturate()
     
 class car_dynamics:
-    def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, noise=0, ke=1, kq=1, accommodation_time=1.0):
+    def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke=1, kq=1, accommodation_time=1.0):
         self.z = z
         self._wheels_radius = wheels_radius
         self._wheels_distance = wheels_distance
@@ -65,16 +65,16 @@ class car_dynamics:
         # --- motor constants (using z transform) ---
 
         # time constants
-        a1 = math.exp(-z/self.tau) + random.uniform(-noise, noise)
-        a2 = math.exp(-z/self.tau) + random.uniform(-noise, noise)
+        a1 = math.exp(-z/self.tau)
+        a2 = math.exp(-z/self.tau)
 
         # control gain
-        b1 = ke * (1 - a1) + random.uniform(-noise, noise)
-        b2 = ke * (1 - a2) + random.uniform(-noise, noise) 
+        b1 = ke * (1 - a1)
+        b2 = ke * (1 - a2)
 
         # noise gain
-        c1 = kq * (1 - a1) + random.uniform(-noise, noise)
-        c2 = kq * (1 - a2) + random.uniform(-noise, noise)
+        c1 = kq * (1 - a1)
+        c2 = kq * (1 - a2)
 
         self._ml.set_constants([a1], [b1], [c1])
         self._mr.set_constants([a2], [b2], [c2])
