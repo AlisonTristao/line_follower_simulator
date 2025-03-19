@@ -185,10 +185,12 @@ def step_simulation(v1, v2):
     # check for events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
+            print("Simulation stopped using X button")
             return False
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                print("Simulation stopped using ESC")
                 return False
             
     # render the simulator
