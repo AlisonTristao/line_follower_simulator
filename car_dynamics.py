@@ -69,12 +69,12 @@ class car_dynamics:
         a2 = math.exp(-z/self.tau) + random.uniform(-noise, noise)
 
         # control gain
-        b1 = ke * (1 - a1)
-        b2 = ke * (1 - a2)
+        b1 = ke * (1 - a1) + random.uniform(-noise, noise)
+        b2 = ke * (1 - a2) + random.uniform(-noise, noise) 
 
         # noise gain
-        c1 = kq * (1 - a1)
-        c2 = kq * (1 - a2)
+        c1 = kq * (1 - a1) + random.uniform(-noise, noise)
+        c2 = kq * (1 - a2) + random.uniform(-noise, noise)
 
         self._ml.set_constants([a1], [b1], [c1])
         self._mr.set_constants([a2], [b2], [c2])
