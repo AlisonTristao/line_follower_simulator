@@ -10,7 +10,7 @@ ke                  = 1.0 # static gain of V1 => (y = ke * v) * RPM/60 => Hz
 accommodation_time  = 1.0 # seconds
 
 # setup the simulation
-start_simulation()
+start_simulation(fps=80)
 
 # setup the car dynamics
 set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time)
