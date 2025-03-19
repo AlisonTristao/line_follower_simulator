@@ -677,7 +677,6 @@ class Simulator:
 
         self.__width = width
         self.__height = height
-        self.__running = True
         self.__FPS = FPS
         self.__objects = []
 
@@ -696,14 +695,6 @@ class Simulator:
     def get_center(self):
         # returns the center coordinates of the simulator window
         return self.__width // 2, self.__height // 2
-
-    def is_running(self):
-        # checks if the simulator is still running
-        return self.__running
-
-    def stop_running(self):
-        # stops the simulator from running
-        self.__running = False
 
     def add(self, obj):
         # adds an object to the simulator environment

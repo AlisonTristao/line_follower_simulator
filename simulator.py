@@ -192,16 +192,18 @@ def step_simulation(v1, v2):
     # check if the simulator is initialized
     if simulator is None or simulator.car is None:
         print("Simulator not initialized")
-        return
+        return None
 
     # check for events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
+            pygame.quit()
             print("Simulation stopped using X button")
             return None
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
+                pygame.quit()
                 print("Simulation stopped using ESC")
                 return None
             
