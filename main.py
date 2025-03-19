@@ -17,7 +17,7 @@ def calculate_postion(line):
 
     return mediam - len(line)/2
 
-sample_time = 1/60
+sample_time = 1/120
 u = 0
 kp = 0.3
 ki = 0.4

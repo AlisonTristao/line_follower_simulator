@@ -6,7 +6,7 @@ from track_generator import *
 from car_dynamics import *
 
 class SimulatorController:
-    def __init__(self, fps=60, length=150, width=150, scale=600, render=3, sensor_distante=50):
+    def __init__(self, fps=120, length=150, width=150, scale=600, render=3, sensor_distante=50):
         self.FPS = fps
         self.LENGTH = length
         self.WIDTH = width
@@ -165,14 +165,13 @@ def step_simulation(v1, v2):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 return False
+    
+    # calculates the car values normalized
+    simulator.update_graps(car.getWheels(), car.speed_norm(), car.omega_norm())
 
     # get the car values
     speed = car.speed()
     omega = car.omega()
-    ml = car._ml.get_y()
-    mr = car._mr.get_y()
-    
-    simulator.update_graps((ml, mr), car.speed_norm(), car.omega_norm())
 
     # calculate space
     angle = omega*z
