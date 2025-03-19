@@ -27,10 +27,14 @@ class SimulatorController:
         self.line_sensor = None
 
         # model parameters
-        self.car = car_dynamics(z=1/self.FPS)
+        self.car = None #car_dynamics(z=1/self.FPS)
 
         # setup the simulator
         self._setup_simulator()
+
+    def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, noise=0, ke=1, kq=1, accommodation_time=1.0):
+        z = 1/self.FPS
+        self.car = car_dynamics(z, wheels_radius, wheels_distance, wheels_RPM, noise, ke, kq, accommodation_time)
 
     def _setup_simulator(self):
         # generate trajectory
@@ -173,12 +177,20 @@ def start_simulation(fps=120, length=150, width=150, scale=600, render=3, sensor
     simulator = SimulatorController(fps, length, width, scale, render, sensor_distante)
     return simulator
 
+def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, noise, ke, accommodation_time):
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, noise, ke, 0, accommodation_time)
+
 def step_simulation(v1, v2):
     # save the current time
     timer = time.time()
 
     # check if the simulator is initialized
-    if simulator is None:
+    if simulator is None or simulator.car is None:
         print("Simulator not initialized")
         return
 
@@ -186,12 +198,12 @@ def step_simulation(v1, v2):
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             print("Simulation stopped using X button")
-            return False
+            return None
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 print("Simulation stopped using ESC")
-                return False
+                return None
             
     # render the simulator
     line = simulator.step(v1, v2)
