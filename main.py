@@ -1,5 +1,7 @@
 from simulator import *
 
+start_simulation()
+
 last_mediam = 0
 def calculate_postion(line):
     global last_mediam

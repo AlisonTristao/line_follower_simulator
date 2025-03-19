@@ -32,11 +32,16 @@ class motor:
         # saturate output
         self.saturate()
     
-class car_dinamics:
+class car_dynamics:
     def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, noise=0):
+        self.z = z
         self._wheels_radius = wheels_radius
         self._wheels_distance = wheels_distance
         self._wheels_RPM = wheels_RPM/100
+
+        # last speed and omega
+        self.last_speed = 0
+        self.last_omega = 0
 
         # gains for calculating speed and omega
         self._gain_Vm = (self._wheels_RPM/60) * (self._wheels_radius/2)
@@ -92,6 +97,24 @@ class car_dinamics:
     def omega(self):
         return round(self._omega() * self._gain_Omega, 2)
     
+    def get_space(self):
+        # get the current speed and omega
+        speed = self.speed()
+        omega = self.omega()
+        
+        # calculate the space using trapezoidal rule
+        space = (self.last_speed + speed) * self.z/2
+        angle = (self.last_omega + omega) * self.z/2
+
+        # update last speed and omega
+        dx = space * math.sin(angle)
+        dy = space * math.cos(angle)
+
+        # update last speed and omega
+        self.last_speed = speed
+        self.last_omega = omega
+        return dx, dy, angle
+
     def getWheels(self):
         return self._ml.get_y(), self._mr.get_y()
 

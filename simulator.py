@@ -6,7 +6,8 @@ from track_generator import *
 from car_dynamics import *
 
 class SimulatorController:
-    def __init__(self, fps=120, length=150, width=150, scale=600, render=3, sensor_distante=50):
+    def __init__(self, fps, length, width, scale, render, sensor_distante):
+        # controler parameters
         self.FPS = fps
         self.LENGTH = length
         self.WIDTH = width
@@ -14,6 +15,7 @@ class SimulatorController:
         self.RENDER = render
         self.sensor_distante = sensor_distante
 
+        # simulator objects
         self.simulator = Simulator('FULL', self.FPS)
         self.track = None
         self.minimap = None
@@ -24,6 +26,10 @@ class SimulatorController:
         self.compass = None
         self.line_sensor = None
 
+        # model parameters
+        self.car = car_dynamics(z=1/self.FPS)
+
+        # setup the simulator
         self._setup_simulator()
 
     def _setup_simulator(self):
@@ -55,17 +61,17 @@ class SimulatorController:
         self.simulator.add(self.minimap)
 
         # create car
-        self.car = Car(self.simulator.get_center(), center=(1.36, 1.4))
-        self.simulator.add(self.car)
+        self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.4))
+        self.simulator.add(self.car_draw)
 
         # create line sensor
-        self.line_sensor = LineSensor((self.car.get_center()[0], self.car.get_center()[1] - self.sensor_distante))
+        self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - self.sensor_distante))
         self.simulator.add(self.line_sensor)
 
         # set track properties
         self.track.set_coordinates(((x_track[0] + self.LENGTH//2) * self.SCALE, (y_track[0] + self.WIDTH//2) * self.SCALE))
-        self.track.set_center(self.car.get_center())
-        self.track.set_pivot(self.car.get_center())
+        self.track.set_center(self.car_draw.get_center())
+        self.track.set_pivot(self.car_draw.get_center())
 
         # create display
         self.display = Display(self.simulator.get_center(), self.simulator.get_window_size())
@@ -98,14 +104,14 @@ class SimulatorController:
         self.display.add_graph("omega")
         self.display.add_line_to_graph("omega", "ω", color=(200, 200, 0))
 
-    def update_graps(self, wheels, speed, omega):
+    def _update_graps(self):
         """
         update the graphs with the given values.
         """
-        self.display.update_graph_data("wheels", "left", wheels[0])
-        self.display.update_graph_data("wheels", "right", wheels[1])
-        self.display.update_graph_data("speed", "vm", speed)
-        self.display.update_graph_data("omega", "ω", omega)
+        self.display.update_graph_data("wheels", "left", self.car.getWheels()[0])
+        self.display.update_graph_data("wheels", "right", self.car.getWheels()[1])
+        self.display.update_graph_data("speed", "vm", self.car.speed_norm())
+        self.display.update_graph_data("omega", "ω", self.car.omega_norm())
 
     def update_FPS(self, fps):
         """
@@ -113,12 +119,22 @@ class SimulatorController:
         """
         self.fps_display.set_text(f"fps: {fps}")
 
-    def step(self, dx, dy, angle):
+    def step(self, v1, v2):
         """
         perform one simulation step with given movement and rotation inputs.
         """
-        dx *= self.SCALE
-        dy *= self.SCALE
+
+        # calculates the car values normalized
+        simulator._update_graps()
+
+        # step the car dynamics
+        self.car.step(v1, v2)
+
+        # get the car values
+        dx, dy, angle = self.car.get_space()
+
+        dx *= -self.SCALE
+        dy *= -self.SCALE
         self.track.step(dx, dy, angle)
 
         # update compass and coordinates
@@ -149,15 +165,24 @@ class SimulatorController:
         """
         self.simulator.stop_running()
 
-simulator = SimulatorController()
-z = (1/simulator.FPS)
-car = car_dinamics(z=z)
+
+simulator = None #SimulatorController()
+
+def start_simulation(fps=120, length=150, width=150, scale=600, render=3, sensor_distante=50):
+    global simulator
+    simulator = SimulatorController(fps, length, width, scale, render, sensor_distante)
+    return simulator
 
 def step_simulation(v1, v2):
+    # save the current time
     timer = time.time()
-    
-    car.step(v1, v2)
 
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    # check for events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             return False
@@ -165,21 +190,9 @@ def step_simulation(v1, v2):
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 return False
-    
-    # calculates the car values normalized
-    simulator.update_graps(car.getWheels(), car.speed_norm(), car.omega_norm())
-
-    # get the car values
-    speed = car.speed()
-    omega = car.omega()
-
-    # calculate space
-    angle = omega*z
-    dx = -speed*math.sin(angle)*z
-    dy = -speed*math.cos(angle)*z
-
+            
     # render the simulator
-    line = simulator.step(dx, dy, angle)
+    line = simulator.step(v1, v2)
 
     # fix the fps
     while (time.time() - timer) < 1/simulator.FPS:
