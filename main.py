@@ -12,7 +12,7 @@ ke                  = 1.0 # static gain of V1 => (y = ke * v) * RPM/60 => Hz
 accommodation_time  = 1.0 # seconds
 
 # setup the simulation
-start_simulation(fps=80)
+start_simulation(fps=80, seed=1234)
 
 # setup the car dynamics
 set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_length)
@@ -41,9 +41,9 @@ def calculate_postion(line):
 
 sample_time = 1/120
 u = 0
-kp = 0.3
-ki = 0.4
-kd = 0.05
+kp = 0.2
+ki = 0.3
+kd = 0.03
 last_error = 0
 integral = 0
 
@@ -52,8 +52,9 @@ def pid_control(error):
     global last_error, integral, kp, ki, kd, sample_time
     error = calculate_postion(line)
     integral += error * sample_time
+    derivada = (error - last_error)/sample_time    
 
-    delta_u = kp * error + kd * (error - last_error)/sample_time + ki * integral 
+    delta_u = kp * error + kd * derivada + ki * integral 
     last_error = error
     return delta_u
 
