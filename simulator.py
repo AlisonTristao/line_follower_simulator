@@ -40,7 +40,7 @@ class SimulatorController:
 
     def _setup_simulator(self):
         # generate trajectory
-        x_track, y_track = generate_track(CIRCLE, noise_level=0.5, checkpoints=36, resolution=1000, track_rad=30)
+        x_track, y_track = generate_track(CIRCLE, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
@@ -167,7 +167,7 @@ class SimulatorController:
 
 simulator = None #SimulatorController()
 
-def start_simulation(fps=120, length=150, width=150, scale=600, render=3, seed=None):
+def start_simulation(fps=120, length=100, width=100, scale=400, render=3, seed=None):
     # define the seed
     if seed is not None:
         random.seed(seed)

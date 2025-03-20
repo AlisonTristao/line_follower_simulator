@@ -378,7 +378,7 @@ class Display(Shape):
             horizontal_div (int): number of horizontal divisions
             vertical_div (int): number of vertical divisions
         """
-        self.font = pygame.font.SysFont("courier", 15, bold=True)
+        self.font = pygame.font.SysFont("courier", 12, bold=True)
 
         # limits of y axis
         self.__max_value = self.__saturation
@@ -459,7 +459,7 @@ class Display(Shape):
         num_divisions = 5
         for i in range(num_divisions + 1):
             value = self.__max_value - (i * (self.__max_value - self.__min_value) // num_divisions)
-            y_pos = graph_y + ((i+0.35) * graph_height // (1.1*num_divisions))
+            y_pos = graph_y + (i * graph_height // (num_divisions))
             label = self.font.render(str(value), True, (0, 0, 0))
             surface.blit(label, (graph_x - 45, y_pos - 10))
 
