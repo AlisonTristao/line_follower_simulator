@@ -2,10 +2,6 @@ import pygame
 import math
 import numpy as np
 
-import pygame
-import math
-import numpy as np
-
 class Shape:
     """
     represents a basic geometric shape with position, color, size, and angle
