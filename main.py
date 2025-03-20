@@ -18,8 +18,8 @@ start_simulation(fps=80, seed=1111)
 set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_length)
 
 # --- insert your code here --- #
-v1 = 10
-v2 = 10
+v1 = 0
+v2 = 0
 
 # example for calculating the position of the line
 last_mediam = 0
@@ -39,7 +39,7 @@ def calculate_postion(line):
 
     return mediam - len(line)/2
 
-sample_time = 1/120
+sample_time = 1/80
 u = 0
 kp = 0.2
 ki = 0.3
@@ -57,6 +57,9 @@ def pid_control(error):
     delta_u = kp * error + kd * derivada + ki * integral 
     last_error = error
     return delta_u
+
+for i in range(int(1/sample_time)):
+    line = step_simulation(v1, v2)
 
 while True:
     # --- step the simulation here --- #
