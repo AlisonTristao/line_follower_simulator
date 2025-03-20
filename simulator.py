@@ -6,14 +6,13 @@ from track_generator import *
 from car_dynamics import *
 
 class SimulatorController:
-    def __init__(self, fps, length, width, scale, render, sensor_distante):
+    def __init__(self, fps, length, width, scale, render):
         # controler parameters
         self.FPS = fps
         self.LENGTH = length
         self.WIDTH = width
         self.SCALE = scale
         self.RENDER = render
-        self.sensor_distante = sensor_distante
 
         # simulator objects
         self.simulator = Simulator('FULL', self.FPS)
@@ -32,14 +31,16 @@ class SimulatorController:
         # setup the simulator
         self._setup_simulator()
 
-    def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke=1, kq=1, accommodation_time=1.0):
+    def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke=1, kq=1, accommodation_time=1.0, sensor_distance=0.1, sensor_length=0.8):
         z = 1/self.FPS
         self.car = car_dynamics(z, wheels_radius, wheels_distance, wheels_RPM, ke, kq, accommodation_time)
         self.car_draw.set_size(self.car.get_size()*self.SCALE)
+        self.line_sensor.set_coordinates((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE))
+        self.line_sensor.set_size(sensor_length * self.SCALE)
 
     def _setup_simulator(self):
         # generate trajectory
-        x_track, y_track = generate_track(CIRCLE, noise_level=0.5, checkpoints=36, resolution=1000, track_rad=30)
+        x_track, y_track = generate_track(CIRCLE, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
@@ -70,7 +71,7 @@ class SimulatorController:
         self.simulator.add(self.car_draw)
 
         # create line sensor
-        self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - self.sensor_distante))
+        self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1]))
         self.simulator.add(self.line_sensor)
 
         # set track properties
@@ -162,29 +163,22 @@ class SimulatorController:
         linha_array = pygame.surfarray.pixels3d(linha)
         linha_pb = linha_array.mean(axis=2)  # Calcula a média no eixo das cores (R, G, B)
         linha_pb = np.array(linha_pb[:, 0], dtype=np.uint8)  # Remove dimensão extra do eixo Y
-        return linha_pb
-
-    def stop(self):
-        """
-        stop the simulator.
-        """
-        self.simulator.stop_running()
-
+        return 1 - linha_pb/255
 
 simulator = None #SimulatorController()
 
-def start_simulation(fps=120, length=150, width=150, scale=600, render=3, sensor_distante=50):
+def start_simulation(fps=120, length=150, width=150, scale=600, render=3):
     global simulator
-    simulator = SimulatorController(fps, length, width, scale, render, sensor_distante)
+    simulator = SimulatorController(fps, length, width, scale, render)
     return simulator
 
-def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time):
+def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_length):
     # check if the simulator is initialized
     if simulator is None:
         print("Simulator not initialized")
         return
 
-    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, 0, accommodation_time)
+    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, 0, accommodation_time, sensor_distance, sensor_length)
 
 def step_simulation(v1, v2):
     # save the current time

@@ -53,6 +53,14 @@ class Shape:
     def get_pivot(self):
         # returns the pivot point for rotations
         return self._pivot
+    
+    def set_size(self, size):
+        # sets a new size for the shape
+        self._size = size
+
+    def get_size(self): 
+        # returns the size of the shape
+        return self._size
 
     def step(self, dx, dy, angle):
         # moves and rotates the shape

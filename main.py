@@ -4,6 +4,8 @@ from simulator import *
 wheels_radius       = 0.04 # meters
 wheels_distance     = 0.10 # meters
 wheels_RPM          = 3000 # RPM
+sensor_distance     = 0.10 # meters
+sensor_length       = 0.10 # meters
 
 # motor constants
 ke                  = 1.0 # static gain of V1 => (y = ke * v) * RPM/60 => Hz
@@ -13,7 +15,7 @@ accommodation_time  = 1.0 # seconds
 start_simulation(fps=80)
 
 # setup the car dynamics
-set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time)
+set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_length)
 
 # --- insert your code here --- #
 v1 = 10
@@ -23,7 +25,6 @@ v2 = 10
 last_mediam = 0
 def calculate_postion(line):
     global last_mediam
-    line = abs(1 - line/255)
     sum = 0
     pesos = 0
     for i in range(len(line)):
