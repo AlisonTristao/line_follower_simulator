@@ -15,7 +15,7 @@ class SimulatorController:
         self.RENDER = render
 
         # simulator objects
-        self.simulator = Simulator('FULL', self.FPS)
+        self.simulator = Simulator('MEDIUM', self.FPS)
         self.track = None
         self.minimap = None
         self.display = None
@@ -39,6 +39,9 @@ class SimulatorController:
         self.line_sensor.set_size(sensor_length * self.SCALE)
 
     def _setup_simulator(self):
+        # print the initialization message
+        print("Initializing simulator...")
+
         # generate trajectory
         x_track, y_track = generate_track(CIRCLE, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
 
@@ -98,6 +101,11 @@ class SimulatorController:
         # create compass
         self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1]))
         self.simulator.add(self.compass)
+
+        # print the initialization message
+        print("Simulator initialized")
+
+        self.simulator.start()
 
     def _setup_display_graphs(self):
         self.display.add_graph("wheels")

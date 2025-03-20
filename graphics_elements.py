@@ -664,6 +664,7 @@ class Simulator:
             win (str): window size mode ('FULL', 'MEDIUM', 'SMALL')
             FPS (int): frames per second for the simulator
         """
+        self.win = win
         pygame.init()
 
         # set the window size based on mode
@@ -671,23 +672,27 @@ class Simulator:
             info = pygame.display.Info()
             width = info.current_w
             height = info.current_h
-            self.screen = pygame.display.set_mode((width, height),  pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
         elif win == 'MEDIUM':
             width = 1400
             height = 800
-            self.screen = pygame.display.set_mode((width, height))
         elif win == 'SMALL':
             width = 800
             height = 600
-            self.screen = pygame.display.set_mode((width, height))
-
-        pygame.display.set_caption("SIMULATOR")
-        self.__clock = pygame.time.Clock()
 
         self.__width = width
         self.__height = height
         self.__FPS = FPS
         self.__objects = []
+
+    def start(self):
+
+        if self.win == 'FULL':
+            self.screen = pygame.display.set_mode((self.__width, self.__height),  pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
+        else:
+            self.screen = pygame.display.set_mode((self.__width, self.__height))
+
+        pygame.display.set_caption("SIMULATOR")
+        self.__clock = pygame.time.Clock()
 
     def set_FPS(self, FPS):
         # sets the frames per second for the simulator
