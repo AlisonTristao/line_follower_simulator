@@ -41,69 +41,84 @@ class SimulatorController:
         self.line_sensor.set_coordinates((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE))
         self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist) # 0.05 meter beetween sensors
 
+    # divide the track in clusters for rendering 
+    def configurate_cluster(self):
+        # create clusters of points in the track
+        processed_points = set()
+        for i in range(-self.LENGTH // 2, self.LENGTH // 2):
+            for j in range(-self.WIDTH // 2, self.WIDTH // 2):
+                # verify if has points in the square
+                index = points_in_square(i, j, (self.LENGTH + self.WIDTH) / self.SCALE, self.x_track, self.y_track)
+                if len(index) > 0:
+                    # create a cluster of points
+                    cluster = Cluster(size=self.track_length*self.SCALE)                        # create a cluster
+                    cluster.set_master(self.car_draw.get_center(), self.car_draw.get_size())    # set the master point
+                    # add the points to the cluster
+                    for k in index:
+                        if (self.x_track[k], self.y_track[k]) not in processed_points:
+                            x = (self.x_track[k] - i) * self.SCALE
+                            y = (self.y_track[k] - j) * self.SCALE
+                            cluster.add_point((x, y), index=k)
+                            processed_points.add((self.x_track[k], self.y_track[k]))
+                    # set the cluster in the track
+                    self.track.set_obj(i + self.LENGTH // 2, j + self.WIDTH // 2, cluster)
+
     def _setup_simulator(self):
         # print the initialization message
         print("Initializing simulator...")
 
         # generate trajectory
-        x_track, y_track = generate_track(self.track_type, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
+        self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
 
+        # create car
+        self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.4))
+        
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
-        processed_points = set()
-        for i in range(-self.LENGTH // 2, self.LENGTH // 2):
-            for j in range(-self.WIDTH // 2, self.WIDTH // 2):
-                index = points_in_square(i, j, (self.LENGTH + self.WIDTH) / self.SCALE, x_track, y_track)
-                if len(index) > 0:
-                    cluster = Cluster(size=self.track_length*self.SCALE)
-                    for k in index:
-                        if (x_track[k], y_track[k]) not in processed_points:
-                            x = (x_track[k] - i) * self.SCALE
-                            y = (y_track[k] - j) * self.SCALE
-                            cluster.add_point((x, y))
-                            processed_points.add((x_track[k], y_track[k]))
-                    self.track.set_obj(i + self.LENGTH // 2, j + self.WIDTH // 2, cluster)
-        self.simulator.add(self.track)
+
+        # create line sensor
+        self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1]))
 
         # create minimap
         minimap_position = (0.9 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1])
         self.minimap = MiniMap(minimap_position, (200, 150))
-        for k in range(0, len(x_track), self.SCALE // 10):
-            self.minimap.add_point((2 * x_track[k] / self.LENGTH, 2 * y_track[k] / self.WIDTH))
-        self.simulator.add(self.minimap)
-
-        # create car
-        self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.4))
-        self.simulator.add(self.car_draw)
-
-        # create line sensor
-        self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1]))
-        self.simulator.add(self.line_sensor)
+        for k in range(0, len(self.x_track), self.SCALE // 10):
+            self.minimap.add_point((2 * self.x_track[k] / self.LENGTH, 2 * self.y_track[k] / self.WIDTH))
 
         # set track properties
-        self.track.set_coordinates(((x_track[0] + self.LENGTH//2) * self.SCALE, (y_track[0] + self.WIDTH//2) * self.SCALE))
+        self.track.set_coordinates(((self.x_track[0] + self.LENGTH//2) * self.SCALE, (self.y_track[0] + self.WIDTH//2) * self.SCALE))
         self.track.set_center(self.car_draw.get_center())
         self.track.set_pivot(self.car_draw.get_center())
 
         # create display
         self.display = Display(self.simulator.get_center(), self.simulator.get_window_size())
-        self.simulator.add(self.display)
         self._setup_display_graphs()
 
         # create statistics displays
         FPS_position = (1.99 * self.simulator.get_center()[0], 0.01 * self.simulator.get_center()[1])
         self.fps_display = Statistics(FPS_position)
-        self.simulator.add(self.fps_display)
 
         # create coordinates display
         coordinates_position = (1.85 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1])
         self.coordinates_display = Statistics(coordinates_position)
         self.coordinates_display.set_offset(2)
-        self.simulator.add(self.coordinates_display)
 
         # create compass
         self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1]))
+
+        # add objects to the simulator
+        # the order of the objects is the layer order
+        self.simulator.add(self.track)
+        self.simulator.add(self.car_draw)
+        self.simulator.add(self.line_sensor)
+        self.simulator.add(self.minimap)
+        self.simulator.add(self.fps_display)
+        self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
+        self.simulator.add(self.display)
+
+        # configurate the cluster
+        self.configurate_cluster()
 
         # print the initialization message
         print("Simulator initialized")
@@ -177,6 +192,8 @@ class SimulatorController:
         block_len = int(self.array_sensor_dist * self.SCALE)
         block_count = line_pb.shape[0] // block_len
         final_line = line_pb[:block_count * block_len].reshape(block_count, block_len).mean(axis=1)
+
+        print(Cluster._next_point)
 
         return 1 - final_line/255
 

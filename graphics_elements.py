@@ -190,39 +190,59 @@ class Cluster(Shape):
     """
     Represents a cluster of points on the track
     """
+    _master = (0, 0)
+    _master_distance = 0
+    _next_point = 0
+    
     def __init__(self, coo=(0, 0), color=(0, 0, 0), size=5, angle=0):
         """
-        initializes the cluster object
-        args:
-            coo (tuple): coordinates of the cluster
-            color (tuple): color of the cluster in rgb format
-            size (int): size of the cluster
-            angle (float): initial angle of the cluster in radians
+        Initializes the cluster object
         """
         super().__init__(coo, color, size, angle)
+        self.__global_index = []
         self.__points_arr = [] 
+        self.__colors_arr = []
 
-    def add_point(self, point):
+    def add_point(self, point, index, color=(0, 0, 0)):
         self.__points_arr.append(point)
+        self.__colors_arr.append(color)
+        self.__global_index.append(index)
+
+    @classmethod
+    def set_master(cls, master, master_distance):
+        cls._master = master
+        cls._master_distance = master_distance
+
+    @classmethod
+    def update_next_point(cls):
+        cls._next_point += 1
 
     def draw(self, surface):
         """
-        draws the cluster on the given surface
-        args:
-            surface (pygame.Surface): the surface to draw on
+        Draws the cluster on the given surface
         """
-        for point in self.__points_arr:
-            point_ = self._rotate_point(point)
-            pygame.draw.circle(surface, self._color, (point_[0] + self._x, point_[1] + self._y), self._size)
+        for i in range(len(self.__points_arr)):
+            point_ = self._rotate_point(self.__points_arr[i])
+            x = point_[0] + self._x
+            y = point_[1] + self._y
+
+            if self.points_in_square(x, y) and self.__global_index[i] == self._next_point:
+                self.__colors_arr[i] = (100, 100, 100)  # Modify the color of the point
+                self.update_next_point()
+
+            pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
 
     def _rotate_point(self, coo):
-        # rotates a point around the origin
         rotated_x = coo[0] * math.cos(-self._angle) - coo[1] * math.sin(-self._angle)
         rotated_y = coo[0] * math.sin(-self._angle) + coo[1] * math.cos(-self._angle)
         return rotated_x, rotated_y
     
     def get_points(self):
         return self.__points_arr
+
+    def points_in_square(self, x1, y1):
+        x0, y0 = self._master
+        return (x0 - self._master_distance < x1 < x0 + self._master_distance) and (y0 < y1 < y0 + self._master_distance)
 
 class MiniMap(Shape):
     """

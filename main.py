@@ -8,12 +8,12 @@ sensor_distance     = 0.10  # meters
 sensor_count        = 15    
 
 # track caracteristics
-track_type          = LEMNISCATE
+track_type          = CIRCLE
 track_length        = 0.015 # meters
 sensor_spacing      = 0.008 # meters
 
 # motor constants
-ke                  = 1.0 # static gain of V1 => (y = ke * v) * RPM/60 => Hz
+ke                  = 1.0 # static gain of V1 => (y = ke * v)
 accommodation_time  = 1.0 # seconds
 
 # setup the simulation

@@ -68,7 +68,7 @@ def generate_track(type=LEMNISCATE, checkpoints=24, track_rad=40, noise_level=0.
     u_new = np.linspace(0, 1, len(checkpoints) * resolution)  # More points for smoothing
     smooth_x, smooth_y = splev(u_new, tck)
 
-    return smooth_x, smooth_y
+    return smooth_x[::-1], smooth_y[::-1]
 
 def points_in_square(x0, y0, size, x_arr, y_arr):
     """
