@@ -33,19 +33,19 @@ class motor:
         self.saturate()
     
 class car_dynamics:
-    def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke=1, kq=1, accommodation_time=1.0):
+    def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=1000, ke=1, kq=1, accommodation_time=1.0):
         self.z = z
         self._wheels_radius = wheels_radius
         self._wheels_distance = wheels_distance
-        self._wheels_RPM = wheels_RPM/100
+        self._wheels_speed_rad_s = (2 * math.pi * wheels_RPM)/(60*100) # divide by 100%
 
         # last speed and omega
         self.last_speed = 0
         self.last_omega = 0
 
         # gains for calculating speed and omega
-        self._gain_Vm = (self._wheels_RPM/60) * (self._wheels_radius/2)
-        self._gain_Omega = (self._wheels_RPM/60) * self._wheels_radius/self._wheels_distance
+        self._gain_Vm = (self._wheels_speed_rad_s) * (self._wheels_radius/2)
+        self._gain_Omega = (self._wheels_speed_rad_s) * self._wheels_radius/self._wheels_distance
 
         # gains for calculating normalized speed and omega
         self._gain_Vm_norm = (1/2)

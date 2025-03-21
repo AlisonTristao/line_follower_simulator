@@ -3,7 +3,7 @@ from simulator import *
 # car constants
 wheels_radius       = 0.04 # meters
 wheels_distance     = 0.10 # meters
-wheels_RPM          = 3000 # RPM
+wheels_RPM          = 1000 # RPM
 sensor_distance     = 0.10 # meters
 sensor_length       = 0.10 # meters
 
@@ -43,7 +43,7 @@ sample_time = 1/80
 u = 0
 kp = 0.2
 ki = 0.3
-kd = 0.03
+kd = 0.08
 last_error = 0
 integral = 0
 
@@ -70,5 +70,5 @@ while True:
     # --- calculate control here --- #
     error = calculate_postion(line)
     delta_u = pid_control(error)
-    v1 = 90 - delta_u
-    v2 = 90 + delta_u
+    v1 = 60 - delta_u
+    v2 = 60 + delta_u
