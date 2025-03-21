@@ -13,6 +13,7 @@ class SimulatorController:
         self.WIDTH = width
         self.SCALE = scale
         self.RENDER = render
+        self.array_sensor_dist = 0.008
 
         # simulator objects
         self.simulator = Simulator('MEDIUM', self.FPS)
@@ -31,12 +32,12 @@ class SimulatorController:
         # setup the simulator
         self._setup_simulator()
 
-    def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke=1, kq=1, accommodation_time=1.0, sensor_distance=0.1, sensor_length=0.8):
+    def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke=1, kq=1, accommodation_time=1.0, sensor_distance=0.1, sensor_count=8):
         z = 1/self.FPS
         self.car = car_dynamics(z, wheels_radius, wheels_distance, wheels_RPM, ke, kq, accommodation_time)
         self.car_draw.set_size(self.car.get_size()*self.SCALE)
         self.line_sensor.set_coordinates((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE))
-        self.line_sensor.set_size(sensor_length * self.SCALE)
+        self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist) # 0.05 meter beetween sensors
 
     def _setup_simulator(self):
         # print the initialization message
@@ -167,11 +168,15 @@ class SimulatorController:
         self.simulator.step()
 
         # return the sensor value
-        linha = self.simulator.screen.subsurface((self.line_sensor.get_x() - self.line_sensor.get_size()/2, self.line_sensor.get_y() -1, self.line_sensor.get_size(), 1))
-        linha_array = pygame.surfarray.pixels3d(linha)
-        linha_pb = linha_array.mean(axis=2)  # Calcula a média no eixo das cores (R, G, B)
-        linha_pb = np.array(linha_pb[:, 0], dtype=np.uint8)  # Remove dimensão extra do eixo Y
-        return 1 - linha_pb/255
+        line = self.simulator.screen.subsurface((self.line_sensor.get_x() - self.line_sensor.get_size()/2, self.line_sensor.get_y() -1, self.line_sensor.get_size(), 1))
+        line_arr = pygame.surfarray.pixels3d(line)
+        line_pb = line_arr.mean(axis=2)  # calculate the mediam 
+        line_pb = np.array(line_pb[:, 0], dtype=np.uint8)  # remove dimension 
+        block_len = int(self.array_sensor_dist * self.SCALE)
+        block_count = line_pb.shape[0] // block_len
+        final_line = line_pb[:block_count * block_len].reshape(block_count, block_len).mean(axis=1)
+
+        return 1 - final_line/255
 
 simulator = None #SimulatorController()
 
@@ -189,13 +194,13 @@ def start_simulation(fps=120, length=100, width=100, scale=400, render=3, seed=N
     simulator = SimulatorController(fps, length, width, scale, render)
     return simulator
 
-def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_length):
+def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_count):
     # check if the simulator is initialized
     if simulator is None:
         print("Simulator not initialized")
         return
 
-    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, 0, accommodation_time, sensor_distance, sensor_length)
+    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, 0, accommodation_time, sensor_distance, sensor_count)
 
 def step_simulation(v1, v2):
     # save the current time
