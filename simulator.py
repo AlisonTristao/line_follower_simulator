@@ -6,14 +6,16 @@ from track_generator import *
 from car_dynamics import *
 
 class SimulatorController:
-    def __init__(self, fps, length, width, scale, render):
+    def __init__(self, fps, length, width, scale, render, track_type=0, track_length=0.02, sensor_spacing=0.001):
         # controler parameters
         self.FPS = fps
         self.LENGTH = length
         self.WIDTH = width
         self.SCALE = scale
         self.RENDER = render
-        self.array_sensor_dist = 0.008
+        self.array_sensor_dist = sensor_spacing
+        self.track_type = track_type
+        self.track_length = track_length
 
         # simulator objects
         self.simulator = Simulator('MEDIUM', self.FPS)
@@ -44,7 +46,7 @@ class SimulatorController:
         print("Initializing simulator...")
 
         # generate trajectory
-        x_track, y_track = generate_track(CIRCLE, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
+        x_track, y_track = generate_track(self.track_type, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
@@ -53,7 +55,7 @@ class SimulatorController:
             for j in range(-self.WIDTH // 2, self.WIDTH // 2):
                 index = points_in_square(i, j, (self.LENGTH + self.WIDTH) / self.SCALE, x_track, y_track)
                 if len(index) > 0:
-                    cluster = Cluster()
+                    cluster = Cluster(size=self.track_length*self.SCALE)
                     for k in index:
                         if (x_track[k], y_track[k]) not in processed_points:
                             x = (x_track[k] - i) * self.SCALE
@@ -180,7 +182,7 @@ class SimulatorController:
 
 simulator = None #SimulatorController()
 
-def start_simulation(fps=120, length=100, width=100, scale=400, render=3, seed=None):
+def start_simulation(fps=120, length=100, width=100, scale=400, render=3, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
     # define the seed
     if seed is not None:
         random.seed(seed)
@@ -191,7 +193,7 @@ def start_simulation(fps=120, length=100, width=100, scale=400, render=3, seed=N
     if simulator is not None:
         print("Simulator already initialized")
         return
-    simulator = SimulatorController(fps, length, width, scale, render)
+    simulator = SimulatorController(fps, length, width, scale, render, track_type, track_length, sensor_spacing)
     return simulator
 
 def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_count):

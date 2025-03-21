@@ -1,18 +1,23 @@
 from simulator import *
 
 # car constants
-wheels_radius       = 0.04 # meters
-wheels_distance     = 0.10 # meters
-wheels_RPM          = 1000 # RPM
-sensor_distance     = 0.10 # meters
+wheels_radius       = 0.04  # meters
+wheels_distance     = 0.10  # meters
+wheels_RPM          = 1000  # RPM
+sensor_distance     = 0.10  # meters
 sensor_count        = 15    
+
+# track caracteristics
+track_type          = LEMNISCATE
+track_length        = 0.015 # meters
+sensor_spacing      = 0.008 # meters
 
 # motor constants
 ke                  = 1.0 # static gain of V1 => (y = ke * v) * RPM/60 => Hz
 accommodation_time  = 1.0 # seconds
 
 # setup the simulation
-start_simulation(fps=80, seed=1111)
+start_simulation(fps=80, seed=1111, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
 
 # setup the car dynamics
 set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_count)
