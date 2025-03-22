@@ -1,5 +1,10 @@
 from simulator import *
 
+# screen settings => sizes FULL, MEDIUM, SMALL
+screen_size = MEDIUM
+screen_fps = 80
+track_seed = 1111
+
 # car constants
 wheels_radius       = 0.04  # meters
 wheels_distance     = 0.10  # meters
@@ -21,7 +26,7 @@ future_points       = 5     # number of future points
 future_spacing      = 30    # resolutuin of the track
 
 # setup the simulation
-start_simulation(fps=80, seed=1111, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
+start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
 
 # setup the car dynamics
 set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_count)
@@ -64,7 +69,7 @@ def pid_control(error):
     global last_error, integral, kp, ki, kd, sample_time
     error = calculate_postion(line)
     integral += error * sample_time
-    derivada = (error - last_error)/sample_time    
+    derivada = (error - last_error)/sample_time 
 
     delta_u = kp * error + kd * derivada + ki * integral 
     last_error = error
@@ -73,7 +78,7 @@ def pid_control(error):
 while True:
     # --- step the simulation here --- #
     line, future_points = step_simulation(v1, v2)
-    if line is None:
+    if line is None or future_points is None:
         break
 
     # --- calculate control here --- #

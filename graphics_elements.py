@@ -2,6 +2,10 @@ import pygame
 import math
 import numpy as np
 
+FULL = 'FULL'
+MEDIUM = 'MEDIUM'
+SMALL = 'SMALL'
+
 class Shape:
     """
     represents a basic geometric shape with position, color, size, and angle
@@ -600,6 +604,7 @@ class Statistics(Shape):
     """
     represents statistical text information displayed on the simulator
     """
+    _font = None
     def __init__(self, coo=(800, 600), color=(0, 200, 0), size=100, angle=0):
         """
         initializes the statistics display
@@ -611,9 +616,15 @@ class Statistics(Shape):
         """
         super().__init__(coo, color, size, angle)
         self.text = "_____"
-        self.font = pygame.font.Font(None, 24)
         self._offset = 1
-        self.font = pygame.font.SysFont("courier", 15, bold=True)
+        # set the font for the text
+        if not Statistics._font:
+            Statistics._font = pygame.font.SysFont("courier", 20, bold=True)
+
+    @classmethod
+    def set_font_size(cls, size):
+        # sets a new font for the text
+        cls._font = pygame.font.SysFont("courier", size, bold=True)
 
     def set_offset(self, offset):
         # sets the offset for the text
@@ -629,7 +640,7 @@ class Statistics(Shape):
         args:
             surface (pygame.Surface): the surface to draw on
         """
-        text_surface = self.font.render(self.text, True, self._color)
+        text_surface = self._font.render(self.text, True, self._color)
         x = self._x - text_surface.get_width() // self._offset
         surface.blit(text_surface, (x, self._y))
 
@@ -740,14 +751,14 @@ class Simulator:
         pygame.init()
 
         # set the window size based on mode
-        if win == 'FULL':
+        if win == FULL:
             info = pygame.display.Info()
             width = info.current_w
             height = info.current_h
-        elif win == 'MEDIUM':
+        elif win == MEDIUM:
             width = 1400
             height = 800
-        elif win == 'SMALL':
+        elif win == SMALL:
             width = 800
             height = 600
 

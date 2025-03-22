@@ -6,13 +6,15 @@ from track_generator import *
 from car_dynamics import *
 
 class SimulatorController:
-    def __init__(self, fps, length, width, scale, render, track_type=0, track_length=0.02, sensor_spacing=0.001):
+    def __init__(self, screen_size, fps, length, width, scale, render, track_type=0, track_length=0.02, sensor_spacing=0.001):
         # controler parameters
         self.FPS = fps
+        self.screen_size = screen_size
         self.LENGTH = length
         self.WIDTH = width
         self.SCALE = scale
         self.RENDER = render
+        self.time_simulation = 0
 
         # track parameters
         self.x_track = None
@@ -23,7 +25,7 @@ class SimulatorController:
         self.win = None
 
         # simulator objects
-        self.simulator = Simulator('MEDIUM', self.FPS)
+        self.simulator = Simulator(screen_size, self.FPS)
         self.track = None
         self.minimap = None
         self.display = None
@@ -33,6 +35,8 @@ class SimulatorController:
         self.compass = None
         self.line_sensor = None
         self.future_points = None
+        self.track_percentage = None
+        self.points = None
 
         # future parameters
         self.future_points_count = 10
@@ -113,14 +117,27 @@ class SimulatorController:
         self.display = Display(self.simulator.get_center(), self.simulator.get_window_size())
         self._setup_display_graphs()
 
-        # create statistics displays
-        FPS_position = (1.99 * self.simulator.get_center()[0], 0.01 * self.simulator.get_center()[1])
-        self.fps_display = Statistics(FPS_position)
-
         # create coordinates display
         coordinates_position = (1.85 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1])
         self.coordinates_display = Statistics(coordinates_position)
         self.coordinates_display.set_offset(2)
+
+        # if the screen is big, raise the font size
+        if self.screen_size == FULL:
+            self.coordinates_display.set_font_size(25)
+        if self.screen_size == MEDIUM:
+            self.coordinates_display.set_font_size(18)
+        if self.screen_size == SMALL:
+            self.coordinates_display.set_font_size(12)
+
+        # create statistics displays
+        self.fps_display = Statistics((1.99 * self.simulator.get_center()[0], 0.01 * self.simulator.get_center()[1]))
+
+        # create display points 
+        self.track_percentage = Statistics((1.0 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1]))
+
+        # pontuation of the track
+        self.points = Statistics((0.25 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1]))
 
         # create compass
         self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1]))
@@ -136,6 +153,8 @@ class SimulatorController:
         self.simulator.add(self.compass)
         self.simulator.add(self.display)
         self.simulator.add(self.future_points)
+        self.simulator.add(self.track_percentage)
+        self.simulator.add(self.points)
 
         # configurate the cluster
         self.configurate_cluster()
@@ -171,6 +190,18 @@ class SimulatorController:
         """
         self.fps_display.set_text(f"fps: {fps}")
 
+    def update_coverage(self, coverage):
+        """
+        update the coverage display with the given value.
+        """
+        self.track_percentage.set_text(f"covered: {coverage}")
+
+    def update_points(self, points):
+        """
+        update the points display with the given value.
+        """
+        self.points.set_text(f"score: {points}")
+
     def step(self, v1, v2):
         """
         perform one simulation step with given movement and rotation inputs.
@@ -205,7 +236,8 @@ class SimulatorController:
 
         # verify if win the game
         if Cluster._next_point == self.win:
-            print("You win the game")
+            print("Congratulations!")
+            print("You win the game, you score is {:.2f}".format(100*100/self.time_simulation))
             return None
 
         # get the future points
@@ -225,8 +257,9 @@ class SimulatorController:
         return (1 - final_line/255), future_point
 
 simulator = None #SimulatorController()
+timer = time.time()
 
-def start_simulation(fps=120, length=100, width=100, scale=300, render=3, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
+def start_simulation(screen_size=MEDIUM, fps=120, length=100, width=100, scale=300, render=3, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
     # define the seed
     if seed is not None:
         random.seed(seed)
@@ -238,7 +271,7 @@ def start_simulation(fps=120, length=100, width=100, scale=300, render=3, seed=N
         print("Simulator already initialized")
         return
     
-    simulator = SimulatorController(fps, length, width, scale, render, track_type, track_length, sensor_spacing)
+    simulator = SimulatorController(screen_size, fps, length, width, scale, render, track_type, track_length, sensor_spacing)
     return simulator
 
 def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_count):
@@ -258,8 +291,7 @@ def set_future_points(count, space):
     simulator.set_future_points(count, space)
 
 def step_simulation(v1, v2):
-    # save the current time
-    timer = time.time()
+    global timer
 
     # check if the simulator is initialized
     if simulator is None or simulator.car is None:
@@ -285,11 +317,24 @@ def step_simulation(v1, v2):
     if position is None:
         return None, None
 
+    # integrate the time simulation
+    simulator.time_simulation += 1/simulator.FPS
+
+    # calculate coverage percentage
+    coverage = Cluster._next_point/simulator.win * 100
+    simulator.update_coverage("{:.2f}%".format(coverage))
+
+    # calculate the points of the track
+    simulator.update_points("{:.2f}".format(100*coverage/simulator.time_simulation))
+
     # fix the fps
     while (time.time() - timer) < 1/simulator.FPS:
         pass
 
     # update the fps count
     simulator.update_FPS("{:.1f}".format(1/(time.time() - timer)))
+
+    # update the timer
+    timer = time.time()
 
     return position
