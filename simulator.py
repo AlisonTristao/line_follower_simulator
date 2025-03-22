@@ -175,12 +175,11 @@ class SimulatorController:
         """
         perform one simulation step with given movement and rotation inputs.
         """
+        # step the car dynamics
+        self.car.step(v1, v2)
 
         # calculates the car values normalized
         simulator._update_graps()
-
-        # step the car dynamics
-        self.car.step(v1, v2)
 
         # get the car values
         dx, dy, angle = self.car.get_space()
@@ -238,6 +237,7 @@ def start_simulation(fps=120, length=100, width=100, scale=300, render=3, seed=N
     if simulator is not None:
         print("Simulator already initialized")
         return
+    
     simulator = SimulatorController(fps, length, width, scale, render, track_type, track_length, sensor_spacing)
     return simulator
 
