@@ -13,9 +13,14 @@ class SimulatorController:
         self.WIDTH = width
         self.SCALE = scale
         self.RENDER = render
+
+        # track parameters
+        self.x_track = None
+        self.y_track = None
         self.array_sensor_dist = sensor_spacing
         self.track_type = track_type
         self.track_length = track_length
+        self.win = None
 
         # simulator objects
         self.simulator = Simulator('MEDIUM', self.FPS)
@@ -27,6 +32,11 @@ class SimulatorController:
         self.coordinates_display = None
         self.compass = None
         self.line_sensor = None
+        self.future_points = None
+
+        # future parameters
+        self.future_points_count = 10
+        self.future_space = 30
 
         # model parameters
         self.car = None #car_dynamics(z=1/self.FPS)
@@ -41,6 +51,12 @@ class SimulatorController:
         self.line_sensor.set_coordinates((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE))
         self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist) # 0.05 meter beetween sensors
 
+    def set_future_points(self, count, space):
+        self.future_points_count = count
+        self.future_space = space
+        Cluster.set_master(self.car_draw.get_center(), self.car_draw.get_size())    # set the master point
+        Cluster.set_future_count(self.future_points_count, self.future_space)     # set the future points count
+
     # divide the track in clusters for rendering 
     def configurate_cluster(self):
         # create clusters of points in the track
@@ -52,7 +68,6 @@ class SimulatorController:
                 if len(index) > 0:
                     # create a cluster of points
                     cluster = Cluster(size=self.track_length*self.SCALE)                        # create a cluster
-                    cluster.set_master(self.car_draw.get_center(), self.car_draw.get_size())    # set the master point
                     # add the points to the cluster
                     for k in index:
                         if (self.x_track[k], self.y_track[k]) not in processed_points:
@@ -69,15 +84,19 @@ class SimulatorController:
 
         # generate trajectory
         self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
+        self.win = len(self.x_track-1)
 
         # create car
-        self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.4))
+        self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.8))
         
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
 
         # create line sensor
         self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1]))
+
+        # create future points
+        self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length*1.5*self.SCALE)
 
         # create minimap
         minimap_position = (0.9 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1])
@@ -116,6 +135,7 @@ class SimulatorController:
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
         self.simulator.add(self.display)
+        self.simulator.add(self.future_points)
 
         # configurate the cluster
         self.configurate_cluster()
@@ -172,17 +192,27 @@ class SimulatorController:
         # update compass and coordinates
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
         self.coordinates_display.set_text(
-            f"x: {round(self.track.get_center()[0] / 200 + 1, 2):.2f} y: {round(self.track.get_center()[1] / 200 + 1, 2):.2f}"
+            f"x: {round(self.track.get_center()[0]/self.SCALE, 2):.2f} y: {round(self.track.get_center()[1]/self.SCALE, 2):.2f}"
         )
 
         # update minimap position
         self.minimap.set_player_position(
-            (2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1,
-             -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1)
+            (2 * self.track.get_center()[0]/(self.SCALE * self.LENGTH) - 1,
+             -2 * self.track.get_center()[1]/(self.SCALE * self.WIDTH) + 1)
         )
 
         # render the simulator
         self.simulator.step()
+
+        # verify if win the game
+        if Cluster._next_point == self.win:
+            print("You win the game")
+            return None
+
+        # get the future points
+        future_point = Cluster.get_next_point()
+        self.future_points.set_points(future_point)
+        future_point = [((-x + self.car_draw.get_center()[0])/self.SCALE, (-y + self.car_draw.get_center()[1])/self.SCALE) for x, y in future_point]
 
         # return the sensor value
         line = self.simulator.screen.subsurface((self.line_sensor.get_x() - self.line_sensor.get_size()/2, self.line_sensor.get_y() -1, self.line_sensor.get_size(), 1))
@@ -193,13 +223,11 @@ class SimulatorController:
         block_count = line_pb.shape[0] // block_len
         final_line = line_pb[:block_count * block_len].reshape(block_count, block_len).mean(axis=1)
 
-        print(Cluster._next_point)
-
-        return 1 - final_line/255
+        return (1 - final_line/255), future_point
 
 simulator = None #SimulatorController()
 
-def start_simulation(fps=120, length=100, width=100, scale=400, render=3, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
+def start_simulation(fps=120, length=100, width=100, scale=300, render=3, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
     # define the seed
     if seed is not None:
         random.seed(seed)
@@ -221,6 +249,14 @@ def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodati
 
     simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, 0, accommodation_time, sensor_distance, sensor_count)
 
+def set_future_points(count, space):
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    simulator.set_future_points(count, space)
+
 def step_simulation(v1, v2):
     # save the current time
     timer = time.time()
@@ -228,23 +264,26 @@ def step_simulation(v1, v2):
     # check if the simulator is initialized
     if simulator is None or simulator.car is None:
         print("Simulator not initialized")
-        return None
+        return None, None
 
     # check for events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             print("Simulation stopped using X button")
-            return None
+            return None, None
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 pygame.quit()
                 print("Simulation stopped using ESC")
-                return None
-            
+                return None, None
+
     # render the simulator
-    line = simulator.step(v1, v2)
+    position = simulator.step(v1, v2)
+
+    if position is None:
+        return None, None
 
     # fix the fps
     while (time.time() - timer) < 1/simulator.FPS:
@@ -253,4 +292,4 @@ def step_simulation(v1, v2):
     # update the fps count
     simulator.update_FPS("{:.1f}".format(1/(time.time() - timer)))
 
-    return line
+    return position

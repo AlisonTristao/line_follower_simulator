@@ -99,7 +99,7 @@ class Car(Shape):
     """
     represents the car in the simulator
     """
-    def __init__(self, coo, color=(255, 0, 0), size=35, angle=30, center=(1, 2)):
+    def __init__(self, coo, color=(0, 0, 200), size=35, angle=30, center=(1, 2)):
         """
         initializes the car
         args:
@@ -145,6 +145,31 @@ class Car(Shape):
         super().step(dx, dy, angle)
         self._calculate_vertices()
 
+class FuturePoints(Shape):
+    """
+    represents the future points of the car in the simulator
+    """
+    def __init__(self, coo, color=(200, 0, 0), size=5, angle=0):
+        """
+        initializes the future points
+        args:
+            coo (tuple): initial coordinates of the future points
+            color (tuple): color of the future points in rgb format
+            size (int): size of the future points
+            angle (float): initial angle in radians
+        """
+        super().__init__(coo, color, size, angle)
+        self._points = []
+
+    def set_points(self, points):
+        # sets the future points to be drawn
+        self._points = points
+
+    def draw(self, surface):
+        # draws the future points as circles on the given surface
+        for point in self._points:
+            pygame.draw.circle(surface, self._color, (int(point[0]), int(point[1])), self._size)
+
 class Default(Shape):
     """
     represents a default object on the track
@@ -189,11 +214,21 @@ class Wall(Shape):
 class Cluster(Shape):
     """
     Represents a cluster of points on the track
+    static variables:
+        _master (tuple): coordinates of the master point
+        _master_distance (int): radius of the master point
+        _next_point (int): next point to be reached
+        _arr_next_points (list): list of next points to be reached
+        _future_count (int): number of future points
+        _future_space (int): space between future points
     """
-    _master = (0, 0)
-    _master_distance = 0
-    _next_point = 0
-    
+    _master             = (0, 0)   
+    _master_distance    = 0         
+    _next_point         = 0        
+    _arr_next_points    = []        
+    _future_count       = 10       
+    _future_space       = 30        
+
     def __init__(self, coo=(0, 0), color=(0, 0, 0), size=5, angle=0):
         """
         Initializes the cluster object
@@ -209,6 +244,12 @@ class Cluster(Shape):
         self.__global_index.append(index)
 
     @classmethod
+    def set_future_count(cls, future_count, future_space):
+        cls._future_count = future_count
+        cls._future_space = future_space
+        cls._arr_next_points = [(0, 0)] * future_count
+
+    @classmethod
     def set_master(cls, master, master_distance):
         cls._master = master
         cls._master_distance = master_distance
@@ -216,6 +257,14 @@ class Cluster(Shape):
     @classmethod
     def update_next_point(cls):
         cls._next_point += 1
+
+    @classmethod
+    def add_next_point(cls, point, index):
+        cls._arr_next_points[index] = point
+
+    @ classmethod
+    def get_next_point(cls):
+        return [(float(x), float(y)) for x, y in list(cls._arr_next_points)]
 
     def draw(self, surface):
         """
@@ -231,6 +280,10 @@ class Cluster(Shape):
                 self.update_next_point()
 
             pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
+
+            for j in range(self._future_space, self._future_space * self._future_count + self._future_count, self._future_space):
+                if self.__global_index[i] == self._next_point + j:
+                    self.add_next_point((x, y), (self.__global_index[i] - self._next_point)//self._future_space - 1)
 
     def _rotate_point(self, coo):
         rotated_x = coo[0] * math.cos(-self._angle) - coo[1] * math.sin(-self._angle)
@@ -274,7 +327,7 @@ class MiniMap(Shape):
         rect_width = self._width
         rect_height = self._height
 
-        border_color = (100, 100, 100)
+        #border_color = (100, 100, 100)
         border_width = 1
 
         # draw border
@@ -285,7 +338,6 @@ class MiniMap(Shape):
         pygame.draw.rect(surface, self._color,
                          (rect_x + border_width, rect_y + border_width,
                           rect_width - 2 * border_width, rect_height - 2 * border_width))
-
 
         # draw track
         point_color = (0, 0, 0)
@@ -756,4 +808,4 @@ class Simulator:
         """
         self.draw()
         pygame.display.flip()
-        self.__clock.tick(self.__FPS)
+        #self.__clock.tick(self.__FPS)
