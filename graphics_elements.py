@@ -568,12 +568,28 @@ class Display(Shape):
     # draw legend
     def __draw_legend(self, surface, graph_x, graph_y, title):
         legend_x = graph_x + 10
-        legend_y = graph_y + 15
+        legend_y = graph_y + 10
         for idx, (line_name, color) in enumerate(self.__graph_colors[title].items()):
+            # draw a background rectangle
+            pygame.draw.rect(surface, (255, 255, 255), (graph_x, graph_y + idx * 23, 100, 25))
             pygame.draw.rect(surface, color, (legend_x, legend_y + idx * 20, 10, 10))
             legend_label = self.font.render(line_name, True, (0, 0, 0))
             surface.blit(legend_label, (legend_x + 15, legend_y + idx * 20 - 5))
 
+    # draw label for y values
+    def __draw_label_last_y(self, surface, graph_x, graph_y, graph_height, graph_width, lines):
+        # draw the last value of each line
+        for i, (line_name, data) in enumerate(lines.items()):
+            # draw a background rectangle
+            pygame.draw.rect(surface, (200, 200, 200), (graph_x, graph_y + graph_height - 25 - i * 23, 100, 25))
+            # round 2 decimal places
+            value = round(data[-1], 2)
+            label = self.font.render(f"{line_name}: {value}", True, (0, 0, 0))
+            # draw the label
+            x = graph_x + 10
+            y = graph_y + graph_height - 20 - i * 20
+            surface.blit(label, (x, y))
+            
     # helper function to draw a graph with multiple lines
     def draw_graph(self, surface, lines, rect, title):
         """
@@ -599,6 +615,9 @@ class Display(Shape):
 
         # draw legend
         self.__draw_legend(surface, graph_x, graph_y, title)
+
+        # draw label for y values
+        self.__draw_label_last_y(surface, graph_x, graph_y, graph_height, graph_width, lines)
 
 class Statistics(Shape):
     """
