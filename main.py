@@ -38,51 +38,10 @@ set_future_points(future_points, future_spacing)
 v1 = 0
 v2 = 0
 
-# example for calculating the position of the line
-last_mediam = 0
-def calculate_postion(line):
-    global last_mediam
-    sum = 0
-    pesos = 0
-    for i in range(len(line)):
-        sum += line[i] * (i+1)
-        pesos += line[i]
-
-    if pesos < 0.3:
-        mediam = last_mediam
-    else:
-        mediam = sum/pesos
-        last_mediam = mediam
-
-    return mediam - len(line)/2
-
-sample_time = 1/80
-u = 0
-kp = 0.3
-ki = 0.3
-kd = 0.1
-last_error = 0
-integral = 0
-
-# example for calculating the control
-def pid_control(error):
-    global last_error, integral, kp, ki, kd, sample_time
-    error = calculate_postion(line)
-    integral += error * sample_time
-    derivada = (error - last_error)/sample_time 
-
-    delta_u = kp * error + kd * derivada + ki * integral 
-    last_error = error
-    return delta_u
-
 while True:
     # --- step the simulation here --- #
     line, future_points = step_simulation(v1, v2)
     if line is None or future_points is None:
         break
 
-    # --- calculate control here --- #
-    error = calculate_postion(line)
-    delta_u = pid_control(error)
-    v1 = 60 - delta_u
-    v2 = 60 + delta_u
+    # --- insert your code here --- #
