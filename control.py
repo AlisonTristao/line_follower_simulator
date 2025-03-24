@@ -98,7 +98,6 @@ if __name__ == "__main__":
         v1 += omega
         v2 -= omega
 
-        print(f"speed: {speed:.2f} | time: {counter/80:.2f}")
         counter += 1
         arr_time.append(counter/80)
 

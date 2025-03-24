@@ -40,13 +40,13 @@ set_future_points(future_points, future_spacing)
 v1 = 0
 v2 = 0
 
-Vm_ref = 1
+Vm_ref = 100
 kp_1 = 1.0
 ki_1 = 0.08
 z_1 = 1/80
 control_vm = Control(kp_1, ki_1, z_1)
 
-omega_ref = 1
+omega_ref = 0
 kp_2 = 1.0
 ki_2 = 0.08
 z_2 = 1/80
@@ -68,5 +68,4 @@ while True:
     v1 += omega
     v2 -= omega
 
-    print(f"speed: {speed:.2f} | time: {counter/80:.2f}")
     counter += 1
