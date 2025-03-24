@@ -1,4 +1,6 @@
 from simulator import *
+from control import Control
+import matplotlib.pyplot as plt
 
 # screen settings => sizes FULL, MEDIUM, SMALL
 screen_size = MEDIUM
@@ -38,51 +40,33 @@ set_future_points(future_points, future_spacing)
 v1 = 0
 v2 = 0
 
-# example for calculating the position of the line
-last_mediam = 0
-def calculate_postion(line):
-    global last_mediam
-    sum = 0
-    pesos = 0
-    for i in range(len(line)):
-        sum += line[i] * (i+1)
-        pesos += line[i]
+Vm_ref = 1
+kp_1 = 1.0
+ki_1 = 0.08
+z_1 = 1/80
+control_vm = Control(kp_1, ki_1, z_1)
 
-    if pesos < 0.3:
-        mediam = last_mediam
-    else:
-        mediam = sum/pesos
-        last_mediam = mediam
+omega_ref = 1
+kp_2 = 1.0
+ki_2 = 0.08
+z_2 = 1/80
+control_omega = Control(kp_2, ki_2, z_2)
 
-    return mediam - len(line)/2
-
-sample_time = 1/80
-u = 0
-kp = 0.3
-ki = 0.3
-kd = 0.1
-last_error = 0
-integral = 0
-
-# example for calculating the control
-def pid_control(error):
-    global last_error, integral, kp, ki, kd, sample_time
-    error = calculate_postion(line)
-    integral += error * sample_time
-    derivada = (error - last_error)/sample_time 
-
-    delta_u = kp * error + kd * derivada + ki * integral 
-    last_error = error
-    return delta_u
-
+counter = 0
 while True:
     # --- step the simulation here --- #
-    line, future_points = step_simulation(v1, v2)
+    line, future_points, speed, omega = step_simulation(v1, v2)
     if line is None or future_points is None:
         break
 
-    # --- calculate control here --- #
-    error = calculate_postion(line)
-    delta_u = pid_control(error)
-    v1 = 60 - delta_u
-    v2 = 60 + delta_u
+    erro_vm = Vm_ref - speed
+    v1 = control_vm.control(erro_vm)
+    v2 = v1
+
+    erro_omega = omega_ref - omega
+    omega = control_omega.control(erro_omega)
+    v1 += omega
+    v2 -= omega
+
+    print(f"speed: {speed:.2f} | time: {counter/80:.2f}")
+    counter += 1

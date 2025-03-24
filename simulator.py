@@ -169,11 +169,13 @@ class SimulatorController:
         self.display.add_line_to_graph("wheels", "left", color=(0, 200, 0))
         self.display.add_line_to_graph("wheels", "right", color=(200, 0, 0))
 
-        self.display.add_graph("speed")
-        self.display.add_line_to_graph("speed", "vm", color=(0, 0, 200))
+        self.display.add_graph("car")
+        self.display.add_line_to_graph("car", "vm", color=(0, 0, 200))
+        self.display.add_line_to_graph("car", "ω", color=(200, 200, 0))
 
-        self.display.add_graph("omega")
-        self.display.add_line_to_graph("omega", "ω", color=(200, 200, 0))
+        self.display.add_graph("control")
+        self.display.add_line_to_graph("control", "v1", color=(0, 200, 0))
+        self.display.add_line_to_graph("control", "v2", color=(200, 0, 0))
 
     def _update_graps(self):
         """
@@ -181,8 +183,10 @@ class SimulatorController:
         """
         self.display.update_graph_data("wheels", "left", self.car.getWheels()[0])
         self.display.update_graph_data("wheels", "right", self.car.getWheels()[1])
-        self.display.update_graph_data("speed", "vm", self.car.speed_norm())
-        self.display.update_graph_data("omega", "ω", self.car.omega_norm())
+        self.display.update_graph_data("car", "vm", self.car.speed_norm())
+        self.display.update_graph_data("car", "ω", self.car.omega_norm())
+        self.display.update_graph_data("control", "v1", self.car.v1)
+        self.display.update_graph_data("control", "v2", self.car.v2)
 
     def update_FPS(self, fps):
         """
@@ -254,8 +258,7 @@ class SimulatorController:
         block_count = line_pb.shape[0] // block_len
         final_line = line_pb[:block_count * block_len].reshape(block_count, block_len).mean(axis=1)
 
-        return (1 - final_line/255), future_point
-
+        return (1 - final_line/255), future_point, self.car.speed_norm(), self.car.omega_norm()
 simulator = None #SimulatorController()
 timer = time.time()
 
@@ -312,9 +315,9 @@ def step_simulation(v1, v2):
                 return None, None
 
     # render the simulator
-    position = simulator.step(v1, v2)
+    data = simulator.step(v1, v2)
 
-    if position is None:
+    if data is None:
         return None, None
 
     # integrate the time simulation
@@ -337,4 +340,4 @@ def step_simulation(v1, v2):
     # update the timer
     timer = time.time()
 
-    return position
+    return data
