@@ -4,7 +4,6 @@ import random
 class motor:
     def __init__(self):
         self._y = 0
-        self._last_y = 0
         self._a = [0]
         self._b = [0]
         self._c = [0]
@@ -20,21 +19,20 @@ class motor:
         elif self._y < -100:
             self._y = -100
 
-    # delay 1 because u(k-1) and q(k-1)
     def get_y(self):
-        return self._last_y
+        return self._y
 
     # first ordem step response
     def step(self, u, q=0):
-        self._last_y = self._y
         self._y = (self._a[0] * self._y + self._b[0] * u + self._c[0] * q)
-        
         # saturate output
         self.saturate()
     
 class car_dynamics:
     def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=1000, ke=1, kq=1, accommodation_time=1.0):
         self.z = z
+        self.v1 = 0
+        self.v2 = 0
         self._wheels_radius = wheels_radius
         self._wheels_distance = wheels_distance
         self._wheels_speed_rad_s = (2 * math.pi * wheels_RPM)/(60*100) # divide by 100%
@@ -71,7 +69,7 @@ class car_dynamics:
         # control gain
         b1 = ke * (1 - a1)
         b2 = ke * (1 - a2)
-
+        
         # noise gain
         c1 = kq * (1 - a1)
         c2 = kq * (1 - a2)
@@ -86,16 +84,16 @@ class car_dynamics:
         return (self._ml.get_y() - self._mr.get_y())
 
     def speed_norm(self):
-        return round(self._speed() * self._gain_Vm_norm, 2)
+        return self._speed() * self._gain_Vm_norm
     
     def omega_norm(self):
-        return round(self._omega() * self._gain_Omega_norm, 2)
+        return self._omega() * self._gain_Omega_norm
 
     def speed(self):
-        return round(self._speed() * self._gain_Vm, 2)
+        return self._speed() * self._gain_Vm
     
     def omega(self):
-        return round(self._omega() * self._gain_Omega, 2)
+        return self._omega() * self._gain_Omega
     
     def get_space(self):
         # get the current speed and omega
@@ -120,6 +118,8 @@ class car_dynamics:
 
     def step(self, u1, u2, q1=0, q2=0):
         self._ml.step(u1, q1), self._mr.step(u2, q2)
+        self.v1 = u1
+        self.v2 = u2
         #return self.speed(), self.omega()
 
     def get_size(self):
