@@ -2,34 +2,13 @@ from simulator import *
 from control import Control
 import matplotlib.pyplot as plt
 
-# ---
-v_max = 4.19
-w_max = 55.8
-
-speed_med = 70
-
-ke_v = 4.19/100
-ke_w = w_max/100
-
-points_s = ke_w/0.1
-
-v1 = speed_med
-v2 = speed_med
-
-delta_u = 0
-
-alpha = 0.94
-largura = int(math.log(0.01)/math.log(alpha))
-free = np.array([0] * largura, dtype=float)
-# ---
-
 # screen settings => sizes FULL, MEDIUM, SMALL
 screen_size = MEDIUM
 screen_fps = 80
 track_seed = 1111
 
 # car constants
-wheels_radius       = 0.04  # meters
+wheels_radius       = 0.06  # meters
 wheels_distance     = 0.15  # meters
 wheels_RPM          = 1000  # RPM
 sensor_distance     = wheels_distance  # meters
@@ -99,6 +78,27 @@ def calculate_free(free, alpha, largura, delta_u):
     return free  # Retorna o array atualizado
 
 # --- insert your code here --- #
+
+# ---
+v_max = wheels_RPM/60 * 2 * math.pi * wheels_radius
+w_max = 2*v_max/wheels_distance
+
+speed_med = 70
+
+ke_v = 4.19/100
+ke_w = w_max/100
+
+points_s = ke_w/0.1
+
+v1 = speed_med
+v2 = speed_med
+
+delta_u = 0
+
+alpha = 0.94
+largura = int(math.log(0.01)/math.log(alpha))
+free = np.array([0] * largura, dtype=float)
+# ---
 
 G = matrix_G(10, alpha)
 K = np.linalg.inv(G.T @ G + 1.2 * np.eye(10)) @ G.T
