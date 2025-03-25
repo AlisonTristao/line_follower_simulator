@@ -3,10 +3,15 @@ from control import Control
 import matplotlib.pyplot as plt
 
 # ---
-v_max = 2
-time_between_points = 0.08
+v_max = 4.19
+w_max = 55.8
 
-speed_med = (100*0.07)/(v_max*0.05)
+speed_med = 70
+
+ke_v = 4.19/100
+ke_w = w_max/100
+
+points_s = ke_w/0.1
 
 v1 = speed_med
 v2 = speed_med
@@ -25,9 +30,9 @@ track_seed = 1111
 
 # car constants
 wheels_radius       = 0.04  # meters
-wheels_distance     = 0.10  # meters
+wheels_distance     = 0.15  # meters
 wheels_RPM          = 1000  # RPM
-sensor_distance     = 0.10  # meters
+sensor_distance     = wheels_distance  # meters
 sensor_count        = 15    
 
 # motor constants
@@ -41,7 +46,7 @@ sensor_spacing      = 0.008 # meters
 
 # future points
 future_points       = 10    # number of future points
-future_spacing      = 12    # resolutuin of the track
+future_spacing      = 40    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
@@ -60,7 +65,7 @@ def converte_array(array):
     #diff = np.diff(array, axis=0)
     theta = []
     for i in range(len(array)):
-        theta.append(converte_xy_to_theta(array[i][0], array[i][1])*time_between_points*screen_fps)
+        theta.append(converte_xy_to_theta(array[i][0], array[i][1]) * points_s)
     
     # calcula a hipotenusa
     hipotenusa = []
@@ -84,20 +89,19 @@ def matrix_G(N, alpha=0.8):
 def calculates_hipotenusa(x, y):
     return math.sqrt(x**2 + y**2)
 
-
-def calculate_free(free, alpha, largura, u):
+def calculate_free(free, alpha, largura, delta_u):
     free = np.roll(free, -1)  # Desloca os valores para a esquerda
     free[-1] = free[-2]  # Mantém o último valor igual ao penúltimo
 
     for i in range(largura):
-        free[i] = (delta_u * (1-alpha**i)) + free[i]
+        free[i] = (delta_u * (1-alpha**i) * ke_w) + free[i]
     
     return free  # Retorna o array atualizado
 
 # --- insert your code here --- #
 
 G = matrix_G(10, alpha)
-K = np.linalg.inv(G.T @ G + 1 * np.eye(10)) @ G.T
+K = np.linalg.inv(G.T @ G + 1.2 * np.eye(10)) @ G.T
 K1 = K[0, :]
 
 counter = 0
@@ -108,7 +112,7 @@ while True:
 
     # --- step the simulaine, future_points, speed, omega tion here --- #
     data = step_simulation(v1, v2)
-    if data is None:
+    if data is None: 
         break
     else:
         line, future_points, speed, omega = data
@@ -117,7 +121,8 @@ while True:
     ref_theta, ref_vm = converte_array(future_points)
     ref_theta = np.array(ref_theta)
 
-    erro = (ref_theta - free[0:10])
+    const = 0 #(-omega + free[0])
+    erro = ref_theta - (free[0:10] + const)
     result = K1 @ erro
     delta_u = result
 
