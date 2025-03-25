@@ -8,7 +8,7 @@ screen_fps = 80
 track_seed = 1111
 
 # car constants
-wheels_radius       = 0.06  # meters
+wheels_radius       = 0.04  # meters
 wheels_distance     = 0.15  # meters
 wheels_RPM          = 1000  # RPM
 sensor_distance     = wheels_distance  # meters

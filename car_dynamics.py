@@ -45,9 +45,6 @@ class car_dynamics:
         self._gain_Vm = (self._wheels_speed_rad_s) * (self._wheels_radius/2)
         self._gain_Omega = (self._wheels_speed_rad_s) * self._wheels_radius/self._wheels_distance
 
-        print("vmax: ", self._gain_Vm * 200)
-        print("wmax: ", self._gain_Omega * 200)
-
         # gains for calculating normalized speed and omega
         self._gain_Vm_norm = (1/2)
         self._gain_Omega_norm = (1/2)
