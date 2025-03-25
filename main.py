@@ -2,6 +2,22 @@ from simulator import *
 from control import Control
 import matplotlib.pyplot as plt
 
+# ---
+v_max = 2
+time_between_points = 0.08
+
+speed_med = (100*0.07)/(v_max*0.05)
+
+v1 = speed_med
+v2 = speed_med
+
+delta_u = 0
+
+alpha = 0.94
+largura = int(math.log(0.01)/math.log(alpha))
+free = np.array([0] * largura, dtype=float)
+# ---
+
 # screen settings => sizes FULL, MEDIUM, SMALL
 screen_size = MEDIUM
 screen_fps = 80
@@ -20,12 +36,12 @@ accommodation_time  = 1.0 # seconds
 
 # track caracteristics
 track_type          = CIRCLE
-track_length        = 0.015 # meters
+track_length        = 0.015 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 5     # number of future points
-future_spacing      = 30    # resolutuin of the track
+future_points       = 10    # number of future points
+future_spacing      = 12    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
@@ -36,36 +52,73 @@ set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_t
 # setup the future points
 set_future_points(future_points, future_spacing)
 
+def converte_xy_to_theta(x, y):
+    return math.atan2(x, y)
+
+def converte_array(array):
+    # array de diferenças
+    #diff = np.diff(array, axis=0)
+    theta = []
+    for i in range(len(array)):
+        theta.append(converte_xy_to_theta(array[i][0], array[i][1])*time_between_points*screen_fps)
+    
+    # calcula a hipotenusa
+    hipotenusa = []
+    for i in range(len(array)):
+        hipotenusa.append(calculates_hipotenusa(array[i][0], array[i][1]))
+
+    return theta, hipotenusa
+
+def resp_degrau(alpha, k):
+    return (1 - alpha**k)
+
+def matrix_G(N, alpha=0.8):
+    # --- matriz de convolução ---
+    G = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            if j <= i:
+                G[i][j] = resp_degrau(alpha, i-j + 1)
+    return G
+
+def calculates_hipotenusa(x, y):
+    return math.sqrt(x**2 + y**2)
+
+
+def calculate_free(free, alpha, largura, u):
+    free = np.roll(free, -1)  # Desloca os valores para a esquerda
+    free[-1] = free[-2]  # Mantém o último valor igual ao penúltimo
+
+    for i in range(largura):
+        free[i] = (delta_u * (1-alpha**i)) + free[i]
+    
+    return free  # Retorna o array atualizado
+
 # --- insert your code here --- #
-v1 = 0
-v2 = 0
 
-Vm_ref = 100
-kp_1 = 1.0
-ki_1 = 0.08
-z_1 = 1/80
-control_vm = Control(kp_1, ki_1, z_1)
-
-omega_ref = 0
-kp_2 = 1.0
-ki_2 = 0.08
-z_2 = 1/80
-control_omega = Control(kp_2, ki_2, z_2)
+G = matrix_G(10, alpha)
+K = np.linalg.inv(G.T @ G + 1 * np.eye(10)) @ G.T
+K1 = K[0, :]
 
 counter = 0
 while True:
-    # --- step the simulation here --- #
-    line, future_points, speed, omega = step_simulation(v1, v2)
-    if line is None or future_points is None:
+    #print("u=", u)
+    v1 -= delta_u
+    v2 += delta_u
+
+    # --- step the simulaine, future_points, speed, omega tion here --- #
+    data = step_simulation(v1, v2)
+    if data is None:
         break
+    else:
+        line, future_points, speed, omega = data
 
-    erro_vm = Vm_ref - speed
-    v1 = control_vm.control(erro_vm)
-    v2 = v1
+    free = calculate_free(free, alpha, largura, delta_u)
+    ref_theta, ref_vm = converte_array(future_points)
+    ref_theta = np.array(ref_theta)
 
-    erro_omega = omega_ref - omega
-    omega = control_omega.control(erro_omega)
-    v1 += omega
-    v2 -= omega
+    erro = (ref_theta - free[0:10])
+    result = K1 @ erro
+    delta_u = result
 
     counter += 1

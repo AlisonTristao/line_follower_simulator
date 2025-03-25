@@ -285,7 +285,7 @@ class Cluster(Shape):
 
             pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
 
-            for j in range(self._future_space, self._future_space * self._future_count + self._future_count, self._future_space):
+            for j in range(self._future_space, self._future_space * self._future_count + self._future_space, self._future_space):
                 if self.__global_index[i] == self._next_point + j:
                     self.add_next_point((x, y), (self.__global_index[i] - self._next_point)//self._future_space - 1)
 

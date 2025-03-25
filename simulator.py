@@ -151,10 +151,10 @@ class SimulatorController:
         self.simulator.add(self.fps_display)
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
-        self.simulator.add(self.display)
         self.simulator.add(self.future_points)
         self.simulator.add(self.track_percentage)
         self.simulator.add(self.points)
+        self.simulator.add(self.display)
 
         # configurate the cluster
         self.configurate_cluster()
@@ -247,7 +247,7 @@ class SimulatorController:
         # get the future points
         future_point = Cluster.get_next_point()
         self.future_points.set_points(future_point)
-        future_point = [((-x + self.car_draw.get_center()[0])/self.SCALE, (-y + self.car_draw.get_center()[1])/self.SCALE) for x, y in future_point]
+        future_point = [((x - self.car_draw.get_center()[0])/self.SCALE, (-y + self.car_draw.get_center()[1])/self.SCALE) for x, y in future_point]
 
         # return the sensor value
         line = self.simulator.screen.subsurface((self.line_sensor.get_x() - self.line_sensor.get_size()/2, self.line_sensor.get_y() -1, self.line_sensor.get_size(), 1))
@@ -262,7 +262,7 @@ class SimulatorController:
 simulator = None #SimulatorController()
 timer = time.time()
 
-def start_simulation(screen_size=MEDIUM, fps=120, length=100, width=100, scale=300, render=3, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
+def start_simulation(screen_size=MEDIUM, fps=120, length=100, width=100, scale=300, render=5, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
     # define the seed
     if seed is not None:
         random.seed(seed)
@@ -299,26 +299,26 @@ def step_simulation(v1, v2):
     # check if the simulator is initialized
     if simulator is None or simulator.car is None:
         print("Simulator not initialized")
-        return None, None
+        return None
 
     # check for events
     for event in pygame.event.get():
         if event.type == pygame.QUIT:
             pygame.quit()
             print("Simulation stopped using X button")
-            return None, None
+            return None
 
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_ESCAPE:
                 pygame.quit()
                 print("Simulation stopped using ESC")
-                return None, None
+                return None
 
     # render the simulator
     data = simulator.step(v1, v2)
 
     if data is None:
-        return None, None
+        return None
 
     # integrate the time simulation
     simulator.time_simulation += 1/simulator.FPS

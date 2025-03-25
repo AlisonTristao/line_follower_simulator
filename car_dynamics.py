@@ -26,7 +26,7 @@ class motor:
     def step(self, u, q=0):
         self._y = (self._a[0] * self._y + self._b[0] * u + self._c[0] * q)
         # saturate output
-        self.saturate()
+        #self.saturate()
     
 class car_dynamics:
     def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=1000, ke=1, kq=1, accommodation_time=1.0):
@@ -44,6 +44,8 @@ class car_dynamics:
         # gains for calculating speed and omega
         self._gain_Vm = (self._wheels_speed_rad_s) * (self._wheels_radius/2)
         self._gain_Omega = (self._wheels_speed_rad_s) * self._wheels_radius/self._wheels_distance
+
+        print("vmax: ", self._gain_Vm * 100)
 
         # gains for calculating normalized speed and omega
         self._gain_Vm_norm = (1/2)
