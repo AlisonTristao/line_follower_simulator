@@ -24,7 +24,7 @@ track_length        = 0.015 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 10    # number of future points
+future_points       = 6    # number of future points
 future_spacing      = 40    # resolutuin of the track
 
 # setup the simulation
@@ -73,13 +73,27 @@ def calculate_free(free, alpha, largura, delta_u):
     free[-1] = free[-2]  # Mantém o último valor igual ao penúltimo
 
     for i in range(largura):
-        free[i] = (delta_u * (1-alpha**i) * ke_w) + free[i]
+        free[i] = (delta_u * (1-alpha**(i+1)) * ke_w) + free[i]
     
     return free  # Retorna o array atualizado
 
+def make_step(array, len_):
+    array_result = np.zeros(len_)
+    qtd = len_//len(array)
+    for i in range(len_):
+        array_result[i] = array[i//qtd]
+
+    return array_result
+
+def make_interp(array, len_):
+    x_original = np.linspace(0, 1, len(array))  # Posições originais
+    x_interp = np.linspace(0, 1, len_)  # Posições desejadas
+    array_result = np.interp(x_interp, x_original, array)  # Interpolação linear
+    
+    return array_result
+
 # --- insert your code here --- #
 
-# ---
 v_max = wheels_RPM/60 * 2 * math.pi * wheels_radius
 w_max = 2*v_max/wheels_distance
 
@@ -88,7 +102,7 @@ speed_med = 70
 ke_v = 4.19/100
 ke_w = w_max/100
 
-points_s = ke_w/0.1
+points_s = ke_w/0.01
 
 v1 = speed_med
 v2 = speed_med
@@ -97,14 +111,14 @@ delta_u = 0
 
 alpha = 0.94
 largura = int(math.log(0.01)/math.log(alpha))
-free = np.array([0] * largura, dtype=float)
-# ---
+free = np.array([0] * (largura + 1), dtype=float)
 
-G = matrix_G(10, alpha)
-K = np.linalg.inv(G.T @ G + 1.2 * np.eye(10)) @ G.T
+# control variables
+
+G = matrix_G(60, alpha)
+K = np.linalg.inv(G.T @ G + 0.005 * np.eye(60)) @ G.T
 K1 = K[0, :]
 
-counter = 0
 while True:
     #print("u=", u)
     v1 -= delta_u
@@ -117,13 +131,12 @@ while True:
     else:
         line, future_points, speed, omega = data
 
-    free = calculate_free(free, alpha, largura, delta_u)
+    free = calculate_free(free, alpha, largura + 1, delta_u)
     ref_theta, ref_vm = converte_array(future_points)
     ref_theta = np.array(ref_theta)
+    
+    r = make_interp(ref_theta, 60)
 
-    const = 0 #(-omega + free[0])
-    erro = ref_theta - (free[0:10] + const)
-    result = K1 @ erro
-    delta_u = result
-
-    counter += 1
+    const = (omega - free[0])
+    erro = r - (free[1:61] - const)
+    delta_u = K1 @ erro
