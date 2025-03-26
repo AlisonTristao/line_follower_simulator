@@ -13,6 +13,7 @@ wheels_distance     = 0.15  # meters
 wheels_RPM          = 1000  # RPM
 sensor_distance     = wheels_distance  # meters
 sensor_count        = 15    
+sensor_spacing      = 0.008 # meters
 
 # motor constants
 ke                  = 1.0 # static gain of V1 => (y = ke * v)
@@ -20,8 +21,7 @@ accommodation_time  = 1.0 # seconds
 
 # track caracteristics
 track_type          = CIRCLE
-track_length        = 0.015 # metersref_theta
-sensor_spacing      = 0.008 # meters
+track_length        = 0.015 # meters
 
 # future points
 future_points       = 6    # number of future points

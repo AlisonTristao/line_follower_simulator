@@ -37,6 +37,7 @@ if __name__ == "__main__":
     wheels_RPM          = 1000  # RPM
     sensor_distance     = 0.10  # meters
     sensor_count        = 15    
+    sensor_spacing      = 0.008 # meters
 
     # motor constants
     ke                  = 1.0 # static gain of V1 => (y = ke * v)
@@ -45,7 +46,6 @@ if __name__ == "__main__":
     # track caracteristics
     track_type          = CIRCLE
     track_length        = 0.015 # meters
-    sensor_spacing      = 0.008 # meters
 
     # future points
     future_points       = 5     # number of future points
