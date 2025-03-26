@@ -26,7 +26,7 @@ class motor:
     def step(self, u, q=0):
         self._y = (self._a[0] * self._y + self._b[0] * u + self._c[0] * q)
         # saturate output
-        #self.saturate()
+        self.saturate()
     
 class car_dynamics:
     def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.2, wheels_RPM=1000, ke=1, kq=1, accommodation_time=1.0):
