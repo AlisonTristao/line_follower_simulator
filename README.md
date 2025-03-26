@@ -1,1 +1,1 @@
-![Imagem do Simulador](image.png)
+![Imagem do Simulador](imagens/image.png)
