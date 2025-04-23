@@ -51,7 +51,7 @@ def converte_array(array):
     for i in range(len(array)):
         hipotenusa.append(calculates_hipotenusa(array[i][0], array[i][1]))
 
-    return theta, hipotenusa
+    return np.array(theta), np.array(hipotenusa)
 
 def resp_degrau(alpha, k):
     return (1 - alpha**k)
@@ -68,12 +68,12 @@ def matrix_G(N, alpha=0.8):
 def calculates_hipotenusa(x, y):
     return math.sqrt(x**2 + y**2)
 
-def calculate_free(free, alpha, largura, delta_u):
+def calculate_free(free, alpha, largura, delta_u, ke):
     free = np.roll(free, -1)  # Desloca os valores para a esquerda
     free[-1] = free[-2]  # Mantém o último valor igual ao penúltimo
 
     for i in range(largura):
-        free[i] = (delta_u * (1-alpha**(i+1)) * ke_w) + free[i]
+        free[i] = (delta_u * (1-alpha**(i+1)) * ke) + free[i]
     
     return free  # Retorna o array atualizado
 
@@ -101,8 +101,9 @@ speed_med = 70
 
 ke_v = 4.19/100
 ke_w = w_max/100
+print(ke_w)
 
-points_s = ke_w/0.01
+points_s = ke_w/0.05
 
 v1 = speed_med
 v2 = speed_med
@@ -113,10 +114,11 @@ alpha = 0.94
 largura = int(math.log(0.01)/math.log(alpha))
 free = np.array([0] * (largura + 1), dtype=float)
 
-# control variables
+lamb = 0.01
+Q = np.eye(60) * ke_w**2 * lamb
 
 G = matrix_G(60, alpha)
-K = np.linalg.inv(G.T @ G + 0.005 * np.eye(60)) @ G.T
+K = np.linalg.inv(G.T @ G + Q) @ G.T
 K1 = K[0, :]
 
 while True:
@@ -131,12 +133,11 @@ while True:
     else:
         line, future_points, speed, omega = data
 
-    free = calculate_free(free, alpha, largura + 1, delta_u)
+    free = calculate_free(free, alpha, largura + 1, delta_u, ke_w)
     ref_theta, ref_vm = converte_array(future_points)
-    ref_theta = np.array(ref_theta)
     
     r = make_interp(ref_theta, 60)
 
-    const = (omega - free[0])
-    erro = r - (free[1:61] - const)
+    eta = (omega - free[0])
+    erro = r - (free[1:61] + eta)
     delta_u = K1 @ erro
