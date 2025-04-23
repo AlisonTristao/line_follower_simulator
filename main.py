@@ -44,12 +44,12 @@ def converte_array(array):
     #diff = np.diff(array, axis=0)
     theta = []
     for i in range(len(array)):
-        theta.append(converte_xy_to_theta(array[i][0], array[i][1]) * points_s)
+        theta.append(converte_xy_to_theta(array[i][0], array[i][1]) * points_s_w)
     
     # calcula a hipotenusa
     hipotenusa = []
     for i in range(len(array)):
-        hipotenusa.append(calculates_hipotenusa(array[i][0], array[i][1]))
+        hipotenusa.append(calculates_hipotenusa(array[i][0], array[i][1]) * points_s_v)
 
     return np.array(theta), np.array(hipotenusa)
 
@@ -97,24 +97,28 @@ def make_interp(array, len_):
 v_max = wheels_RPM/60 * 2 * math.pi * wheels_radius
 w_max = 2*v_max/wheels_distance
 
-speed_med = 70
+speed_med = 0
 
 ke_v = 4.19/100
 ke_w = w_max/100
 print(ke_w)
 
-points_s = ke_w/0.05
+points_s_w = ke_w/0.05
+points_s_v = ke_v/0.05
 
 v1 = speed_med
 v2 = speed_med
 
-delta_u = 0
+delta_u_w = 0
+delta_u_v = 0
 
 alpha = 0.94
 largura = int(math.log(0.01)/math.log(alpha))
-free = np.array([0] * (largura + 1), dtype=float)
 
-lamb = 0.01
+free_w = np.array([0] * (largura + 1), dtype=float)
+free_v = np.array([0] * (largura + 1), dtype=float)
+
+lamb = 0.001
 Q = np.eye(60) * ke_w**2 * lamb
 
 G = matrix_G(60, alpha)
@@ -123,8 +127,8 @@ K1 = K[0, :]
 
 while True:
     #print("u=", u)
-    v1 -= delta_u
-    v2 += delta_u
+    v1 += delta_u_v + delta_u_w
+    v2 += delta_u_v - delta_u_w
 
     # --- step the simulaine, future_points, speed, omega tion here --- #
     data = step_simulation(v1, v2)
@@ -133,11 +137,20 @@ while True:
     else:
         line, future_points, speed, omega = data
 
-    free = calculate_free(free, alpha, largura + 1, delta_u, ke_w)
+    free_w = calculate_free(free_w, alpha, largura + 1, delta_u_w, ke_w)
+    free_v = calculate_free(free_v, alpha, largura + 1, delta_u_v, ke_v)
+
     ref_theta, ref_vm = converte_array(future_points)
     
-    r = make_interp(ref_theta, 60)
+    r_w = [0] * 60 #make_interp(ref_theta, 60)
+    r_v = [ke_v * 50] * 60 #make_interp(ref_vm, 60)
 
-    eta = (omega - free[0])
-    erro = r - (free[1:61] + eta)
-    delta_u = K1 @ erro
+    eta_w = (omega - free_w[0])
+    eta_v = (speed - free_v[0])
+
+    erro_v = r_v - (free_v[1:61] + eta_v)
+    delta_u_v = K1 @ erro_v
+
+    erro_w = r_w - (free_w[1:61] + eta_w)
+    delta_u_w = K1 @ erro_w
+    #print(delta_u_w, delta_u_v)
