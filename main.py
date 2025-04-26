@@ -56,13 +56,15 @@ def converte_array(array):
 def resp_degrau(alpha, k):
     return (1 - alpha**k)
 
-def matrix_G(N, alpha=0.8):
+def matrix_G(N, N_u, alpha=0.8):
     # --- matriz de convolução ---
     G = np.zeros((N, N))
     for i in range(N):
         for j in range(N):
             if j <= i:
                 G[i][j] = resp_degrau(alpha, i-j + 1)
+    # return just the N_u first columns
+    G = G[:, :N_u]
     return G
 
 def calculates_hipotenusa(x, y):
@@ -92,44 +94,74 @@ def make_interp(array, len_):
     
     return array_result
 
+def pad_to_shape(matrix, target_shape):
+    padded = np.zeros(target_shape)
+    rows, cols = matrix.shape
+    padded[:rows, :cols] = matrix
+    return padded
+
 # --- insert your code here --- #
 
 v_max = wheels_RPM/60 * 2 * math.pi * wheels_radius
 w_max = 2*v_max/wheels_distance
 
-speed_med = 0
-
-ke_v = 4.19/100
+ke_v = v_max/100
 ke_w = w_max/100
-print(ke_v * 100)
 
 points_s_w = ke_w/0.05
 points_s_v = ke_v/0.003
 
-v1 = speed_med
-v2 = speed_med
+# --- setup the control --- #
+
+v1 = 0
+v2 = 0
 
 delta_u_w = 0
 delta_u_v = 0
 
-alpha = 0.9
-largura = int(math.log(0.01)/math.log(alpha))
+alpha_l = 0.92
+alpha_r = 0.88
 
-free_w = np.array([0] * (largura + 1), dtype=float)
-free_v = np.array([0] * (largura + 1), dtype=float)
+largura = int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
+#largura_r = int(math.log(0.01)/math.log(alpha_r))
+
+free_l = np.zeros(largura)
+free_r = np.zeros(largura)
 
 lamb_v = 10.0
 lamb_w = 0.01
+epsl_v = 0.01
+epsl_w = 0.01
 
-Q_w = np.eye(largura) * ke_w**2 * lamb_w
-Q_v = np.eye(largura) * ke_v**2 * lamb_v
+N_uw = 10
+N_uv = 12
 
-G = matrix_G(largura, alpha)
-K_W = np.linalg.inv(G.T @ G + Q_w) @ G.T
-K1_W = K_W[0, :]
+R_v = np.eye(N_uv) * lamb_v
+R_w = np.eye(N_uw) * lamb_w
+R = np.block([
+    [R_w, np.zeros((N_uw, N_uv))],
+    [np.zeros((N_uv, N_uw)), R_v]
+])
 
-K_V = np.linalg.inv(G.T @ G + Q_v) @ G.T
-K1_V = K_V[0, :]
+Q_v = np.eye(largura) * epsl_v
+Q_w = np.eye(largura) * epsl_w
+Q = np.block([
+    [Q_w, np.zeros((largura, largura))],
+    [np.zeros((largura, largura)), Q_v]
+])
+
+G_lw = matrix_G(largura, N_uw, alpha_l) * ke_w
+G_rw = -matrix_G(largura, N_uw, alpha_r) * -ke_w
+G_lv = matrix_G(largura, N_uv, alpha_l) * ke_v
+G_rv = matrix_G(largura, N_uv, alpha_r) * ke_v
+G = np.block([
+    [G_lw, G_lv], 
+    [G_rw, G_rv]
+])
+
+# solution of quadratic problem
+K = np.linalg.inv(G.T @ Q @ G + R) @ G.T @ Q
+K1 = K[0]
 
 while True:
     #print("u=", u)
@@ -145,25 +177,28 @@ while True:
 
     # --- calculate free response --- #
 
-    free_w = calculate_free(free_w, alpha, largura + 1, delta_u_w, ke_w)
-    free_v = calculate_free(free_v, alpha, largura + 1, delta_u_v, ke_v)
-
-    # --- calculate the reference trajectory --- #
-
-    ref_theta, ref_vm = converte_array(future_points)
-    
-    r_w = make_interp(ref_theta, largura)
-    r_v = make_interp(ref_vm, largura)
-
-    # --- calculate the model error --- #
+    free_l = calculate_free(free_l, alpha_l, largura, delta_u_w, 1)
+    free_r = calculate_free(free_r, alpha_r, largura, delta_u_v, 1)
+    free_w = (free_l - free_r)
+    free_v = (free_l + free_r)
 
     eta_w = (omega - free_w[0])
     eta_v = (speed - free_v[0])
 
-    # --- calculate the control action --- #
+    free = np.concatenate((free_w + eta_w, free_v + eta_v), axis=0)
 
-    erro_v = r_v - (free_v[1:61] + eta_v)
-    delta_u_v = K1_V @ erro_v
+    # --- calculate the reference trajectory --- #
 
-    erro_w = r_w - (free_w[1:61] + eta_w)
-    delta_u_w = K1_W @ erro_w
+    ref_theta, ref_vm = converte_array(future_points)
+
+    r_w = make_interp(ref_theta, largura)
+    r_v = make_interp(ref_vm, largura)
+
+    ref = np.concatenate((r_w, r_v), axis=0)
+
+    # --- calculate the model error --- #
+
+    delta_u = K @ (ref - free)
+    print(delta_u)
+    delta_u_w = delta_u[0]
+    delta_u_v = delta_u[10]
