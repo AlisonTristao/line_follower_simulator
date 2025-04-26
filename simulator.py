@@ -221,6 +221,7 @@ class SimulatorController:
 
         dx *= -self.SCALE
         dy *= -self.SCALE
+        angle *= -1
         self.track.step(dx, dy, angle)
 
         # update compass and coordinates

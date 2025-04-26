@@ -101,10 +101,10 @@ speed_med = 0
 
 ke_v = 4.19/100
 ke_w = w_max/100
-print(ke_w)
+print(ke_v * 100)
 
 points_s_w = ke_w/0.05
-points_s_v = ke_v/0.05
+points_s_v = ke_v/0.003
 
 v1 = speed_med
 v2 = speed_med
@@ -112,18 +112,24 @@ v2 = speed_med
 delta_u_w = 0
 delta_u_v = 0
 
-alpha = 0.94
+alpha = 0.9
 largura = int(math.log(0.01)/math.log(alpha))
 
 free_w = np.array([0] * (largura + 1), dtype=float)
 free_v = np.array([0] * (largura + 1), dtype=float)
 
-lamb = 0.001
-Q = np.eye(60) * ke_w**2 * lamb
+lamb_v = 10.0
+lamb_w = 0.01
 
-G = matrix_G(60, alpha)
-K = np.linalg.inv(G.T @ G + Q) @ G.T
-K1 = K[0, :]
+Q_w = np.eye(largura) * ke_w**2 * lamb_w
+Q_v = np.eye(largura) * ke_v**2 * lamb_v
+
+G = matrix_G(largura, alpha)
+K_W = np.linalg.inv(G.T @ G + Q_w) @ G.T
+K1_W = K_W[0, :]
+
+K_V = np.linalg.inv(G.T @ G + Q_v) @ G.T
+K1_V = K_V[0, :]
 
 while True:
     #print("u=", u)
@@ -137,20 +143,27 @@ while True:
     else:
         line, future_points, speed, omega = data
 
+    # --- calculate free response --- #
+
     free_w = calculate_free(free_w, alpha, largura + 1, delta_u_w, ke_w)
     free_v = calculate_free(free_v, alpha, largura + 1, delta_u_v, ke_v)
 
+    # --- calculate the reference trajectory --- #
+
     ref_theta, ref_vm = converte_array(future_points)
     
-    r_w = [0] * 60 #make_interp(ref_theta, 60)
-    r_v = [ke_v * 50] * 60 #make_interp(ref_vm, 60)
+    r_w = make_interp(ref_theta, largura)
+    r_v = make_interp(ref_vm, largura)
+
+    # --- calculate the model error --- #
 
     eta_w = (omega - free_w[0])
     eta_v = (speed - free_v[0])
 
+    # --- calculate the control action --- #
+
     erro_v = r_v - (free_v[1:61] + eta_v)
-    delta_u_v = K1 @ erro_v
+    delta_u_v = K1_V @ erro_v
 
     erro_w = r_w - (free_w[1:61] + eta_w)
-    delta_u_w = K1 @ erro_w
-    #print(delta_u_w, delta_u_v)
+    delta_u_w = K1_W @ erro_w
