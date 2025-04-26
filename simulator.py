@@ -221,6 +221,7 @@ class SimulatorController:
 
         dx *= -self.SCALE
         dy *= -self.SCALE
+        angle *= -1
         self.track.step(dx, dy, angle)
 
         # update compass and coordinates
@@ -258,7 +259,7 @@ class SimulatorController:
         block_count = line_pb.shape[0] // block_len
         final_line = line_pb[:block_count * block_len].reshape(block_count, block_len).mean(axis=1)
 
-        return (1 - final_line/255), future_point, self.car.speed(), -self.car.omega()
+        return (1 - final_line/255), future_point, self.car.speed(), self.car.omega()
     
 simulator = None #SimulatorController()
 timer = time.time()

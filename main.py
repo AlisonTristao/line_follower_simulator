@@ -123,8 +123,8 @@ K1 = K[0, :]
 
 while True:
     #print("u=", u)
-    v1 -= delta_u
-    v2 += delta_u
+    v1 += delta_u
+    v2 -= delta_u
 
     # --- step the simulaine, future_points, speed, omega tion here --- #
     data = step_simulation(v1, v2)
