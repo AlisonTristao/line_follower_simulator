@@ -63,7 +63,7 @@ class car_dynamics:
         # --- motor constants (using z transform) ---
 
         # time constants
-        a1 = 0.9 #math.exp(-z/self.tau)
+        a1 = 0.8 #math.exp(-z/self.tau)
         a2 = 0.9 #math.exp(-z/self.tau)
 
         # control gain
