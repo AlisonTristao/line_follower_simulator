@@ -63,11 +63,11 @@ class car_dynamics:
         # --- motor constants (using z transform) ---
 
         # time constants
-        a1 = math.exp(-z/self.tau)
-        a2 = math.exp(-z/self.tau)
+        a1 = 0.8 #math.exp(-z/self.tau)
+        a2 = 0.9 #math.exp(-z/self.tau)
 
         # control gain
-        b1 = ke * (1 - a1)
+        b1 = ke * (0.98 - a1)
         b2 = ke * (1 - a2)
         
         # noise gain
@@ -117,6 +117,10 @@ class car_dynamics:
         return self._ml.get_y(), self._mr.get_y()
 
     def step(self, u1, u2, q1=0, q2=0):
+        # saturate
+        u1 = max(-100, min(100, u1))
+        u2 = max(-100, min(100, u2))
+
         self._ml.step(u1, q1), self._mr.step(u2, q2)
         self.v1 = u1
         self.v2 = u2
