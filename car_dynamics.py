@@ -67,7 +67,7 @@ class car_dynamics:
         a2 = 0.9 #math.exp(-z/self.tau)
 
         # control gain
-        b1 = ke * (1 - a1)
+        b1 = ke * (0.98 - a1)
         b2 = ke * (1 - a2)
         
         # noise gain

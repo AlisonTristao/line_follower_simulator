@@ -36,9 +36,6 @@ set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_t
 # setup the future points
 set_future_points(future_points, future_spacing)
 
-def converte_xy_to_theta(x, y):
-    return math.atan2(x, y)
-
 def converte_array(array):
     # array de diferenças
     #diff = np.diff(array, axis=0)
@@ -49,33 +46,39 @@ def converte_array(array):
     # calcula a hipotenusa
     hipotenusa = []
     for i in range(len(array)):
-        hipotenusa.append(calculates_hipotenusa(array[i][0], array[i][1]) * points_s_v)
+        delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
+        delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
+
+        hipotenusa.append(calculates_hipotenusa(delta_x, delta_y) * points_s_v)
 
     return np.array(theta), np.array(hipotenusa)
+
+def converte_xy_to_theta(x, y):
+    return math.atan2(x, y)
+
+def calculates_hipotenusa(x, y):
+    return math.sqrt(x**2 + y**2)
 
 def resp_degrau(alpha, k):
     return (1 - alpha**k)
 
-def matrix_G(N, N_u, alpha=0.8):
+def matrix_G(N, N_u, alpha=0.8, beta=0.2):
     # --- matriz de convolução ---
     G = np.zeros((N, N))
     for i in range(N):
         for j in range(N):
             if j <= i:
-                G[i][j] = resp_degrau(alpha, i-j + 1)
+                G[i][j] = resp_degrau(alpha, i-j + 1) * beta/(1 - alpha)
     # return just the N_u first columns
     G = G[:, :N_u]
     return G
 
-def calculates_hipotenusa(x, y):
-    return math.sqrt(x**2 + y**2)
-
-def calculate_free(free, alpha, N_horizon, delta_u, ke):
+def calculate_free(free, alpha, beta, N_horizon, delta_u, ke):
     free = np.roll(free, -1)  # Desloca os valores para a esquerda
     free[-1] = free[-2]  # Mantém o último valor igual ao penúltimo
 
     for i in range(N_horizon):
-        free[i] = (delta_u * (1-alpha**(i+1)) * ke) + free[i]
+        free[i] = (delta_u * (1-alpha**(i+1)) * (beta/(1 - alpha)) * ke) + free[i]
     
     return free  # Retorna o array atualizado
 
@@ -108,21 +111,23 @@ w_max = 2*v_max/wheels_distance
 ke_v = v_max/100
 ke_w = w_max/100
 
-points_s_w = ke_w/0.075
-points_s_v = ke_v/0.0125
+points_s_w = ke_w/0.065
+points_s_v = ke_v/0.0035
 
 # --- setup the control --- #
 
 alpha_l = 0.8
 alpha_r = 0.9
+beta_l = 0.98 - alpha_l
+beta_r = 1 - alpha_r
 
 N_horizon = int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_uw = 5
 N_uv = 5
 
-lamb_v = 0.01
+lamb_v = 0.015
 lamb_w = 0.01
-epsl_v = 0.002
+epsl_v = 0.003
 epsl_w = 1
 
 v1 = 0
@@ -150,10 +155,10 @@ Q = np.block([
     [np.zeros((N_horizon, N_horizon)), Q_v]
 ])
 
-G_lw = matrix_G(N_horizon, N_uw, alpha_l) * ke_w
-G_rw = matrix_G(N_horizon, N_uw, alpha_r) * -ke_w
-G_lv = matrix_G(N_horizon, N_uv, alpha_l) * ke_v
-G_rv = matrix_G(N_horizon, N_uv, alpha_r) * ke_v
+G_lw = matrix_G(N_horizon, N_uw, alpha_l, beta_l) * ke_w
+G_rw = matrix_G(N_horizon, N_uw, alpha_r, beta_r) * -ke_w
+G_lv = matrix_G(N_horizon, N_uv, alpha_l, beta_l) * ke_v
+G_rv = matrix_G(N_horizon, N_uv, alpha_r, beta_r) * ke_v
 G = np.block([
     [G_lw, G_lv], 
     [G_rw, G_rv]
@@ -177,8 +182,8 @@ while True:
 
     # --- calculate free response --- #
 
-    free_l = calculate_free(free_l, alpha_l, N_horizon, delta_u_l, 1)
-    free_r = calculate_free(free_r, alpha_r, N_horizon, delta_u_r, 1)
+    free_l = calculate_free(free_l, alpha_l, beta_l, N_horizon, delta_u_l, 1)
+    free_r = calculate_free(free_r, alpha_r, beta_r, N_horizon, delta_u_r, 1)
     free_w = (free_l - free_r) * ke_w/2
     free_v = (free_l + free_r) * ke_v/2
 
