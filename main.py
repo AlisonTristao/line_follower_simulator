@@ -5,6 +5,7 @@ import matplotlib.pyplot as plt
 # screen settings => sizes FULL, MEDIUM, SMALL
 screen_size = MEDIUM
 screen_fps = 80
+z = 1/screen_fps
 track_seed = 1111
 
 # car constants
@@ -15,11 +16,13 @@ sensor_distance     = wheels_distance  # meters
 sensor_count        = 15    
 
 # motor constants
-ke                  = 1.0 # static gain of V1 => (y = ke * v)
-accommodation_time  = 1.0 # seconds
+ke_l = 0.99
+ke_r = 1.00
+accommodation_time_l = 0.61 # seconds
+accommodation_time_r = 0.59 # seconds
 
 # track caracteristics
-track_type          = CIRCLE
+track_type          = LEMNISCATE
 track_length        = 0.015 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
@@ -31,7 +34,7 @@ future_spacing      = 40    # resolutuin of the track
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
 
 # setup the car dynamics
-set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_count)
+set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, accommodation_time_l, accommodation_time_r, sensor_distance, sensor_count)
 
 # setup the future points
 set_future_points(future_points, future_spacing)
@@ -111,23 +114,23 @@ w_max = 2*v_max/wheels_distance
 ke_v = v_max/100
 ke_w = w_max/100
 
-points_s_w = ke_w/0.065
-points_s_v = ke_v/0.0035
+points_s_w = ke_w/0.08
+points_s_v = ke_v/0.004
 
 # --- setup the control --- #
 
-alpha_l = 0.8
-alpha_r = 0.9
-beta_l = 0.98 - alpha_l
-beta_r = 1 - alpha_r
+alpha_l = math.exp(-z*5/accommodation_time_l)
+alpha_r = math.exp(-z*5/accommodation_time_r)
+beta_l = ke_l - alpha_l
+beta_r = ke_r - alpha_r
 
 N_horizon = int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_uw = 5
 N_uv = 5
 
-lamb_v = 0.015
+lamb_v = 0.02
 lamb_w = 0.01
-epsl_v = 0.003
+epsl_v = 0.002
 epsl_w = 1
 
 v1 = 0
@@ -171,6 +174,11 @@ K1 = K[0]
 while True:
     v1 += delta_u_l
     v2 += delta_u_r
+
+    # saturate the inputs
+
+    v1 = max(min(v1, 100), -100)
+    v2 = max(min(v2, 100), -100)
 
     # --- step the simulaine, future_points, speed, omega tion here --- #
 

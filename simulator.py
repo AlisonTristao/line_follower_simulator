@@ -48,9 +48,9 @@ class SimulatorController:
         # setup the simulator
         self._setup_simulator()
 
-    def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke=1, kq=1, accommodation_time=1.0, sensor_distance=0.1, sensor_count=8):
+    def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke_l=1, ke_r=1, kq=1, accommodation_time_l=1.0, accommodation_time_r=1.0, sensor_distance=0.1, sensor_count=8):
         z = 1/self.FPS
-        self.car = car_dynamics(z, wheels_radius, wheels_distance, wheels_RPM, ke, kq, accommodation_time)
+        self.car = car_dynamics(z, wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, kq, accommodation_time_l, accommodation_time_r)
         self.car_draw.set_size(self.car.get_size()*self.SCALE)
         self.line_sensor.set_coordinates((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE))
         self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist) # 0.05 meter beetween sensors
@@ -87,7 +87,7 @@ class SimulatorController:
         print("Initializing simulator...")
 
         # generate trajectory
-        self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.3, checkpoints=36, resolution=1000, track_rad=30)
+        self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.1, checkpoints=36, resolution=1000, track_rad=30)
         self.win = len(self.x_track-1)
 
         # create car
@@ -174,8 +174,8 @@ class SimulatorController:
         self.display.add_line_to_graph("car", "ω", color=(200, 200, 0))
 
         self.display.add_graph("control")
-        self.display.add_line_to_graph("control", "v1", color=(0, 200, 0))
-        self.display.add_line_to_graph("control", "v2", color=(200, 0, 0))
+        self.display.add_line_to_graph("control", "left", color=(0, 200, 0))
+        self.display.add_line_to_graph("control", "right", color=(200, 0, 0))
 
     def _update_graps(self):
         """
@@ -185,8 +185,8 @@ class SimulatorController:
         self.display.update_graph_data("wheels", "right", self.car.getWheels()[1])
         self.display.update_graph_data("car", "vm", self.car.speed_norm())
         self.display.update_graph_data("car", "ω", self.car.omega_norm())
-        self.display.update_graph_data("control", "v1", self.car.v1)
-        self.display.update_graph_data("control", "v2", self.car.v2)
+        self.display.update_graph_data("control", "left", self.car.v1)
+        self.display.update_graph_data("control", "right", self.car.v2)
 
     def update_FPS(self, fps):
         """
@@ -279,13 +279,13 @@ def start_simulation(screen_size=MEDIUM, fps=120, length=100, width=100, scale=3
     simulator = SimulatorController(screen_size, fps, length, width, scale, render, track_type, track_length, sensor_spacing)
     return simulator
 
-def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, accommodation_time, sensor_distance, sensor_count):
+def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, accommodation_time_l, accommodation_time_r, sensor_distance, sensor_count):
     # check if the simulator is initialized
     if simulator is None:
         print("Simulator not initialized")
         return
 
-    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke, 0, accommodation_time, sensor_distance, sensor_count)
+    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, 0, accommodation_time_l, accommodation_time_r, sensor_distance, sensor_count)
 
 def set_future_points(count, space):
     # check if the simulator is initialized

@@ -29,7 +29,7 @@ class motor:
         #self.saturate()
     
 class car_dynamics:
-    def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.2, wheels_RPM=1000, ke=1, kq=1, accommodation_time=1.0):
+    def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.2, wheels_RPM=1000, ke_l=1, ke_r=1, kq=1, accommodation_time_l=1.0, accommodation_time_r=1.0):
         self.z = z
         self.v1 = 0
         self.v2 = 0
@@ -49,11 +49,9 @@ class car_dynamics:
         self._gain_Vm_norm = (1/2)
         self._gain_Omega_norm = (1/2)
 
-        # constants
-        ke = 1
-        kq = 1
-        accommodation_time = 1.0
-        self.tau = accommodation_time/5
+        # accommodation time 
+        self.tau_l = accommodation_time_l/5
+        self.tau_r = accommodation_time_r/5
 
         # motor objects
         self._ml = motor()
@@ -63,13 +61,13 @@ class car_dynamics:
         # --- motor constants (using z transform) ---
 
         # time constants
-        a1 = 0.8 #math.exp(-z/self.tau)
-        a2 = 0.9 #math.exp(-z/self.tau)
+        a1 = math.exp(-z/self.tau_l)
+        a2 = math.exp(-z/self.tau_r)
 
         # control gain
-        b1 = ke * (0.98 - a1)
-        b2 = ke * (1 - a2)
-        
+        b1 = (ke_l - a1)
+        b2 = (ke_r - a2)
+
         # noise gain
         c1 = kq * (1 - a1)
         c2 = kq * (1 - a2)
