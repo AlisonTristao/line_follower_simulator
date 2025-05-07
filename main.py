@@ -44,7 +44,7 @@ def converte_array(array):
     #diff = np.diff(array, axis=0)
     theta = []
     for i in range(len(array)):
-        theta.append(converte_xy_to_theta(array[i][0], array[i][1]) * points_s_w)
+        theta.append(converte_xy_to_theta(array[i][0], array[i][1]))
     
     # calcula a hipotenusa
     hipotenusa = []
@@ -52,7 +52,7 @@ def converte_array(array):
         delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
         delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
 
-        hipotenusa.append(calculates_hipotenusa(delta_x, delta_y) * points_s_v)
+        hipotenusa.append(calculates_hipotenusa(delta_x, delta_y))
 
     return np.array(theta), np.array(hipotenusa)
 
@@ -114,8 +114,9 @@ w_max = 2*v_max/wheels_distance
 ke_v = v_max/100
 ke_w = w_max/100
 
-points_s_w = ke_w/0.08
-points_s_v = ke_v/0.004
+s = 0.08
+points_s_w = 1e-5
+points_s_v = s
 
 # --- setup the control --- #
 
@@ -202,7 +203,13 @@ while True:
 
     # --- calculate the reference trajectory --- #
 
-    ref_theta, ref_vm = converte_array(future_points)
+    angle, space = converte_array(future_points)
+
+    s = space[0]/speed if speed != 0 else 1000
+    points_s_w = 0.95 * points_s_w + 0.05 * s 
+
+    ref_theta = angle/(1.5 * points_s_w)
+    ref_vm = space/points_s_v
 
     r_w = make_interp(ref_theta, N_horizon)
     r_v = make_interp(ref_vm, N_horizon)
