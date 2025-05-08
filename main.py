@@ -27,8 +27,8 @@ track_length        = 0.015 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 10    # number of future points
-future_spacing      = 20    # resolutuin of the track
+future_points       = 5    # number of future points
+future_spacing      = 40    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
@@ -118,7 +118,7 @@ ke_v = v_max/100
 ke_w = w_max/100
 
 points_s_w = 0.125
-points_s_v = 0.035
+points_s_v = 0.07
 
 # --- setup the control --- #
 
@@ -138,6 +138,10 @@ epsl_w = 1
 
 v1 = 0
 v2 = 0
+
+# last values para achar a saturação
+last_v1 = 0
+last_v2 = 0
 
 delta_u_l = 0
 delta_u_r = 0
@@ -175,13 +179,18 @@ K = np.linalg.inv(G.T @ Q @ G + R) @ G.T @ Q
 K1 = K[0]
 
 while True:
+    # saturate the inputs
     v1 += delta_u_l
     v2 += delta_u_r
 
-    # saturate the inputs
-
     v1 = max(min(v1, 100), -100)
     v2 = max(min(v2, 100), -100)
+
+    delta_u_l = v1 - last_v1
+    delta_u_r = v2 - last_v2
+
+    last_v1 = v1
+    last_v2 = v2
 
     # --- step the simulaine, future_points, speed, omega tion here --- #
 
@@ -207,17 +216,6 @@ while True:
 
     angle, space = converte_array(future_points)
 
-    # remove the outliers
-    mediam = np.median(abs(space[1:]))
-    for i in range(len(space)):
-        if abs(space[i]) < mediam * 0.92 or abs(space[i]) > mediam * 1.08:
-            space[i] = mediam
-            angle[i] = (angle[i+1] + angle[i-1])/2 if i < len(space) - 1 else angle[i-1]
-
-    # mediana of the space
-    '''median = np.mean(space)
-    s = median/speed if speed != 0 else 1000'''
-
     ref_theta = angle/points_s_w
     ref_vm = space/points_s_v
 
@@ -235,4 +233,5 @@ while True:
 
     # --- update the graph reference --- #
     set_graph_reference(r_w/ke_w, r_v/ke_v)
-    set_free_response(free_w/ke_w, free_v/ke_v)
+    set_graph_free_response(free_w/(2*ke_w), 2*free_v/ke_v)
+    set_graph_error(erro[:N_horizon]/ke_w, erro[N_horizon:]/ke_v)

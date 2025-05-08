@@ -4,6 +4,7 @@ import time
 from graphics_elements import *
 from track_generator import *
 from car_dynamics import *
+import numpy as np
 
 class SimulatorController:
     def __init__(self, screen_size, fps, length, width, scale, render, track_type=0, track_length=0.02, sensor_spacing=0.001):
@@ -46,6 +47,8 @@ class SimulatorController:
         self.future_v = [1] * 10
         self.free_response_omega = [1] * 10
         self.free_response_v = [1] * 10
+        self.error_omega = [1] * 10
+        self.error_v = [1] * 10
 
         # model parameters
         self.car = None #car_dynamics(z=1/self.FPS)
@@ -193,6 +196,10 @@ class SimulatorController:
         self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "vm", color=self.get_rand_color())
         self.display.add_line_to_graph("free_response", "ω", color=self.get_rand_color())
+
+        self.display.add_graph("error")
+        self.display.add_line_to_graph("error", "vm", color=self.get_rand_color())
+        self.display.add_line_to_graph("error", "ω", color=self.get_rand_color())
     def _update_graps(self):
         """
         update the graphs with the given values.
@@ -207,6 +214,8 @@ class SimulatorController:
         self.display.set_graph_data("reference", "ω", self.future_omega)
         self.display.set_graph_data("free_response", "vm", self.free_response_v)
         self.display.set_graph_data("free_response", "ω", self.free_response_omega)
+        self.display.set_graph_data("error", "vm", self.error_v)
+        self.display.set_graph_data("error", "ω", self.error_omega)
 
     def update_FPS(self, fps):
         """
@@ -324,7 +333,7 @@ def set_graph_reference(omega, v):
     simulator.future_v = v
     simulator.future_omega = omega
 
-def set_free_response(omega, v):
+def set_graph_free_response(omega, v):
     # check if the simulator is initialized
     if simulator is None:
         print("Simulator not initialized")
@@ -332,6 +341,15 @@ def set_free_response(omega, v):
 
     simulator.free_response_omega = omega
     simulator.free_response_v = v
+
+def set_graph_error(omega, v):
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    simulator.error_omega = omega
+    simulator.error_v = v
 
 def step_simulation(v1, v2):
     global timer
@@ -354,6 +372,11 @@ def step_simulation(v1, v2):
                 print("Simulation stopped using ESC")
                 return None
             
+        # Detecta quando a tecla 'P' é pressionada
+        if event.type == pygame.KEYDOWN:
+            if event.key == pygame.K_p:
+                input("Pressione 'Enter' para continuar a simulação...")
+
         simulator.display.verify_checkbox(event)
 
     # render the simulator

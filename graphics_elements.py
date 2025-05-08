@@ -15,7 +15,7 @@ class Shape:
         initializes the shape
         args:
             coo (tuple): coordinates of the shape (x, y)
-            color (tuple): color of the shape in rgb format
+            color (tuple): coatualize_next_pointlor of the shape in rgb format
             size (int): size of the shape
             angle (float): initial angle in radians
         """
@@ -98,6 +98,9 @@ class Shape:
     def draw(self, surface):
         # raises an error because it must be implemented by subclasses
         raise NotImplementedError("this method should be implemented by subclasses.")
+    
+    def update(self):
+        pass
 
 class Car(Shape):
     """
@@ -279,6 +282,16 @@ class Cluster(Shape):
     def get_next_point(cls):
         return [(float(x), float(y)) for x, y in list(cls._arr_next_points)]
 
+    def update(self):
+        for i in range(len(self.__points_arr)):
+            point_ = self._rotate_point(self.__points_arr[i])
+            x = point_[0] + self._x
+            y = point_[1] + self._y
+
+            for j in range(self._future_space, self._future_space * self._future_count + self._future_space, self._future_space):
+                if self.__global_index[i] == self._next_point + j:
+                    self.add_next_point((x, y), (self.__global_index[i] - self._next_point)//self._future_space - 1)
+
     def draw(self, surface):
         """
         Draws the cluster on the given surface
@@ -302,10 +315,6 @@ class Cluster(Shape):
                 self.update_next_point()
 
             pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
-
-            for j in range(self._future_space, self._future_space * self._future_count + self._future_space, self._future_space):
-                if self.__global_index[i] == self._next_point + j:
-                    self.add_next_point((x, y), (self.__global_index[i] - self._next_point)//self._future_space - 1)
 
     def _rotate_point(self, coo):
         x = coo[0]
@@ -449,6 +458,7 @@ class Track(Shape):
             [sin_theta, cos_theta]
         ]
 
+        # configurate the track
         for i, j in points:
             x = i * self.__point_spacing + d[0]
             y = j * self.__point_spacing + d[1]
@@ -457,6 +467,10 @@ class Track(Shape):
             self.matrix[i][j].set_coordinates((x, y))
             self.matrix[i][j].set_angle(self._angle)
             self.matrix[i][j].draw(surface)
+
+        # update the elements
+        for i, j in points:
+            self.matrix[i][j].update()
 
     def __points_in_circle(self, x0, y0):
         # returns the points within a circle of visibility
