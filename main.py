@@ -6,7 +6,7 @@ import matplotlib.pyplot as plt
 screen_size = MEDIUM
 screen_fps = 80
 z = 1/screen_fps
-track_seed = 1111
+track_seed = 1112
 
 # car constants
 wheels_radius       = 0.04  # meters
@@ -27,8 +27,8 @@ track_length        = 0.015 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 5    # number of future points
-future_spacing      = 40    # resolutuin of the track
+future_points       = 3    # number of future points
+future_spacing      = 60    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
@@ -103,8 +103,8 @@ w_max = 2*v_max/wheels_distance
 ke_v = v_max/100
 ke_w = w_max/100
 
-points_s_w = 0.125
-points_s_v = 0.07
+points_s_w = 0.09
+points_s_v = 0.125
 
 # --- setup the control --- #
 
@@ -118,8 +118,8 @@ N_uw = 5
 N_uv = 5
 
 lamb_v = 0.02
-lamb_w = 0.01
-epsl_v = 0.002
+lamb_w = 0.001
+epsl_v = 0.001
 epsl_w = 1
 
 v1 = 0
@@ -202,7 +202,8 @@ while True:
 
     angle, space = converte_array(future_points)
 
-    ref_theta = angle/points_s_w
+    s = space[0]/speed if speed > 0 else 1000
+    ref_theta = angle/s
     ref_vm = space/points_s_v
 
     r_w = make_interp(ref_theta, N_horizon)
