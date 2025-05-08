@@ -436,6 +436,32 @@ class Track(Shape):
         rotated_y = translated_x * math.sin(self._angle) + translated_y * math.cos(self._angle)
         return rotated_x + ox, rotated_y + oy
 
+class Checkbox:
+    def __init__(self, x, y, size, label="", font_size=24):
+        self.rect = pygame.Rect(x, y, size/2, size/2)
+        self.color = (0, 0, 0)
+        self.checked = True
+        self.label = label
+        self.font = pygame.font.SysFont(None, font_size)
+        self.label_surface = self.font.render(label, True, (0, 0, 0))
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, self.color, self.rect, 2)
+        if self.checked:
+            pygame.draw.line(surface, (0, 0, 0), self.rect.topleft, self.rect.bottomright, 2)
+            pygame.draw.line(surface, (0, 0, 0), self.rect.topright, self.rect.bottomleft, 2)
+        surface.blit(self.label_surface, (self.rect.right + 10, self.rect.y))
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(event.pos):
+                self.checked = not self.checked
+
+    def set_coordinates(self, coo):
+        # sets new coordinates for the checkbox
+        self.rect.x = coo[0]
+        self.rect.y = coo[1]
+
 class Display(Shape):
     """
     represents a display for the simulator with graphs and text
@@ -470,15 +496,24 @@ class Display(Shape):
         self.__graph_data = {}
         self.__graph_colors = {}
 
+        self.__checbox_arr = {}
+
     # define time of the x axis
     def set_time(self, fps):
         self.__len_data = int(fps)
+
+    def verify_checkbox(self, event):
+        for graph_name, checkbox in self.__checbox_arr.items():
+            checkbox.handle_event(event)
 
     # adds a new graph with a specific line name
     def add_graph(self, graph_name):
         if graph_name not in self.__graph_data:
             self.__graph_data[graph_name] = {}
             self.__graph_colors[graph_name] = {}
+
+            # create checkboxes for each line in the graph
+            self.__checbox_arr[graph_name] = Checkbox(0, 0, 30, graph_name)
 
     # removes a graph from the display
     def remove_graph(self, graph_name):
@@ -499,28 +534,46 @@ class Display(Shape):
             if len(self.__graph_data[graph_name][line_name]) > self.__len_data:
                 self.__graph_data[graph_name][line_name].pop(0)
 
+    # update the array of data for a specific graph
+    def set_graph_data(self, graph_name, line_name, data):
+        self.__graph_data[graph_name][line_name] = data
+
     # draws the display as a rectangle with rounded corners, including graphs and text
     def draw(self, surface):
         # draw the display rectangle with rounded corners
         rect = pygame.Rect(self._x, self._y, self._size[0], self._size[1])
         pygame.draw.rect(surface, self._color, rect, border_radius=15)
 
-        # calculate the sections for graphs
-        graph_height = self._size[1] // len(self.__graph_data) if self.__graph_data else self._size[1]
+        # calculate the height of each graph useing the number of selected graphs
+        selected = sum(1 for checkbox in self.__checbox_arr.values() if checkbox.checked)
+        graph_height = (self._size[1] - 30) // selected if selected > 0 else 0
 
         # draw each graph
+        selected = []
         for idx, (graph_name, lines) in enumerate(self.__graph_data.items()):
-            self.draw_graph(
-                surface,
-                lines,
-                (
-                    self._x + 15,
-                    self._y + idx * graph_height + 15,
-                    self._size[0] - 30,
-                    graph_height - 30
-                ),
-                graph_name
-            )
+
+            # draw the checkbox for all graps
+            checkbox = self.__checbox_arr[graph_name]
+            x = self._x + self._size[0] + 5
+            y = self._y + idx * 20
+            checkbox.set_coordinates((x, y))
+            checkbox.draw(surface)
+
+            if checkbox.checked:
+                selected.append(graph_name)
+
+        for i in range(len(selected)):
+            graph_name = selected[i]
+            lines = self.__graph_data[graph_name]
+
+            # calculate the position of the graph
+            graph_x = self._x + 15
+            graph_y = self._y + i * graph_height + 15
+            graph_width = self._size[0] - 30
+            graph_height_ = graph_height - 15 if i < len(selected) - 1 else graph_height
+
+            # draw the graph
+            self.draw_graph(surface, lines, (graph_x, graph_y, graph_width, graph_height_), graph_name)
 
     # draw grid lines
     def __draw_grid(self, surface, graph_width, graph_height, graph_x, graph_y):

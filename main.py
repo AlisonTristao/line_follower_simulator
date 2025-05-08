@@ -27,7 +27,7 @@ track_length        = 0.015 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 6    # number of future points
+future_points       = 10    # number of future points
 future_spacing      = 40    # resolutuin of the track
 
 # setup the simulation
@@ -42,9 +42,12 @@ set_future_points(future_points, future_spacing)
 def converte_array(array):
     # array de diferenças
     #diff = np.diff(array, axis=0)
+
     theta = []
     for i in range(len(array)):
-        theta.append(converte_xy_to_theta(array[i][0], array[i][1]))
+        delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
+        delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
+        theta.append(converte_xy_to_theta(delta_x, delta_y))
     
     # calcula a hipotenusa
     hipotenusa = []
@@ -114,9 +117,8 @@ w_max = 2*v_max/wheels_distance
 ke_v = v_max/100
 ke_w = w_max/100
 
-s = 0.08
-points_s_w = 1e-5
-points_s_v = s
+points_s_w = 0.125
+points_s_v = 0.08
 
 # --- setup the control --- #
 
@@ -131,7 +133,7 @@ N_uv = 5
 
 lamb_v = 0.02
 lamb_w = 0.01
-epsl_v = 0.002
+epsl_v = 0.003
 epsl_w = 1
 
 v1 = 0
@@ -205,10 +207,18 @@ while True:
 
     angle, space = converte_array(future_points)
 
-    s = space[0]/speed if speed != 0 else 1000
-    points_s_w = 0.95 * points_s_w + 0.05 * s 
+    # remove the outliers
+    '''mediam = np.mean(abs(space[1:]))
+    for i in range(1, len(space)):
+        if abs(space[i]) < mediam * 0.92 or abs(space[i]) > mediam * 1.08:
+            space[i] = mediam
+            angle[i] = (angle[i+1] + angle[i-1])/2 if i < len(space) - 1 else angle[i-1]
 
-    ref_theta = angle/(1.5 * points_s_w)
+    # mediana of the space
+    median = np.mean(space)
+    s = median/speed if speed != 0 else 1000'''
+
+    ref_theta = angle/points_s_w
     ref_vm = space/points_s_v
 
     r_w = make_interp(ref_theta, N_horizon)
@@ -222,3 +232,7 @@ while True:
     delta_u = K @ erro
     delta_u_l = delta_u[0]
     delta_u_r = delta_u[N_uw]
+
+    # --- update the graph reference --- #
+    set_graph_reference(r_w/ke_w, r_v/ke_v)
+    set_free_response(free_w/ke_w, free_v/ke_v)

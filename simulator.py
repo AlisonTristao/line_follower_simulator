@@ -42,6 +42,11 @@ class SimulatorController:
         self.future_points_count = 10
         self.future_space = 30
 
+        self.future_omega = [1] * 10
+        self.future_v = [1] * 10
+        self.free_response_omega = [1] * 10
+        self.free_response_v = [1] * 10
+
         # model parameters
         self.car = None #car_dynamics(z=1/self.FPS)
 
@@ -164,19 +169,30 @@ class SimulatorController:
 
         self.simulator.start()
 
+    def get_rand_color(self):
+        random.seed(None)
+        return tuple(random.randint(0, 255) for _ in range(3))
+
     def _setup_display_graphs(self):
         self.display.add_graph("wheels")
-        self.display.add_line_to_graph("wheels", "left", color=(0, 200, 0))
-        self.display.add_line_to_graph("wheels", "right", color=(200, 0, 0))
+        self.display.add_line_to_graph("wheels", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("wheels", "right", color=self.get_rand_color())
 
         self.display.add_graph("car")
-        self.display.add_line_to_graph("car", "vm", color=(0, 0, 200))
-        self.display.add_line_to_graph("car", "ω", color=(200, 200, 0))
+        self.display.add_line_to_graph("car", "vm", color=self.get_rand_color())
+        self.display.add_line_to_graph("car", "ω", color=self.get_rand_color())
 
         self.display.add_graph("control")
-        self.display.add_line_to_graph("control", "left", color=(0, 200, 0))
-        self.display.add_line_to_graph("control", "right", color=(200, 0, 0))
+        self.display.add_line_to_graph("control", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("control", "right", color=self.get_rand_color())
 
+        self.display.add_graph("reference")
+        self.display.add_line_to_graph("reference", "vm", color=self.get_rand_color())
+        self.display.add_line_to_graph("reference", "ω", color=self.get_rand_color())
+
+        self.display.add_graph("free_response")
+        self.display.add_line_to_graph("free_response", "vm", color=self.get_rand_color())
+        self.display.add_line_to_graph("free_response", "ω", color=self.get_rand_color())
     def _update_graps(self):
         """
         update the graphs with the given values.
@@ -187,6 +203,10 @@ class SimulatorController:
         self.display.update_graph_data("car", "ω", self.car.omega_norm())
         self.display.update_graph_data("control", "left", self.car.v1)
         self.display.update_graph_data("control", "right", self.car.v2)
+        self.display.set_graph_data("reference", "vm", self.future_v)
+        self.display.set_graph_data("reference", "ω", self.future_omega)
+        self.display.set_graph_data("free_response", "vm", self.free_response_v)
+        self.display.set_graph_data("free_response", "ω", self.free_response_omega)
 
     def update_FPS(self, fps):
         """
@@ -295,6 +315,24 @@ def set_future_points(count, space):
 
     simulator.set_future_points(count, space)
 
+def set_graph_reference(omega, v):
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    simulator.future_v = v
+    simulator.future_omega = omega
+
+def set_free_response(omega, v):
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    simulator.free_response_omega = omega
+    simulator.free_response_v = v
+
 def step_simulation(v1, v2):
     global timer
 
@@ -315,6 +353,8 @@ def step_simulation(v1, v2):
                 pygame.quit()
                 print("Simulation stopped using ESC")
                 return None
+            
+        simulator.display.verify_checkbox(event)
 
     # render the simulator
     data = simulator.step(v1, v2)
