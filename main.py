@@ -118,7 +118,7 @@ ke_v = v_max/100
 ke_w = w_max/100
 
 points_s_w = 0.125
-points_s_v = 0.08
+points_s_v = 0.07
 
 # --- setup the control --- #
 
@@ -133,7 +133,7 @@ N_uv = 5
 
 lamb_v = 0.02
 lamb_w = 0.01
-epsl_v = 0.003
+epsl_v = 0.002
 epsl_w = 1
 
 v1 = 0
@@ -196,7 +196,7 @@ while True:
     free_l = calculate_free(free_l, alpha_l, beta_l, N_horizon, delta_u_l, 1)
     free_r = calculate_free(free_r, alpha_r, beta_r, N_horizon, delta_u_r, 1)
     free_w = (free_l - free_r) * ke_w/2
-    free_v = (free_l + free_r) * ke_v/2
+    free_v = (free_l + free_r) * ke_v/4
 
     eta_w = (omega - free_w[0])
     eta_v = (speed - free_v[0])
@@ -208,14 +208,14 @@ while True:
     angle, space = converte_array(future_points)
 
     # remove the outliers
-    '''mediam = np.mean(abs(space[1:]))
+    mediam = np.mean(abs(space[1:]))
     for i in range(1, len(space)):
         if abs(space[i]) < mediam * 0.92 or abs(space[i]) > mediam * 1.08:
             space[i] = mediam
             angle[i] = (angle[i+1] + angle[i-1])/2 if i < len(space) - 1 else angle[i-1]
 
     # mediana of the space
-    median = np.mean(space)
+    '''median = np.mean(space)
     s = median/speed if speed != 0 else 1000'''
 
     ref_theta = angle/points_s_w
