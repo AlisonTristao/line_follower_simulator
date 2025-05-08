@@ -88,26 +88,12 @@ def calculate_free(free, alpha, beta, N_horizon, delta_u, ke):
     
     return free  # Retorna o array atualizado
 
-def make_step(array, len_):
-    array_result = np.zeros(len_)
-    qtd = len_//len(array)
-    for i in range(len_):
-        array_result[i] = array[i//qtd]
-
-    return array_result
-
 def make_interp(array, len_):
     x_original = np.linspace(0, 1, len(array))  # Posições originais
     x_interp = np.linspace(0, 1, len_)  # Posições desejadas
     array_result = np.interp(x_interp, x_original, array)  # Interpolação linear
     
     return array_result
-
-def pad_to_shape(matrix, target_shape):
-    padded = np.zeros(target_shape)
-    rows, cols = matrix.shape
-    padded[:rows, :cols] = matrix
-    return padded
 
 # --- insert your code here --- #
 
