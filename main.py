@@ -28,7 +28,7 @@ sensor_spacing      = 0.008 # meters
 
 # future points
 future_points       = 10    # number of future points
-future_spacing      = 40    # resolutuin of the track
+future_spacing      = 20    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
@@ -118,7 +118,7 @@ ke_v = v_max/100
 ke_w = w_max/100
 
 points_s_w = 0.125
-points_s_v = 0.07
+points_s_v = 0.035
 
 # --- setup the control --- #
 
@@ -208,8 +208,8 @@ while True:
     angle, space = converte_array(future_points)
 
     # remove the outliers
-    mediam = np.mean(abs(space[1:]))
-    for i in range(1, len(space)):
+    mediam = np.median(abs(space[1:]))
+    for i in range(len(space)):
         if abs(space[i]) < mediam * 0.92 or abs(space[i]) > mediam * 1.08:
             space[i] = mediam
             angle[i] = (angle[i+1] + angle[i-1])/2 if i < len(space) - 1 else angle[i-1]

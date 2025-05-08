@@ -87,8 +87,8 @@ def points_in_square(x0, y0, size, x_arr, y_arr):
     x_arr = np.array(x_arr)
     y_arr = np.array(y_arr)
     
-    inside_x = (x_arr >= x0 - size) & (x_arr <= x0 + size)
-    inside_y = (y_arr >= y0 - size) & (y_arr <= y0 + size)
+    inside_x = (x_arr > x0 - size) & (x_arr < x0 + size)
+    inside_y = (y_arr > y0 - size) & (y_arr < y0 + size)
     inside_square = inside_x & inside_y
 
     return np.where(inside_square)[0].tolist()

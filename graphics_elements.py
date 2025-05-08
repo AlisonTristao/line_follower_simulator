@@ -242,6 +242,15 @@ class Cluster(Shape):
         self.__points_arr = [] 
         self.__colors_arr = []
 
+        cos_theta = math.cos(self._angle)
+        sin_theta = math.sin(self._angle)
+
+        # Matriz de rotação 2D
+        self._rotation_matrix = [
+            [cos_theta, -sin_theta],
+            [sin_theta, cos_theta]
+        ]
+
     def add_point(self, point, index, color=(0, 0, 0)):
         self.__points_arr.append(point)
         self.__colors_arr.append(color)
@@ -274,6 +283,15 @@ class Cluster(Shape):
         """
         Draws the cluster on the given surface
         """
+        cos_theta = math.cos(self._angle)
+        sin_theta = math.sin(self._angle)
+
+        # Matriz de rotação 2D
+        self._rotation_matrix = [
+            [cos_theta, -sin_theta],
+            [sin_theta, cos_theta]
+        ]
+
         for i in range(len(self.__points_arr)):
             point_ = self._rotate_point(self.__points_arr[i])
             x = point_[0] + self._x
@@ -290,9 +308,11 @@ class Cluster(Shape):
                     self.add_next_point((x, y), (self.__global_index[i] - self._next_point)//self._future_space - 1)
 
     def _rotate_point(self, coo):
-        rotated_x = coo[0] * math.cos(-self._angle) - coo[1] * math.sin(-self._angle)
-        rotated_y = coo[0] * math.sin(-self._angle) + coo[1] * math.cos(-self._angle)
-        return rotated_x, rotated_y
+        x = coo[0]
+        y = coo[1]
+        x_rotated = x * self._rotation_matrix[0][0] + y * self._rotation_matrix[0][1]
+        y_rotated = x * self._rotation_matrix[1][0] + y * self._rotation_matrix[1][1]
+        return x_rotated, y_rotated
     
     def get_points(self):
         return self.__points_arr
@@ -377,6 +397,15 @@ class Track(Shape):
         self.__point_spacing = point_spacing
         self._center = (0, 0) #(self.screen_size[0] // 1.5, self.screen_size[1] // 2)
 
+        cos_theta = math.cos(self._angle)
+        sin_theta = math.sin(self._angle)
+
+        # Matriz de rotação 2D
+        self._rotation_matrix = [
+            [cos_theta, -sin_theta],
+            [sin_theta, cos_theta]
+        ]
+
         # initializes the matrix of points and walls
         self.wall = Wall()
         self.default = Default()
@@ -411,13 +440,22 @@ class Track(Shape):
         d = (self._center[0] - self._x, self._center[1] - self._y)
         points = self.__points_in_circle(x0_col, y0_row)
 
+        cos_theta = math.cos(self._angle)
+        sin_theta = math.sin(self._angle)
+
+        # Matriz de rotação 2D
+        self._rotation_matrix = [
+            [cos_theta, -sin_theta],
+            [sin_theta, cos_theta]
+        ]
+
         for i, j in points:
             x = i * self.__point_spacing + d[0]
             y = j * self.__point_spacing + d[1]
             x, y = self._rotate_point((x, y))
 
             self.matrix[i][j].set_coordinates((x, y))
-            self.matrix[i][j].set_angle(-self._angle)
+            self.matrix[i][j].set_angle(self._angle)
             self.matrix[i][j].draw(surface)
 
     def __points_in_circle(self, x0, y0):
@@ -425,16 +463,16 @@ class Track(Shape):
         rows, cols = self._size
         x, y = np.ogrid[:rows, :cols]
         dist_sq = (x - x0) ** 2 + (y - y0) ** 2
-        return np.argwhere(dist_sq <= self.__visible ** 2)
+        return np.argwhere(dist_sq < self.__visible ** 2)
 
     def _rotate_point(self, coo):
         # rotates a point around the track's pivot
         ox, oy = self._pivot
         translated_x = coo[0] - ox
         translated_y = coo[1] - oy
-        rotated_x = translated_x * math.cos(self._angle) - translated_y * math.sin(self._angle)
-        rotated_y = translated_x * math.sin(self._angle) + translated_y * math.cos(self._angle)
-        return rotated_x + ox, rotated_y + oy
+        x_rotated = translated_x * self._rotation_matrix[0][0] + translated_y * self._rotation_matrix[0][1]
+        y_rotated = translated_x * self._rotation_matrix[1][0] + translated_y * self._rotation_matrix[1][1]
+        return x_rotated + ox, y_rotated + oy
 
 class Checkbox:
     def __init__(self, x, y, size, label="", font_size=24):

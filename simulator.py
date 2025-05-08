@@ -92,7 +92,7 @@ class SimulatorController:
         print("Initializing simulator...")
 
         # generate trajectory
-        self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.1, checkpoints=36, resolution=1000, track_rad=30)
+        self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.0, checkpoints=36, resolution=1000, track_rad=30)
         self.win = len(self.x_track-1)
 
         # create car
