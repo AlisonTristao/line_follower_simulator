@@ -26,6 +26,15 @@ class Shape:
         self._size = size
         self._pivot = (0, 0)
 
+        cos_theta = math.cos(self._angle)
+        sin_theta = math.sin(self._angle)
+
+        # Matriz de rotação 2D
+        self._rotation_matrix = [
+            [cos_theta, -sin_theta],
+            [sin_theta, cos_theta]
+        ]
+
     def get_center(self):
         # returns the center coordinates of the shape
         return self._x, self._y
@@ -37,6 +46,15 @@ class Shape:
     def set_angle(self, angle):
         # sets a new angle for the shape
         self._angle = angle
+
+        cos_theta = math.cos(self._angle)
+        sin_theta = math.sin(self._angle)
+
+        # Matriz de rotação 2D
+        self._rotation_matrix = [
+            [cos_theta, -sin_theta],
+            [sin_theta, cos_theta]
+        ]
 
     def set_coordinates(self, coo):
         # sets new coordinates for the shape
@@ -70,6 +88,7 @@ class Shape:
     def _rotate(self, angle):
         # rotates the shape by the given angle
         self._angle += angle
+        self.set_angle(self._angle)
 
     def _move(self, dx, dy):
         # moves the shape by dx and dy considering rotation
@@ -85,15 +104,21 @@ class Shape:
         y_new = self._x * math.sin(theta) + self._y * math.cos(theta)
         self._x, self._y = x_new, y_new
 
-    def rotate_around_pivot(self, pivot, theta):
-        # rotates the shape around a given pivot point by theta radians
-        ox, oy = pivot
-        translated_x = self._x - ox
-        translated_y = self._y - oy
-        rotated_x = translated_x * math.cos(theta) - translated_y * math.sin(theta)
-        rotated_y = translated_x * math.sin(theta) + translated_y * math.cos(theta)
-        self._x = rotated_x + ox
-        self._y = rotated_y + oy
+    def _rotate_point(self, coo):
+        x = coo[0]
+        y = coo[1]
+        x_rotated = x * self._rotation_matrix[0][0] + y * self._rotation_matrix[0][1]
+        y_rotated = x * self._rotation_matrix[1][0] + y * self._rotation_matrix[1][1]
+        return x_rotated, y_rotated
+
+    def rotate_around_pivot(self, coo):
+        # rotates a point around the track's pivot
+        ox, oy = self._pivot
+        translated_x = coo[0] - ox
+        translated_y = coo[1] - oy
+        x_rotated = translated_x * self._rotation_matrix[0][0] + translated_y * self._rotation_matrix[0][1]
+        y_rotated = translated_x * self._rotation_matrix[1][0] + translated_y * self._rotation_matrix[1][1]
+        return x_rotated + ox, y_rotated + oy
 
     def draw(self, surface):
         # raises an error because it must be implemented by subclasses
@@ -194,7 +219,6 @@ class Default(Shape):
     def draw(self, surface):
         # draws the default object as a circle on the given surface
         pygame.draw.circle(surface, self._color, (int(self._x), int(self._y)), self._size)
-        #pass
 
 class Wall(Shape):
     """
@@ -245,15 +269,6 @@ class Cluster(Shape):
         self.__points_arr = [] 
         self.__colors_arr = []
 
-        cos_theta = math.cos(self._angle)
-        sin_theta = math.sin(self._angle)
-
-        # Matriz de rotação 2D
-        self._rotation_matrix = [
-            [cos_theta, -sin_theta],
-            [sin_theta, cos_theta]
-        ]
-
     def add_point(self, point, index, color=(0, 0, 0)):
         self.__points_arr.append(point)
         self.__colors_arr.append(color)
@@ -296,37 +311,22 @@ class Cluster(Shape):
         """
         Draws the cluster on the given surface
         """
-        cos_theta = math.cos(self._angle)
-        sin_theta = math.sin(self._angle)
-
-        # Matriz de rotação 2D
-        self._rotation_matrix = [
-            [cos_theta, -sin_theta],
-            [sin_theta, cos_theta]
-        ]
 
         for i in range(len(self.__points_arr)):
             point_ = self._rotate_point(self.__points_arr[i])
             x = point_[0] + self._x
             y = point_[1] + self._y
 
-            if self.points_in_square(x, y) and self.__global_index[i] == self._next_point:
+            if self._points_in_square(x, y) and self.__global_index[i] == self._next_point:
                 self.__colors_arr[i] = (100, 100, 100)  # Modify the color of the point
                 self.update_next_point()
 
             pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
-
-    def _rotate_point(self, coo):
-        x = coo[0]
-        y = coo[1]
-        x_rotated = x * self._rotation_matrix[0][0] + y * self._rotation_matrix[0][1]
-        y_rotated = x * self._rotation_matrix[1][0] + y * self._rotation_matrix[1][1]
-        return x_rotated, y_rotated
     
     def get_points(self):
         return self.__points_arr
 
-    def points_in_square(self, x1, y1):
+    def _points_in_square(self, x1, y1):
         x0, y0 = self._master
         return (x0 - self._master_distance < x1 < x0 + self._master_distance) and (y0 < y1 < y0 + self._master_distance)
 
@@ -406,15 +406,6 @@ class Track(Shape):
         self.__point_spacing = point_spacing
         self._center = (0, 0) #(self.screen_size[0] // 1.5, self.screen_size[1] // 2)
 
-        cos_theta = math.cos(self._angle)
-        sin_theta = math.sin(self._angle)
-
-        # Matriz de rotação 2D
-        self._rotation_matrix = [
-            [cos_theta, -sin_theta],
-            [sin_theta, cos_theta]
-        ]
-
         # initializes the matrix of points and walls
         self.wall = Wall()
         self.default = Default()
@@ -449,20 +440,11 @@ class Track(Shape):
         d = (self._center[0] - self._x, self._center[1] - self._y)
         points = self.__points_in_circle(x0_col, y0_row)
 
-        cos_theta = math.cos(self._angle)
-        sin_theta = math.sin(self._angle)
-
-        # Matriz de rotação 2D
-        self._rotation_matrix = [
-            [cos_theta, -sin_theta],
-            [sin_theta, cos_theta]
-        ]
-
         # configurate the track
         for i, j in points:
             x = i * self.__point_spacing + d[0]
             y = j * self.__point_spacing + d[1]
-            x, y = self._rotate_point((x, y))
+            x, y = self.rotate_around_pivot((x, y))
 
             self.matrix[i][j].set_coordinates((x, y))
             self.matrix[i][j].set_angle(self._angle)
@@ -478,15 +460,6 @@ class Track(Shape):
         x, y = np.ogrid[:rows, :cols]
         dist_sq = (x - x0) ** 2 + (y - y0) ** 2
         return np.argwhere(dist_sq < self.__visible ** 2)
-
-    def _rotate_point(self, coo):
-        # rotates a point around the track's pivot
-        ox, oy = self._pivot
-        translated_x = coo[0] - ox
-        translated_y = coo[1] - oy
-        x_rotated = translated_x * self._rotation_matrix[0][0] + translated_y * self._rotation_matrix[0][1]
-        y_rotated = translated_x * self._rotation_matrix[1][0] + translated_y * self._rotation_matrix[1][1]
-        return x_rotated + ox, y_rotated + oy
 
 class Checkbox:
     def __init__(self, x, y, size, label="", font_size=24):
