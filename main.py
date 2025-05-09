@@ -203,7 +203,7 @@ while True:
     angle, space = converte_array(future_points)
 
     s = space[0]/speed if speed > 0 else 1000
-    ref_theta = angle/s
+    ref_theta = [0] + angle/s
     ref_vm = space/points_s_v
 
     r_w = make_interp(ref_theta, N_horizon)
