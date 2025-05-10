@@ -269,10 +269,10 @@ class Cluster(Shape):
         self.__points_arr = [] 
         self.__colors_arr = []
 
-    def add_point(self, point, index, color=(0, 0, 0)):
-        self.__points_arr.append(point)
+    def add_point(self, point, color=(0, 0, 0)):
+        self.__points_arr.append((point[0], point[1]))
         self.__colors_arr.append(color)
-        self.__global_index.append(index)
+        self.__global_index.append(point[2])
 
     @classmethod
     def set_future_count(cls, future_count, future_space):
@@ -910,10 +910,5 @@ class Simulator:
         for obj in self.__objects:
             obj.draw(self.screen)
 
-    def step(self):
-        """
-        performs a simulation step by updating and rendering objects
-        """
-        self.draw()
         pygame.display.flip()
-        #self.__clock.tick(self.__FPS)
+        self.__clock.tick(self.__FPS)

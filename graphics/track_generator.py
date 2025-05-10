@@ -1,7 +1,6 @@
 import math
 import random
 import numpy as np
-#import matplotlib.pyplot as plt
 from scipy.interpolate import splprep, splev
 
 LEMNISCATE = 0
@@ -93,6 +92,42 @@ def points_in_square(x0, y0, size, x_arr, y_arr):
 
     return np.where(inside_square)[0].tolist()
 
-if __name__ == "__main__":
-    #generate_track(LEMNISCATE)
-    generate_track(CIRCLE)
+def generate_cluster(length, width, scale, x_arr, y_arr):
+    """
+    Generates a cluster of points in a square area.
+    
+    Args:
+        length (float): Length of the square.
+        width (float): Width of the square.
+
+    Returns:
+        array of arrays: Array of points in the cluster.
+    """
+
+    # matriz of 3 dimensions
+    cluster_matrix = []
+    position = []
+
+    # save the points useds
+    processed_points = set()
+    for i in range(-length//2, length//2):
+        for j in range(-width//2, width//2):
+            # verify if has in the square
+            index_arr = points_in_square(i, j, (length + width)/scale, x_arr, y_arr)
+            if len(index_arr) > 0:
+                cluster_array = []
+                # create the cluster
+                for index in index_arr:
+                    # verify if the point is already used
+                    if index not in processed_points:
+                        x = (x_arr[index] - i) * scale
+                        y = (y_arr[index] - j) * scale
+                        cluster_array.append((x, y, index))
+                        processed_points.add(index)
+            
+                # add the cluster to the matrix
+                cluster_matrix.append([])
+                cluster_matrix[-1] = cluster_array
+                position.append((i + length // 2, j + width // 2))
+
+    return cluster_matrix, position
