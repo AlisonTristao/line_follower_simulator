@@ -22,12 +22,12 @@ accommodation_time_r = 0.59 # seconds
 
 # track caracteristics
 track_type          = LEMNISCATE
-track_length        = 0.015 # metersref_theta
+track_length        = 0.02 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
 # future points
 future_points       = 3    # number of future points
-future_spacing      = 60    # resolutuin of the track
+future_spacing      = 30    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)

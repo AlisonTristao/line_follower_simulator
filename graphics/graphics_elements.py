@@ -911,4 +911,4 @@ class Simulator:
             obj.draw(self.screen)
 
         pygame.display.flip()
-        self.__clock.tick(self.__FPS)
+        #self.__clock.tick(self.__FPS)

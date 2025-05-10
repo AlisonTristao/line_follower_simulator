@@ -84,7 +84,7 @@ class SimulatorController:
         print("Initializing simulator...")
 
         # generate trajectory
-        self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.225, checkpoints=36, resolution=1000, track_rad=30)
+        self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.225, checkpoints=36, resolution=500, track_rad=30)
         self.win = len(self.x_track-1)
 
         # create car
@@ -282,7 +282,7 @@ class SimulatorController:
 simulator = None #SimulatorController()
 timer = time.time()
 
-def start_simulation(screen_size=MEDIUM, fps=120, length=100, width=100, scale=300, render=5, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
+def start_simulation(screen_size=MEDIUM, fps=120, length=100, width=100, scale=300, render=4, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
     # define the seed
     if seed is not None:
         random.seed(seed)
