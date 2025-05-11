@@ -15,7 +15,7 @@ class Shape:
         initializes the shape
         args:
             coo (tuple): coordinates of the shape (x, y)
-            color (tuple): color of the shape in rgb format
+            color (tuple): coatualize_next_pointlor of the shape in rgb format
             size (int): size of the shape
             angle (float): initial angle in radians
         """
@@ -25,6 +25,15 @@ class Shape:
         self._color = color
         self._size = size
         self._pivot = (0, 0)
+
+        cos_theta = math.cos(self._angle)
+        sin_theta = math.sin(self._angle)
+
+        # Matriz de rotação 2D
+        self._rotation_matrix = [
+            [cos_theta, -sin_theta],
+            [sin_theta, cos_theta]
+        ]
 
     def get_center(self):
         # returns the center coordinates of the shape
@@ -37,6 +46,15 @@ class Shape:
     def set_angle(self, angle):
         # sets a new angle for the shape
         self._angle = angle
+
+        cos_theta = math.cos(self._angle)
+        sin_theta = math.sin(self._angle)
+
+        # Matriz de rotação 2D
+        self._rotation_matrix = [
+            [cos_theta, -sin_theta],
+            [sin_theta, cos_theta]
+        ]
 
     def set_coordinates(self, coo):
         # sets new coordinates for the shape
@@ -70,6 +88,7 @@ class Shape:
     def _rotate(self, angle):
         # rotates the shape by the given angle
         self._angle += angle
+        self.set_angle(self._angle)
 
     def _move(self, dx, dy):
         # moves the shape by dx and dy considering rotation
@@ -85,19 +104,28 @@ class Shape:
         y_new = self._x * math.sin(theta) + self._y * math.cos(theta)
         self._x, self._y = x_new, y_new
 
-    def rotate_around_pivot(self, pivot, theta):
-        # rotates the shape around a given pivot point by theta radians
-        ox, oy = pivot
-        translated_x = self._x - ox
-        translated_y = self._y - oy
-        rotated_x = translated_x * math.cos(theta) - translated_y * math.sin(theta)
-        rotated_y = translated_x * math.sin(theta) + translated_y * math.cos(theta)
-        self._x = rotated_x + ox
-        self._y = rotated_y + oy
+    def _rotate_point(self, coo):
+        x = coo[0]
+        y = coo[1]
+        x_rotated = x * self._rotation_matrix[0][0] + y * self._rotation_matrix[0][1]
+        y_rotated = x * self._rotation_matrix[1][0] + y * self._rotation_matrix[1][1]
+        return x_rotated, y_rotated
+
+    def rotate_around_pivot(self, coo):
+        # rotates a point around the track's pivot
+        ox, oy = self._pivot
+        translated_x = coo[0] - ox
+        translated_y = coo[1] - oy
+        x_rotated = translated_x * self._rotation_matrix[0][0] + translated_y * self._rotation_matrix[0][1]
+        y_rotated = translated_x * self._rotation_matrix[1][0] + translated_y * self._rotation_matrix[1][1]
+        return x_rotated + ox, y_rotated + oy
 
     def draw(self, surface):
         # raises an error because it must be implemented by subclasses
         raise NotImplementedError("this method should be implemented by subclasses.")
+    
+    def update(self):
+        pass
 
 class Car(Shape):
     """
@@ -191,7 +219,6 @@ class Default(Shape):
     def draw(self, surface):
         # draws the default object as a circle on the given surface
         pygame.draw.circle(surface, self._color, (int(self._x), int(self._y)), self._size)
-        #pass
 
 class Wall(Shape):
     """
@@ -242,10 +269,10 @@ class Cluster(Shape):
         self.__points_arr = [] 
         self.__colors_arr = []
 
-    def add_point(self, point, index, color=(0, 0, 0)):
-        self.__points_arr.append(point)
+    def add_point(self, point, color=(0, 0, 0)):
+        self.__points_arr.append((point[0], point[1]))
         self.__colors_arr.append(color)
-        self.__global_index.append(index)
+        self.__global_index.append(point[2])
 
     @classmethod
     def set_future_count(cls, future_count, future_space):
@@ -270,34 +297,36 @@ class Cluster(Shape):
     def get_next_point(cls):
         return [(float(x), float(y)) for x, y in list(cls._arr_next_points)]
 
-    def draw(self, surface):
-        """
-        Draws the cluster on the given surface
-        """
+    def update(self):
         for i in range(len(self.__points_arr)):
             point_ = self._rotate_point(self.__points_arr[i])
             x = point_[0] + self._x
             y = point_[1] + self._y
 
-            if self.points_in_square(x, y) and self.__global_index[i] == self._next_point:
-                self.__colors_arr[i] = (100, 100, 100)  # Modify the color of the point
-                self.update_next_point()
-
-            pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
-
             for j in range(self._future_space, self._future_space * self._future_count + self._future_space, self._future_space):
                 if self.__global_index[i] == self._next_point + j:
                     self.add_next_point((x, y), (self.__global_index[i] - self._next_point)//self._future_space - 1)
 
-    def _rotate_point(self, coo):
-        rotated_x = coo[0] * math.cos(-self._angle) - coo[1] * math.sin(-self._angle)
-        rotated_y = coo[0] * math.sin(-self._angle) + coo[1] * math.cos(-self._angle)
-        return rotated_x, rotated_y
+    def draw(self, surface):
+        """
+        Draws the cluster on the given surface
+        """
+
+        for i in range(len(self.__points_arr)):
+            point_ = self._rotate_point(self.__points_arr[i])
+            x = point_[0] + self._x
+            y = point_[1] + self._y
+
+            if self._points_in_square(x, y) and self.__global_index[i] == self._next_point:
+                self.__colors_arr[i] = (100, 100, 100)  # Modify the color of the point
+                self.update_next_point()
+
+            pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
     
     def get_points(self):
         return self.__points_arr
 
-    def points_in_square(self, x1, y1):
+    def _points_in_square(self, x1, y1):
         x0, y0 = self._master
         return (x0 - self._master_distance < x1 < x0 + self._master_distance) and (y0 < y1 < y0 + self._master_distance)
 
@@ -411,30 +440,52 @@ class Track(Shape):
         d = (self._center[0] - self._x, self._center[1] - self._y)
         points = self.__points_in_circle(x0_col, y0_row)
 
+        # configurate the track
         for i, j in points:
             x = i * self.__point_spacing + d[0]
             y = j * self.__point_spacing + d[1]
-            x, y = self._rotate_point((x, y))
+            x, y = self.rotate_around_pivot((x, y))
 
             self.matrix[i][j].set_coordinates((x, y))
-            self.matrix[i][j].set_angle(-self._angle)
+            self.matrix[i][j].set_angle(self._angle)
             self.matrix[i][j].draw(surface)
+
+        # update the elements
+        for i, j in points:
+            self.matrix[i][j].update()
 
     def __points_in_circle(self, x0, y0):
         # returns the points within a circle of visibility
         rows, cols = self._size
         x, y = np.ogrid[:rows, :cols]
         dist_sq = (x - x0) ** 2 + (y - y0) ** 2
-        return np.argwhere(dist_sq <= self.__visible ** 2)
+        return np.argwhere(dist_sq < self.__visible ** 2)
 
-    def _rotate_point(self, coo):
-        # rotates a point around the track's pivot
-        ox, oy = self._pivot
-        translated_x = coo[0] - ox
-        translated_y = coo[1] - oy
-        rotated_x = translated_x * math.cos(self._angle) - translated_y * math.sin(self._angle)
-        rotated_y = translated_x * math.sin(self._angle) + translated_y * math.cos(self._angle)
-        return rotated_x + ox, rotated_y + oy
+class Checkbox:
+    def __init__(self, x, y, size, label="", font_size=24):
+        self.rect = pygame.Rect(x, y, size/2, size/2)
+        self.color = (0, 0, 0)
+        self.checked = False
+        self.label = label
+        self.font = pygame.font.SysFont(None, font_size)
+        self.label_surface = self.font.render(label, True, (0, 0, 0))
+
+    def draw(self, surface):
+        pygame.draw.rect(surface, self.color, self.rect, 2)
+        if self.checked:
+            pygame.draw.line(surface, (0, 0, 0), self.rect.topleft, self.rect.bottomright, 2)
+            pygame.draw.line(surface, (0, 0, 0), self.rect.topright, self.rect.bottomleft, 2)
+        surface.blit(self.label_surface, (self.rect.right + 10, self.rect.y))
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(event.pos):
+                self.checked = not self.checked
+
+    def set_coordinates(self, coo):
+        # sets new coordinates for the checkbox
+        self.rect.x = coo[0]
+        self.rect.y = coo[1]
 
 class Display(Shape):
     """
@@ -470,15 +521,27 @@ class Display(Shape):
         self.__graph_data = {}
         self.__graph_colors = {}
 
+        self.__checbox_arr = {}
+
     # define time of the x axis
     def set_time(self, fps):
         self.__len_data = int(fps)
+
+    def verify_checkbox(self, event):
+        for graph_name, checkbox in self.__checbox_arr.items():
+            checkbox.handle_event(event)
 
     # adds a new graph with a specific line name
     def add_graph(self, graph_name):
         if graph_name not in self.__graph_data:
             self.__graph_data[graph_name] = {}
             self.__graph_colors[graph_name] = {}
+
+            # create checkboxes for each line in the graph
+            self.__checbox_arr[graph_name] = Checkbox(0, 0, 30, graph_name)
+
+            if len(self.__graph_data) <= 4:
+                self.__checbox_arr[graph_name].checked = True
 
     # removes a graph from the display
     def remove_graph(self, graph_name):
@@ -499,28 +562,46 @@ class Display(Shape):
             if len(self.__graph_data[graph_name][line_name]) > self.__len_data:
                 self.__graph_data[graph_name][line_name].pop(0)
 
+    # update the array of data for a specific graph
+    def set_graph_data(self, graph_name, line_name, data):
+        self.__graph_data[graph_name][line_name] = data
+
     # draws the display as a rectangle with rounded corners, including graphs and text
     def draw(self, surface):
         # draw the display rectangle with rounded corners
         rect = pygame.Rect(self._x, self._y, self._size[0], self._size[1])
         pygame.draw.rect(surface, self._color, rect, border_radius=15)
 
-        # calculate the sections for graphs
-        graph_height = self._size[1] // len(self.__graph_data) if self.__graph_data else self._size[1]
+        # calculate the height of each graph useing the number of selected graphs
+        selected = sum(1 for checkbox in self.__checbox_arr.values() if checkbox.checked)
+        graph_height = (self._size[1] - 30) // selected if selected > 0 else 0
 
         # draw each graph
+        selected = []
         for idx, (graph_name, lines) in enumerate(self.__graph_data.items()):
-            self.draw_graph(
-                surface,
-                lines,
-                (
-                    self._x + 15,
-                    self._y + idx * graph_height + 15,
-                    self._size[0] - 30,
-                    graph_height - 30
-                ),
-                graph_name
-            )
+
+            # draw the checkbox for all graps
+            checkbox = self.__checbox_arr[graph_name]
+            x = self._x + self._size[0] + 5
+            y = self._y + idx * 20
+            checkbox.set_coordinates((x, y))
+            checkbox.draw(surface)
+
+            if checkbox.checked:
+                selected.append(graph_name)
+
+        for i in range(len(selected)):
+            graph_name = selected[i]
+            lines = self.__graph_data[graph_name]
+
+            # calculate the position of the graph
+            graph_x = self._x + 15
+            graph_y = self._y + i * graph_height + 15
+            graph_width = self._size[0] - 30
+            graph_height_ = graph_height - 15 if i < len(selected) - 1 else graph_height
+
+            # draw the graph
+            self.draw_graph(surface, lines, (graph_x, graph_y, graph_width, graph_height_), graph_name)
 
     # draw grid lines
     def __draw_grid(self, surface, graph_width, graph_height, graph_x, graph_y):
@@ -556,14 +637,15 @@ class Display(Shape):
             step_width = graph_width / len(data)
             color = self.__graph_colors[title][line_name]
 
-            for i in range(len(normalized_data) - 1):
+            for i in range(len(normalized_data)):
                 x1 = graph_x + i * step_width
                 y1 = graph_y + normalized_data[i]
                 x2 = graph_x + (i + 1) * step_width
+                y2 = graph_y + normalized_data[i + 1] if i < len(normalized_data) - 1 else y1
                 # draw the horizontal step
                 pygame.draw.line(surface, color, (x1, y1), (x2, y1), 2)
                 # draw the vertical connection to the next step
-                pygame.draw.line(surface, color, (x2, y1), (x2, graph_y + normalized_data[i + 1]), 2)
+                pygame.draw.line(surface, color, (x2, y1), (x2, y2), 2)
 
     # draw legend
     def __draw_legend(self, surface, graph_x, graph_y, title):
@@ -571,7 +653,7 @@ class Display(Shape):
         legend_y = graph_y + 10
         for idx, (line_name, color) in enumerate(self.__graph_colors[title].items()):
             # draw a background rectangle
-            pygame.draw.rect(surface, (255, 255, 255), (graph_x, graph_y + idx * 23, 100, 25))
+            #pygame.draw.rect(surface, (255, 255, 255), (graph_x, graph_y + idx * 23, 100, 25))
             pygame.draw.rect(surface, color, (legend_x, legend_y + idx * 20, 10, 10))
             legend_label = self.font.render(line_name, True, (0, 0, 0))
             surface.blit(legend_label, (legend_x + 15, legend_y + idx * 20 - 5))
@@ -581,7 +663,7 @@ class Display(Shape):
         # draw the last value of each line
         for i, (line_name, data) in enumerate(lines.items()):
             # draw a background rectangle
-            pygame.draw.rect(surface, (200, 200, 200), (graph_x, graph_y + graph_height - 25 - i * 23, 100, 25))
+            #pygame.draw.rect(surface, (200, 200, 200), (graph_x, graph_y + graph_height - 25 - i * 23, 100, 25))
             # round 2 decimal places
             value = round(data[-1], 2)
             label = self.font.render(f"{line_name}: {value}", True, (0, 0, 0))
@@ -832,10 +914,5 @@ class Simulator:
         for obj in self.__objects:
             obj.draw(self.screen)
 
-    def step(self):
-        """
-        performs a simulation step by updating and rendering objects
-        """
-        self.draw()
         pygame.display.flip()
         #self.__clock.tick(self.__FPS)
