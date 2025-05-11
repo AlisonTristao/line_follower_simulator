@@ -220,6 +220,6 @@ while True:
     # --- update the graph reference --- #
     set_graph_future_control(delta_u[:N_uw], delta_u[N_uw:])
     set_graph_reference(r_w/ke_w, r_v/ke_v)
-    set_graph_force_response(G_lw @ delta_u[:N_uw], G_lv @ delta_u[N_uw:])
+    set_graph_forced_response(G_lw @ delta_u[:N_uw], G_lv @ delta_u[N_uw:])
     set_graph_free_response(free_w/ke_w * 10, 2*free_v/ke_v)
     set_graph_error(erro[:N_horizon]/ke_w, erro[N_horizon:]/ke_v)
