@@ -465,7 +465,7 @@ class Checkbox:
     def __init__(self, x, y, size, label="", font_size=24):
         self.rect = pygame.Rect(x, y, size/2, size/2)
         self.color = (0, 0, 0)
-        self.checked = True
+        self.checked = False
         self.label = label
         self.font = pygame.font.SysFont(None, font_size)
         self.label_surface = self.font.render(label, True, (0, 0, 0))
@@ -539,6 +539,9 @@ class Display(Shape):
 
             # create checkboxes for each line in the graph
             self.__checbox_arr[graph_name] = Checkbox(0, 0, 30, graph_name)
+
+            if len(self.__graph_data) <= 4:
+                self.__checbox_arr[graph_name].checked = True
 
     # removes a graph from the display
     def remove_graph(self, graph_name):
@@ -634,14 +637,15 @@ class Display(Shape):
             step_width = graph_width / len(data)
             color = self.__graph_colors[title][line_name]
 
-            for i in range(len(normalized_data) - 1):
+            for i in range(len(normalized_data)):
                 x1 = graph_x + i * step_width
                 y1 = graph_y + normalized_data[i]
                 x2 = graph_x + (i + 1) * step_width
+                y2 = graph_y + normalized_data[i + 1] if i < len(normalized_data) - 1 else y1
                 # draw the horizontal step
                 pygame.draw.line(surface, color, (x1, y1), (x2, y1), 2)
                 # draw the vertical connection to the next step
-                pygame.draw.line(surface, color, (x2, y1), (x2, graph_y + normalized_data[i + 1]), 2)
+                pygame.draw.line(surface, color, (x2, y1), (x2, y2), 2)
 
     # draw legend
     def __draw_legend(self, surface, graph_x, graph_y, title):
@@ -649,7 +653,7 @@ class Display(Shape):
         legend_y = graph_y + 10
         for idx, (line_name, color) in enumerate(self.__graph_colors[title].items()):
             # draw a background rectangle
-            pygame.draw.rect(surface, (255, 255, 255), (graph_x, graph_y + idx * 23, 100, 25))
+            #pygame.draw.rect(surface, (255, 255, 255), (graph_x, graph_y + idx * 23, 100, 25))
             pygame.draw.rect(surface, color, (legend_x, legend_y + idx * 20, 10, 10))
             legend_label = self.font.render(line_name, True, (0, 0, 0))
             surface.blit(legend_label, (legend_x + 15, legend_y + idx * 20 - 5))
@@ -659,7 +663,7 @@ class Display(Shape):
         # draw the last value of each line
         for i, (line_name, data) in enumerate(lines.items()):
             # draw a background rectangle
-            pygame.draw.rect(surface, (200, 200, 200), (graph_x, graph_y + graph_height - 25 - i * 23, 100, 25))
+            #pygame.draw.rect(surface, (200, 200, 200), (graph_x, graph_y + graph_height - 25 - i * 23, 100, 25))
             # round 2 decimal places
             value = round(data[-1], 2)
             label = self.font.render(f"{line_name}: {value}", True, (0, 0, 0))

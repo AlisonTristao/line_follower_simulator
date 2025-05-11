@@ -51,6 +51,10 @@ class SimulatorController:
         self.future_v = [1] * 10
         self.free_response_omega = [1] * 10
         self.free_response_v = [1] * 10
+        self.force_response_omega = [1] * 10
+        self.force_response_v = [1] * 10
+        self.future_control_left = [1] * 10
+        self.future_control_right = [1] * 10
         self.error_omega = [1] * 10
         self.error_v = [1] * 10
 
@@ -178,6 +182,10 @@ class SimulatorController:
         self.display.add_line_to_graph("control", "left", color=self.get_rand_color())
         self.display.add_line_to_graph("control", "right", color=self.get_rand_color())
 
+        self.display.add_graph("future_control")
+        self.display.add_line_to_graph("future_control", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("future_control", "right", color=self.get_rand_color())
+
         self.display.add_graph("reference")
         self.display.add_line_to_graph("reference", "vm", color=self.get_rand_color())
         self.display.add_line_to_graph("reference", "ω", color=self.get_rand_color())
@@ -185,6 +193,10 @@ class SimulatorController:
         self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "vm", color=self.get_rand_color())
         self.display.add_line_to_graph("free_response", "ω", color=self.get_rand_color())
+
+        self.display.add_graph("force_response")
+        self.display.add_line_to_graph("force_response", "vm", color=self.get_rand_color())
+        self.display.add_line_to_graph("force_response", "ω", color=self.get_rand_color())
 
         self.display.add_graph("error")
         self.display.add_line_to_graph("error", "vm", color=self.get_rand_color())
@@ -199,10 +211,14 @@ class SimulatorController:
         self.display.update_graph_data("car", "ω", self.car.omega_norm())
         self.display.update_graph_data("control", "left", self.car.v1)
         self.display.update_graph_data("control", "right", self.car.v2)
+        self.display.set_graph_data("future_control", "left", self.future_control_left)
+        self.display.set_graph_data("future_control", "right", self.future_control_right)
         self.display.set_graph_data("reference", "vm", self.future_v)
         self.display.set_graph_data("reference", "ω", self.future_omega)
         self.display.set_graph_data("free_response", "vm", self.free_response_v)
         self.display.set_graph_data("free_response", "ω", self.free_response_omega)
+        self.display.set_graph_data("force_response", "vm", self.force_response_v)
+        self.display.set_graph_data("force_response", "ω", self.force_response_omega)
         self.display.set_graph_data("error", "vm", self.error_v)
         self.display.set_graph_data("error", "ω", self.error_omega)
 
@@ -313,6 +329,15 @@ def set_future_points(count, space):
 
     simulator.set_future_points(count, space)
 
+def set_graph_future_control(left, right):
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    simulator.future_control_left = left
+    simulator.future_control_right = right
+
 def set_graph_reference(omega, v):
     # check if the simulator is initialized
     if simulator is None:
@@ -330,6 +355,15 @@ def set_graph_free_response(omega, v):
 
     simulator.free_response_omega = omega
     simulator.free_response_v = v
+
+def set_graph_force_response(omega, v):
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    simulator.force_response_omega = omega
+    simulator.force_response_v = v
 
 def set_graph_error(omega, v):
     # check if the simulator is initialized

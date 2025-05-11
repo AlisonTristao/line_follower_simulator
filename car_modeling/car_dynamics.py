@@ -24,6 +24,8 @@ class motor:
 
     # first ordem step response
     def step(self, u, q=0):
+        if u <= 10:
+            u = 0
         self._y = (self._a[0] * self._y + self._b[0] * u + self._c[0] * q)
         # saturate output
         #self.saturate()
