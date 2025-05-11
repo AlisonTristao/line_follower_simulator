@@ -1,5 +1,4 @@
 from simulator import *
-import matplotlib.pyplot as plt
 
 # screen settings => sizes FULL, MEDIUM, SMALL
 screen_size = MEDIUM
