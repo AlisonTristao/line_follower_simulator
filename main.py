@@ -38,25 +38,39 @@ set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, accommo
 # setup the future points
 set_future_points(future_points, future_spacing)
 
+def rotate_point(x, y, angle):
+    # Rotaciona o vetor (x, y) pelo ângulo dado (em radianos)
+    cos_a = math.cos(-angle)  # sinal negativo para rotacionar sistema de coordenadas
+    sin_a = math.sin(-angle)
+    x_rot = x * cos_a - y * sin_a
+    y_rot = x * sin_a + y * cos_a
+    return x_rot, y_rot
+
 def converte_array(array):
-    # array de diferenças
-    #diff = np.diff(array, axis=0)
-
-    theta = []
-    for i in range(len(array)):
-        delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
-        delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
-        theta.append(converte_xy_to_theta(delta_x, delta_y))
-    
-    # calcula a hipotenusa
+    theta_list = []
     hipotenusa = []
-    for i in range(len(array)):
-        delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
-        delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
 
+    current_theta = 0.0  # orientação inicial
+
+    for i in range(len(array)):
+        if i == 0:
+            delta_x = array[i][0]
+            delta_y = array[i][1]
+        else:
+            delta_x = array[i][0] - array[i - 1][0]
+            delta_y = array[i][1] - array[i - 1][1]
+
+        # rotaciona o delta pelo inverso do theta atual (coordenada local)
+        delta_rot_x, delta_rot_y = rotate_point(delta_x, delta_y, current_theta)
+
+        # calcula novo theta com base no vetor já rotacionado
+        delta_theta = converte_xy_to_theta(delta_rot_x, delta_rot_y)
+        current_theta += delta_theta  # acumula rotação
+
+        theta_list.append(current_theta)
         hipotenusa.append(calculates_hipotenusa(delta_x, delta_y))
 
-    return np.array(theta), np.array(hipotenusa)
+    return np.array(theta_list), np.array(hipotenusa)
 
 def converte_xy_to_theta(x, y):
     return math.atan2(x, y)
@@ -116,9 +130,9 @@ N_horizon = int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_uw = 5
 N_uv = 5
 
-lamb_v = 0.02
-lamb_w = 0.001
-epsl_v = 0.001
+lamb_v = 0.01
+lamb_w = 0.000
+epsl_v = 0.0001
 epsl_w = 1
 
 v1 = 0
@@ -202,7 +216,7 @@ while True:
     angle, space = converte_array(future_points)
 
     s = space[0]/speed if speed > 0 else 1000
-    ref_theta = [0] + angle/s
+    ref_theta = angle/s
     ref_vm = space/points_s_v
 
     r_w = make_interp(ref_theta, N_horizon)
