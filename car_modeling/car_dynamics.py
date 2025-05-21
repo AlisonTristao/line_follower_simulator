@@ -4,6 +4,7 @@ import random
 class motor:
     def __init__(self):
         self._y = 0
+        self._last_y = [0, 0, 0]
         self._a = [0]
         self._b = [0]
         self._c = [0]
@@ -22,11 +23,25 @@ class motor:
     def get_y(self):
         return self._y
 
+    def save_last_y(self):
+        self._last_y.append(self._y)
+        if len(self._last_y) > 3:
+            self._last_y.pop(0)
+
+    def get_last_y(self):
+        return self._last_y
+
     # first ordem step response
     def step(self, u, q=0):
         if u <= 10:
             u = 0
+
+        # calculate the step
         self._y = (self._a[0] * self._y + self._b[0] * u + self._c[0] * q)
+
+        # save the last y
+        self.save_last_y()
+
         # saturate output
         self.saturate()
     
@@ -112,6 +127,17 @@ class car_dynamics:
         self.last_speed = speed
         self.last_omega = omega
         return dx, dy, angle
+
+    def get_wheels_speed(self):
+        speed_l = self._ml.get_last_y()
+        speed_r = self._mr.get_last_y()
+
+        # multiply by the wheel gain
+        for i in range(len(speed_l)):
+            speed_l[i] = speed_l[i] * self._wheels_speed_rad_s
+            speed_r[i] = speed_r[i] * self._wheels_speed_rad_s
+
+        return speed_l, speed_r
 
     def getWheels(self):
         return self._ml.get_y(), self._mr.get_y()

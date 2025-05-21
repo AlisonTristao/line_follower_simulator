@@ -1,4 +1,5 @@
 from simulator import *
+import pandas as pd
 
 # screen settings => sizes FULL, MEDIUM, SMALL
 screen_size = MEDIUM
@@ -17,8 +18,8 @@ sensor_spacing      = 0.008 # meters
 # motor constants
 ke_l = 0.99
 ke_r = 1.00
-accommodation_time_l = 0.61 # seconds
-accommodation_time_r = 0.59 # seconds
+accommodation_time_l = 0.62 # seconds
+accommodation_time_r = 0.58 # seconds
 
 # track caracteristics
 track_type          = LEMNISCATE
@@ -38,6 +39,16 @@ set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, accommo
 # setup the future points
 set_future_points(future_points, future_spacing)
 
+def matriz_por_indices(caminho_csv, indices_colunas):
+    try:
+        df = pd.read_csv(caminho_csv, header=None)
+        if max(indices_colunas) >= len(df.columns):
+            raise IndexError("Um dos índices fornecidos excede o número de colunas no CSV.")
+        return df.iloc[:, indices_colunas].values.tolist()
+    except Exception as e:
+        print(f"Erro ao processar o CSV: {e}")
+        return []
+
 def rotate_point(x, y, angle):
     # Rotaciona o vetor (x, y) pelo ângulo dado (em radianos)
     cos_a = math.cos(-angle)  # sinal negativo para rotacionar sistema de coordenadas
@@ -45,38 +56,6 @@ def rotate_point(x, y, angle):
     x_rot = x * cos_a - y * sin_a
     y_rot = x * sin_a + y * cos_a
     return x_rot, y_rot
-
-def converte_array(array):
-    theta_list = []
-    hipotenusa = []
-
-    current_theta = 0.0  # orientação inicial
-
-    for i in range(len(array)):
-        if i == 0:
-            delta_x = array[i][0]
-            delta_y = array[i][1]
-        else:
-            delta_x = array[i][0] - array[i - 1][0]
-            delta_y = array[i][1] - array[i - 1][1]
-
-        # rotaciona o delta pelo inverso do theta atual (coordenada local)
-        delta_rot_x, delta_rot_y = rotate_point(delta_x, delta_y, current_theta)
-
-        # calcula novo theta com base no vetor já rotacionado
-        delta_theta = converte_xy_to_theta(delta_rot_x, delta_rot_y)
-        current_theta += delta_theta  # acumula rotação
-
-        theta_list.append(current_theta)
-        hipotenusa.append(calculates_hipotenusa(delta_x, delta_y))
-
-    return np.array(theta_list), np.array(hipotenusa)
-
-def converte_xy_to_theta(x, y):
-    return math.atan2(x, y)
-
-def calculates_hipotenusa(x, y):
-    return math.sqrt(x**2 + y**2)
 
 def resp_degrau(alpha, k):
     return (1 - alpha**k)
@@ -92,14 +71,30 @@ def matrix_G(N, N_u, alpha=0.8, beta=0.2):
     G = G[:, :N_u]
     return G
 
-def calculate_free(free, alpha, beta, N_horizon, delta_u, ke):
-    free = np.roll(free, -1)  # Desloca os valores para a esquerda
-    free[-1] = free[-2]  # Mantém o último valor igual ao penúltimo
+def matrix_G_integradora(N, N_u, alpha=0.8, beta=0.2):
+    # --- matriz de convolução ---
+    G = np.zeros((N, N))
+    for i in range(N):
+        for j in range(N):
+            if j <= i:
+                last = G[i-1][j] if i > 0 else 0
+                G[i][j] = resp_degrau(alpha, i-j + 1) * beta/(1 - alpha) + last
+    # return just the N_u first columns
+    G = G[:, :N_u]
+    return G
 
-    for i in range(N_horizon):
-        free[i] = (delta_u * (1-alpha**(i+1)) * (beta/(1 - alpha)) * ke) + free[i]
+def free_GPC(free_matrix, last_y):
+    if len(free_matrix[0]) != len(last_y):
+        print("coeffs diferentes dos y passados!")
+        return
     
-    return free  # Retorna o array atualizado
+    #last_y = last_y[::-1]
+    future = []
+    for alpha in free_matrix:
+        y_k = sum([alpha[i] * last_y[i] for i in range(len(alpha))])
+        future.append(y_k)
+    
+    return future
 
 def make_interp(array, len_):
     x_original = np.linspace(0, 1, len(array))  # Posições originais
@@ -110,23 +105,19 @@ def make_interp(array, len_):
 
 # --- insert your code here --- #
 
-v_max = wheels_RPM/60 * 2 * math.pi * wheels_radius
-w_max = 2*v_max/wheels_distance
-
-ke_v = v_max/100
-ke_w = w_max/100
-
-points_s_w = 0.09
-points_s_v = 0.125
-
-# --- setup the control --- #
+wheel_gain = 2 * math.pi * wheels_radius
 
 alpha_l = math.exp(-z*5/accommodation_time_l)
 alpha_r = math.exp(-z*5/accommodation_time_r)
 beta_l = ke_l - alpha_l
 beta_r = ke_r - alpha_r
 
-N_horizon = int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
+print("alpha_l: ", round(alpha_l, 3))
+print("alpha_r: ", round(alpha_r, 3))
+print("beta_l: ", round(beta_l, 3))
+print("beta_r: ", round(beta_r, 3))
+
+N_horizon = 80 #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_uw = 5
 N_uv = 5
 
@@ -135,8 +126,8 @@ lamb_w = 0.000
 epsl_v = 0.0001
 epsl_w = 1
 
-v1 = 0
-v2 = 0
+v1 = 11
+v2 = 11
 
 # last values para achar a saturação
 last_v1 = 0
@@ -145,8 +136,11 @@ last_v2 = 0
 delta_u_l = 0
 delta_u_r = 0
 
-free_l = np.zeros(N_horizon)
-free_r = np.zeros(N_horizon)
+order = 3
+free_l = matriz_por_indices("car_modeling/coeffs.csv", [0, 1, 2])
+free_r = matriz_por_indices("car_modeling/coeffs.csv", [3, 4, 5])
+last_theta_l = []
+last_theta_r = []
 
 # --- matrizes do controle --- #
 
@@ -164,10 +158,10 @@ Q = np.block([
     [np.zeros((N_horizon, N_horizon)), Q_v]
 ])
 
-G_lw = matrix_G(N_horizon, N_uw, alpha_l, beta_l) * ke_w
-G_rw = matrix_G(N_horizon, N_uw, alpha_r, beta_r) * -ke_w
-G_lv = matrix_G(N_horizon, N_uv, alpha_l, beta_l) * ke_v
-G_rv = matrix_G(N_horizon, N_uv, alpha_r, beta_r) * ke_v
+G_lw = matrix_G_integradora(N_horizon, N_uw, alpha_l, beta_l) * wheel_gain
+G_rw = matrix_G_integradora(N_horizon, N_uw, alpha_r, beta_r) * -wheel_gain
+G_lv = matrix_G_integradora(N_horizon, N_uv, alpha_l, beta_l) * wheel_gain
+G_rv = matrix_G_integradora(N_horizon, N_uv, alpha_r, beta_r) * wheel_gain
 G = np.block([
     [G_lw, G_lv], 
     [G_rw, G_rv]
@@ -197,43 +191,27 @@ while True:
     if data is None: 
         break
     else:
-        line, future_points, speed, omega = data
+        line, future_points, speed, omega, last_omega_wheels = data
 
     # --- calculate free response --- #
 
-    free_l = calculate_free(free_l, alpha_l, beta_l, N_horizon, delta_u_l, 1)
-    free_r = calculate_free(free_r, alpha_r, beta_r, N_horizon, delta_u_r, 1)
-    free_w = (free_l - free_r) * ke_w/2
-    free_v = (free_l + free_r) * ke_v/4
+    last_theta_l = [last_omega_wheels[0][i] * z for i in range(len(last_omega_wheels[0]))]
+    last_theta_r = [last_omega_wheels[1][i] * z for i in range(len(last_omega_wheels[1]))]
 
-    eta_w = (omega - free_w[0])
-    eta_v = (speed - free_v[0])
+    free_future_l = free_GPC(free_l, last_theta_l)
+    free_future_r = free_GPC(free_r, last_theta_r)
 
-    free = np.concatenate((free_w + eta_w, free_v + eta_v), axis=0)
+    future_distance = []
+    future_theta = []
 
-    # --- calculate the reference trajectory --- #
+    for i in range(len(free_future_l)):
+        future_distance.append((free_future_l[i] + free_future_r[i]) * 100 * wheel_gain/2)
+        future_theta.append((free_future_l[i] - free_future_r[i]) * 100 * wheel_gain/wheels_distance)
 
-    angle, space = converte_array(future_points)
+    #print("distance", future_distance)
+    #print("angle", future_theta)
+    
+    set_graph_free_response(future_theta, future_distance)
 
-    s = space[0]/speed if speed > 0 else 1000
-    ref_theta = angle/s
-    ref_vm = space/points_s_v
-
-    r_w = make_interp(ref_theta, N_horizon)
-    r_v = make_interp(ref_vm, N_horizon)
-
-    ref = np.concatenate((r_w, r_v), axis=0)
-
-    # --- calculate the control action --- #
-
-    erro = (ref - free)
-    delta_u = K @ erro
-    delta_u_l = delta_u[0]
-    delta_u_r = delta_u[N_uw]
-
-    # --- update the graph reference --- #
-    set_graph_future_control(delta_u[:N_uw], delta_u[N_uw:])
-    set_graph_reference(r_w/ke_w, r_v/ke_v)
-    set_graph_forced_response(G_lw @ delta_u[:N_uw], G_lv @ delta_u[N_uw:])
-    set_graph_free_response(free_w/ke_w * 10, 2*free_v/ke_v)
-    set_graph_error(erro[:N_horizon]/ke_w, erro[N_horizon:]/ke_v)
+    delta_u_l = 0
+    delta_u_r = 0
