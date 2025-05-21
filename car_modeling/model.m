@@ -1,6 +1,6 @@
 pkg load control
 
-horizon = 80;
+horizon = 40;
 
 fps = 80;
 z = tf('z', 1/fps);
@@ -10,8 +10,8 @@ z_inv = tf('z^-1', 1/fps);
 delta = z - 1;
 
 % motors constant
-alpha_left  = 0.904;
-alpha_right = 0.898;
+alpha_left  = 0.90411;
+alpha_right = 0.89784;
 beta_left   = 0.086;
 beta_right  = 0.102;
 

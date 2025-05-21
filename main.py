@@ -27,8 +27,8 @@ track_length        = 0.02 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 3    # number of future points
-future_spacing      = 30    # resolutuin of the track
+future_points       = 40    # number of future points
+future_spacing      = 5    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
@@ -38,6 +38,49 @@ set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, accommo
 
 # setup the future points
 set_future_points(future_points, future_spacing)
+
+def make_ramp(alpha, len):
+    # --- make ramp ---
+    ramp = []
+    for i in range(len):
+        ramp.append(i * alpha)
+    return ramp
+
+def make_step(alpha, len):
+    # --- make step ---
+    step = []
+    for i in range(len):
+        step.append(alpha)
+    return step
+
+def converte_array(array):
+    # array de diferenças
+    #diff = np.diff(array, axis=0)
+
+    theta = []
+    last = 0
+    for i in range(len(array)):
+        delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
+        delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
+        last += converte_xy_to_theta(delta_x, delta_y)
+        theta.append(last)
+    
+    # calcula a hipotenusa
+    last = 0
+    hipotenusa = []
+    for i in range(len(array)):
+        delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
+        delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
+        last += calculates_hipotenusa(delta_x, delta_y)
+        hipotenusa.append(last)
+
+    return np.array(theta), np.array(hipotenusa)
+
+def converte_xy_to_theta(x, y):
+    return math.atan2(x, y)
+
+def calculates_hipotenusa(x, y):
+    return math.sqrt(x**2 + y**2)
 
 def matriz_por_indices(caminho_csv, indices_colunas):
     try:
@@ -88,7 +131,7 @@ def free_GPC(free_matrix, last_y):
         print("coeffs diferentes dos y passados!")
         return
     
-    #last_y = last_y[::-1]
+    last_y = last_y[::-1]
     future = []
     for alpha in free_matrix:
         y_k = sum([alpha[i] * last_y[i] for i in range(len(alpha))])
@@ -106,28 +149,27 @@ def make_interp(array, len_):
 # --- insert your code here --- #
 
 wheel_gain = 2 * math.pi * wheels_radius
-
 alpha_l = math.exp(-z*5/accommodation_time_l)
 alpha_r = math.exp(-z*5/accommodation_time_r)
 beta_l = ke_l - alpha_l
 beta_r = ke_r - alpha_r
 
-print("alpha_l: ", round(alpha_l, 3))
-print("alpha_r: ", round(alpha_r, 3))
+print("alpha_l: ", round(alpha_l, 5))
+print("alpha_r: ", round(alpha_r, 5))
 print("beta_l: ", round(beta_l, 3))
 print("beta_r: ", round(beta_r, 3))
 
-N_horizon = 80 #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
+N_horizon = 40 #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_uw = 5
 N_uv = 5
 
 lamb_v = 0.01
-lamb_w = 0.000
-epsl_v = 0.0001
+lamb_w = 10
+epsl_v = 1
 epsl_w = 1
 
-v1 = 11
-v2 = 11
+v1 = 1
+v2 = 1
 
 # last values para achar a saturação
 last_v1 = 0
@@ -139,10 +181,11 @@ delta_u_r = 0
 order = 3
 free_l = matriz_por_indices("car_modeling/coeffs.csv", [0, 1, 2])
 free_r = matriz_por_indices("car_modeling/coeffs.csv", [3, 4, 5])
-last_theta_l = []
-last_theta_r = []
+last_theta_l = [0, 0, 0]
+last_theta_r = [0, 0, 0]
 
 # --- matrizes do controle --- #
+
 
 R_v = np.eye(N_uv) * lamb_v
 R_w = np.eye(N_uw) * lamb_w
@@ -191,12 +234,16 @@ while True:
     if data is None: 
         break
     else:
-        line, future_points, speed, omega, last_omega_wheels = data
+        line, future_points, speed, omega, omega_wheels = data
 
     # --- calculate free response --- #
+    last_theta_l.append(last_theta_l[-1] + omega_wheels[0] * z)
+    last_theta_r.append(last_theta_r[-1] + omega_wheels[1] * z)
+    if len(last_theta_l) > 3:
+        last_theta_l.pop(0)
+        last_theta_r.pop(0)
 
-    last_theta_l = [last_omega_wheels[0][i] * z for i in range(len(last_omega_wheels[0]))]
-    last_theta_r = [last_omega_wheels[1][i] * z for i in range(len(last_omega_wheels[1]))]
+    #angle, distante = converte_array(future_points)
 
     free_future_l = free_GPC(free_l, last_theta_l)
     free_future_r = free_GPC(free_r, last_theta_r)
@@ -205,13 +252,32 @@ while True:
     future_theta = []
 
     for i in range(len(free_future_l)):
-        future_distance.append((free_future_l[i] + free_future_r[i]) * 100 * wheel_gain/2)
-        future_theta.append((free_future_l[i] - free_future_r[i]) * 100 * wheel_gain/wheels_distance)
+        future_distance.append((free_future_l[i] + free_future_r[i]) * wheels_radius/2)
+        future_theta.append((free_future_l[i] - free_future_r[i]) * wheels_radius/wheels_distance)
+
+    print("theta", future_theta[0], omega)
+    #print("dist", future_distance[1], speed)
 
     #print("distance", future_distance)
     #print("angle", future_theta)
-    
-    set_graph_free_response(future_theta, future_distance)
 
-    delta_u_l = 0
-    delta_u_r = 0
+    angle = make_step(0.1, N_horizon)
+    distante = make_step(0.0, N_horizon)
+
+    diff = np.diff(future_theta, axis=0)
+    set_graph_reference(angle, distante)
+    set_graph_free_response(diff * 100, future_distance)
+
+    angle = np.array(angle)
+    distante = np.array(distante)
+    future_theta = np.array(future_theta)
+    future_distance = np.array(future_distance)
+
+    erro_theta = future_theta - angle
+    erro_distante = distante - future_distance
+
+    erro = np.concatenate((erro_theta, erro_distante), axis=0)
+
+    delta_u = K @ erro
+    delta_u_r = 0 #delta_u[0]
+    delta_u_l = 0 #delta_u[N_uw]
