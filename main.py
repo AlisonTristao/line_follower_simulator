@@ -114,14 +114,14 @@ def matrix_G(N, N_u, alpha=0.8, beta=0.2):
     G = G[:, :N_u]
     return G
 
-def matrix_G_integradora(N, N_u, alpha=0.8, beta=0.2):
+def matrix_G_array(array_g, N_u):
     # --- matriz de convolução ---
-    G = np.zeros((N, N))
-    for i in range(N):
-        for j in range(N):
+    G = np.zeros((len(array_g), len(array_g)))
+    for i in range(len(array_g)):
+        for j in range(len(array_g)):
             if j <= i:
-                last = G[i-1][j] if i > 0 else 0
-                G[i][j] = resp_degrau(alpha, i-j + 1) * beta/(1 - alpha) + last
+                G[i][j] = array_g[i][0]
+
     # return just the N_u first columns
     G = G[:, :N_u]
     return G
@@ -164,12 +164,12 @@ N_uw = 5
 N_uv = 5
 
 lamb_v = 0.01
-lamb_w = 10
-epsl_v = 1
+lamb_w = 1
+epsl_v = 1e-6
 epsl_w = 1
 
-v1 = 1
-v2 = 1
+v1 = 0
+v2 = 0
 
 # last values para achar a saturação
 last_v1 = 0
@@ -186,7 +186,6 @@ last_theta_r = [0, 0, 0]
 
 # --- matrizes do controle --- #
 
-
 R_v = np.eye(N_uv) * lamb_v
 R_w = np.eye(N_uw) * lamb_w
 R = np.block([
@@ -201,10 +200,14 @@ Q = np.block([
     [np.zeros((N_horizon, N_horizon)), Q_v]
 ])
 
-G_lw = matrix_G_integradora(N_horizon, N_uw, alpha_l, beta_l) * wheel_gain
-G_rw = matrix_G_integradora(N_horizon, N_uw, alpha_r, beta_r) * -wheel_gain
-G_lv = matrix_G_integradora(N_horizon, N_uv, alpha_l, beta_l) * wheel_gain
-G_rv = matrix_G_integradora(N_horizon, N_uv, alpha_r, beta_r) * wheel_gain
+g_l = matriz_por_indices("car_modeling/g.csv", [0])
+g_r = matriz_por_indices("car_modeling/g.csv", [1])
+
+G_lw = matrix_G_array(g_l, N_uw) * wheel_gain/wheels_distance
+G_lv = matrix_G_array(g_l, N_uv) * wheel_gain/2
+G_rw = matrix_G_array(g_r, N_uw) * wheel_gain/wheels_distance
+G_rv = matrix_G_array(g_r, N_uv) * wheel_gain/2
+
 G = np.block([
     [G_lw, G_lv], 
     [G_rw, G_rv]
@@ -255,29 +258,31 @@ while True:
         future_distance.append((free_future_l[i] + free_future_r[i]) * wheels_radius/2)
         future_theta.append((free_future_l[i] - free_future_r[i]) * wheels_radius/wheels_distance)
 
-    print("theta", future_theta[0], omega)
+    #print("theta", future_theta[0], omega)
     #print("dist", future_distance[1], speed)
 
     #print("distance", future_distance)
     #print("angle", future_theta)
 
     angle = make_step(0.1, N_horizon)
-    distante = make_step(0.0, N_horizon)
+    distante = make_step(0, N_horizon)
 
     diff = np.diff(future_theta, axis=0)
     set_graph_reference(angle, distante)
-    set_graph_free_response(diff * 100, future_distance)
+    set_graph_free_response(diff, future_distance)
 
     angle = np.array(angle)
     distante = np.array(distante)
     future_theta = np.array(future_theta)
     future_distance = np.array(future_distance)
 
-    erro_theta = future_theta - angle
+    erro_theta = angle - future_theta
     erro_distante = distante - future_distance
 
     erro = np.concatenate((erro_theta, erro_distante), axis=0)
 
+    print(erro)
+
     delta_u = K @ erro
-    delta_u_r = 0 #delta_u[0]
-    delta_u_l = 0 #delta_u[N_uw]
+    delta_u_l = delta_u[0]
+    delta_u_r = delta_u[N_uw]

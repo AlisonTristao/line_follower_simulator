@@ -16,19 +16,16 @@ beta_left   = 0.086;
 beta_right  = 0.102;
 
 % wheels
-sistem_left = beta_left/(z-alpha_left);
-sistem_right = beta_right/(z-alpha_right);
+sl = beta_left/(z-alpha_left);
+sr = beta_right/(z-alpha_right);
 
 % system to delta_u control
-sistem_left = sistem_left * (1/delta)^2 %* (z_inv / z_inv)
-sistem_right = sistem_right * (1/delta)^2 %* (z_inv / z_inv)
-
-%step(sistem_left, sistem_right, 1)
-%impulse(sistem_left, sistem_right, 1)
+system_left = sl * (1/delta)^2 %* (z_inv / z_inv)
+system_right = sr * (1/delta)^2 %* (z_inv / z_inv)
 
 % Pega coeficientes numerador e denominador
-den_left = sistem_left.den{1}(2:end) * -1;
-den_right = sistem_right.den{1}(2:end) * -1;
+den_left = system_left.den{1}(2:end) * -1;
+den_right = system_right.den{1}(2:end) * -1;
 
 m_left = [den_left;1, 0, 0; 0, 1, 0];
 m_right = [den_right;1, 0, 0;0, 1, 0];
@@ -42,6 +39,16 @@ for i = 1:horizon
     resultados = [resultados; linha];
 end
 
+g_l = impulse(system_left, (horizon + 2)/fps);
+g_r = impulse(system_right, (horizon + 2)/fps);
+% transforma em colunas
+g_l = g_l(4:end);
+g_r = g_r(4:end);
+
+% concatena horizontalmente
+g = [g_l, g_r];
+
 csvwrite('coeffs.csv', resultados);
+csvwrite('g.csv', g);
 
 pause(5)
