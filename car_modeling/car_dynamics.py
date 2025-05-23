@@ -22,9 +22,6 @@ class motor:
     def get_y(self):
         return self._y
 
-    def get_last_y(self):
-        return self._y
-
     # first ordem step response
     def step(self, u, q=0):
         #if abs(u) <= 10:
@@ -107,8 +104,8 @@ class car_dynamics:
         omega = self.omega()
         
         # calculate the space using trapezoidal rule
-        space = (self.last_speed + speed) * self.z/2
-        angle = (self.last_omega + omega) * self.z/2
+        space = speed * self.z #(self.last_speed + speed) * self.z/2
+        angle = omega * self.z #(self.last_omega + omega) * self.z/2
 
         # update last speed and omega
         dx = space * math.sin(angle)
@@ -119,13 +116,13 @@ class car_dynamics:
         self.last_omega = omega
         return dx, dy, angle
 
+    def _get_wheels(self):
+        return self._ml.get_y(), self._mr.get_y()
+    
+    def get_wheels_norm(self):
+        return self._get_wheels()
+
     def get_wheels_speed(self):
-        speed_l = self._ml.get_last_y()
-        speed_r = self._mr.get_last_y()
-
-        return speed_l, speed_r
-
-    def getWheels(self):
         return self._ml.get_y(), self._mr.get_y()
 
     def step(self, u1, u2, q1=0, q2=0):

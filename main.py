@@ -16,7 +16,7 @@ sensor_count        = 15
 sensor_spacing      = 0.008 # meters
 
 # motor constants
-ke_l = 0.99
+ke_l = 1.00
 ke_r = 1.00
 accommodation_time_l = 0.62 # seconds
 accommodation_time_r = 0.58 # seconds
@@ -28,7 +28,7 @@ sensor_spacing      = 0.008 # meters
 
 # future points
 future_points       = 40    # number of future points
-future_spacing      = 5    # resolutuin of the track
+future_spacing      = 10    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
@@ -53,28 +53,39 @@ def make_step(alpha, len):
         step.append(alpha)
     return step
 
+def angle_between_vectors(v1, v2):
+    # Produto vetorial (em 2D é um escalar)
+    det = v1[0] * v2[1] - v1[1] * v2[0]
+    # Produto escalar
+    dot = v1[0] * v2[0] + v1[1] * v2[1]
+    return math.atan2(det, dot)
+
 def converte_array(array):
-    # array de diferenças
-    #diff = np.diff(array, axis=0)
+    angle_list = []
+    distance_list = []
+    total_angle = 0
+    total_distance = 0
 
-    theta = []
-    last = 0
-    for i in range(len(array)):
-        delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
-        delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
-        last += converte_xy_to_theta(delta_x, delta_y)
-        theta.append(last)
-    
-    # calcula a hipotenusa
-    last = 0
-    hipotenusa = []
-    for i in range(len(array)):
-        delta_x = array[i][0] - array[i-1][0] if i > 0 else array[i][0]
-        delta_y = array[i][1] - array[i-1][1] if i > 0 else array[i][1]
-        last += calculates_hipotenusa(delta_x, delta_y)
-        hipotenusa.append(last)
+    for i in range(1, len(array)):
+        p0 = array[i - 1]
+        p1 = array[i]
+        v1 = np.subtract(p1, p0)
+        dist = np.linalg.norm(v1)
+        total_distance += dist
+        distance_list.append(total_distance)
 
-    return np.array(theta), np.array(hipotenusa)
+        if i == 1:
+            angle_list.append(0)  # sem ângulo no primeiro segmento
+            continue
+
+        p_1 = array[i - 2]
+        v0 = np.subtract(p0, p_1)
+
+        angle = angle_between_vectors(v0, v1)
+        total_angle += angle
+        angle_list.append(total_angle)
+
+    return np.array(angle_list), np.array(distance_list)
 
 def converte_xy_to_theta(x, y):
     return math.atan2(x, y)
@@ -148,7 +159,6 @@ def make_interp(array, len_):
 
 # --- insert your code here --- #
 
-wheel_gain = 2 * math.pi * wheels_radius
 alpha_l = math.exp(-z*5/accommodation_time_l)
 alpha_r = math.exp(-z*5/accommodation_time_r)
 beta_l = ke_l - alpha_l
@@ -160,20 +170,16 @@ print("beta_l: ", round(beta_l, 3))
 print("beta_r: ", round(beta_r, 3))
 
 N_horizon = 40 #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
-N_uw = 5
-N_uv = 5
+N_uw = N_horizon
+N_uv = N_horizon
 
-lamb_v = 0.01
-lamb_w = 1
-epsl_v = 1e-6
+lamb_v = 1
+lamb_w = 1e-2
+epsl_v = 3e-2
 epsl_w = 1
 
-v1 = 0
-v2 = 0
-
-# last values para achar a saturação
-last_v1 = 0
-last_v2 = 0
+v1 = 1
+v2 = 1
 
 delta_u_l = 0
 delta_u_r = 0
@@ -203,10 +209,10 @@ Q = np.block([
 g_l = matriz_por_indices("car_modeling/g.csv", [0])
 g_r = matriz_por_indices("car_modeling/g.csv", [1])
 
-G_lw = matrix_G_array(g_l, N_uw) * wheel_gain/wheels_distance
-G_lv = matrix_G_array(g_l, N_uv) * wheel_gain/2
-G_rw = matrix_G_array(g_r, N_uw) * wheel_gain/wheels_distance
-G_rv = matrix_G_array(g_r, N_uv) * wheel_gain/2
+G_lw = matrix_G_array(g_l, N_uw) * wheels_radius/wheels_distance
+G_lv = matrix_G_array(g_l, N_uv) * wheels_radius/2
+G_rw = matrix_G_array(g_r, N_uw) * -wheels_radius/wheels_distance
+G_rv = matrix_G_array(g_r, N_uv) * wheels_radius/2
 
 G = np.block([
     [G_lw, G_lv], 
@@ -225,12 +231,6 @@ while True:
     v1 = max(min(v1, 100), -100)
     v2 = max(min(v2, 100), -100)
 
-    delta_u_l = v1 - last_v1
-    delta_u_r = v2 - last_v2
-
-    last_v1 = v1
-    last_v2 = v2
-
     # --- step the simulaine, future_points, speed, omega tion here --- #
 
     data = step_simulation(v1, v2)
@@ -248,28 +248,33 @@ while True:
 
     #angle, distante = converte_array(future_points)
 
-    free_future_l = free_GPC(free_l, last_theta_l)
-    free_future_r = free_GPC(free_r, last_theta_r)
+    free_future_l = free_GPC(free_l, last_theta_l.copy())
+    free_future_r = free_GPC(free_r, last_theta_r.copy())
 
     future_distance = []
     future_theta = []
 
     for i in range(len(free_future_l)):
         future_distance.append((free_future_l[i] + free_future_r[i]) * wheels_radius/2)
-        future_theta.append((free_future_l[i] - free_future_r[i]) * wheels_radius/wheels_distance)
+        future_theta.append((-free_future_l[i] + free_future_r[i]) * wheels_radius/wheels_distance)
 
-    #print("theta", future_theta[0], omega)
+    #print("left", free_future_l[0], last_theta_l[-1], "right", free_future_r[0], last_theta_r[-1])
+    #print(last_theta_l[-1], last_theta_r[-1])
     #print("dist", future_distance[1], speed)
-
+    #print("theta", future_theta[0], omega)
     #print("distance", future_distance)
     #print("angle", future_theta)
 
-    angle = make_step(0.1, N_horizon)
-    distante = make_step(0, N_horizon)
+    angle = make_step(3.14159, N_horizon)
+    distante = make_step(0.01, N_horizon)
 
-    diff = np.diff(future_theta, axis=0)
+    #print(future_points)
+    #angle, distante = converte_array(future_points)
+    #print("angle", angle)
+    #print("distante", distante)
+
     set_graph_reference(angle, distante)
-    set_graph_free_response(diff, future_distance)
+    set_graph_free_response(future_theta, future_distance)
 
     angle = np.array(angle)
     distante = np.array(distante)
@@ -281,8 +286,6 @@ while True:
 
     erro = np.concatenate((erro_theta, erro_distante), axis=0)
 
-    print(erro)
-
     delta_u = K @ erro
-    delta_u_l = delta_u[0]
-    delta_u_r = delta_u[N_uw]
+    delta_u_r = delta_u[0]
+    delta_u_l = delta_u[N_uw]

@@ -182,45 +182,45 @@ class SimulatorController:
         self.display.add_line_to_graph("control", "left", color=self.get_rand_color())
         self.display.add_line_to_graph("control", "right", color=self.get_rand_color())
 
+        self.display.add_graph("free_response")
+        self.display.add_line_to_graph("free_response", "d", color=self.get_rand_color())
+        self.display.add_line_to_graph("free_response", "θ", color=self.get_rand_color())
+
         self.display.add_graph("future_control")
         self.display.add_line_to_graph("future_control", "left", color=self.get_rand_color())
         self.display.add_line_to_graph("future_control", "right", color=self.get_rand_color())
 
         self.display.add_graph("reference")
-        self.display.add_line_to_graph("reference", "vm", color=self.get_rand_color())
-        self.display.add_line_to_graph("reference", "ω", color=self.get_rand_color())
-
-        self.display.add_graph("free_response")
-        self.display.add_line_to_graph("free_response", "vm", color=self.get_rand_color())
-        self.display.add_line_to_graph("free_response", "ω", color=self.get_rand_color())
+        self.display.add_line_to_graph("reference", "d", color=self.get_rand_color())
+        self.display.add_line_to_graph("reference", "θ", color=self.get_rand_color())
 
         self.display.add_graph("forced_response")
-        self.display.add_line_to_graph("forced_response", "vm", color=self.get_rand_color())
-        self.display.add_line_to_graph("forced_response", "ω", color=self.get_rand_color())
+        self.display.add_line_to_graph("forced_response", "d", color=self.get_rand_color())
+        self.display.add_line_to_graph("forced_response", "θ", color=self.get_rand_color())
 
         self.display.add_graph("error")
-        self.display.add_line_to_graph("error", "vm", color=self.get_rand_color())
-        self.display.add_line_to_graph("error", "ω", color=self.get_rand_color())
+        self.display.add_line_to_graph("error", "d", color=self.get_rand_color())
+        self.display.add_line_to_graph("error", "θ", color=self.get_rand_color())
     def _update_graps(self):
         """
         update the graphs with the given values.
         """
-        self.display.update_graph_data("wheels", "left", self.car.getWheels()[0])
-        self.display.update_graph_data("wheels", "right", self.car.getWheels()[1])
+        self.display.update_graph_data("wheels", "left", self.car.get_wheels_norm()[0])
+        self.display.update_graph_data("wheels", "right", self.car.get_wheels_norm()[1])
         self.display.update_graph_data("car", "vm", self.car.speed_norm())
         self.display.update_graph_data("car", "ω", self.car.omega_norm())
         self.display.update_graph_data("control", "left", self.car.v1)
         self.display.update_graph_data("control", "right", self.car.v2)
         self.display.set_graph_data("future_control", "left", self.future_control_left)
         self.display.set_graph_data("future_control", "right", self.future_control_right)
-        self.display.set_graph_data("reference", "vm", self.future_v)
-        self.display.set_graph_data("reference", "ω", self.future_omega)
-        self.display.set_graph_data("free_response", "vm", self.free_response_v)
-        self.display.set_graph_data("free_response", "ω", self.free_response_omega)
-        self.display.set_graph_data("forced_response", "vm", self.forced_response_v)
-        self.display.set_graph_data("forced_response", "ω", self.forced_response_omega)
-        self.display.set_graph_data("error", "vm", self.error_v)
-        self.display.set_graph_data("error", "ω", self.error_omega)
+        self.display.set_graph_data("reference", "d", self.future_v)
+        self.display.set_graph_data("reference", "θ", self.future_omega)
+        self.display.set_graph_data("free_response", "d", self.free_response_v)
+        self.display.set_graph_data("free_response", "θ", self.free_response_omega)
+        self.display.set_graph_data("forced_response", "d", self.forced_response_v)
+        self.display.set_graph_data("forced_response", "θ", self.forced_response_omega)
+        self.display.set_graph_data("error", "d", self.error_v)
+        self.display.set_graph_data("error", "θ", self.error_omega)
 
     def update_FPS(self, fps):
         """
