@@ -125,16 +125,16 @@ def matrix_G(N, N_u, alpha=0.8, beta=0.2):
     G = G[:, :N_u]
     return G
 
-def matrix_G_array(array_g, N_u):
+def matrix_G_array(array_g, N_u, N):
     # --- matriz de convolução ---
     G = np.zeros((len(array_g), len(array_g)))
     for i in range(len(array_g)):
         for j in range(len(array_g)):
             if j <= i:
-                G[i][j] = array_g[i][0]
+                G[i][j] = array_g[i-j][0]
 
-    # return just the N_u first columns
-    G = G[:, :N_u]
+    # return just the N_u first columns and N rows
+    G = G[:N, :N_u]
     return G
 
 def free_GPC(free_matrix, last_y):
@@ -173,9 +173,9 @@ N_horizon = 40 #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_uw = N_horizon
 N_uv = N_horizon
 
-lamb_v = 1
-lamb_w = 1e-2
-epsl_v = 3e-2
+lamb_v = 0.01
+lamb_w = 0.01
+epsl_v = 0.001
 epsl_w = 1
 
 v1 = 1
@@ -209,10 +209,10 @@ Q = np.block([
 g_l = matriz_por_indices("car_modeling/g.csv", [0])
 g_r = matriz_por_indices("car_modeling/g.csv", [1])
 
-G_lw = matrix_G_array(g_l, N_uw) * -wheels_radius/wheels_distance
-G_lv = matrix_G_array(g_l, N_uv) * wheels_radius/2
-G_rw = matrix_G_array(g_r, N_uw) * wheels_radius/wheels_distance
-G_rv = matrix_G_array(g_r, N_uv) * wheels_radius/2
+G_lw = matrix_G_array(g_l, N_uw, N_horizon) * -wheels_radius/wheels_distance
+G_lv = matrix_G_array(g_l, N_uv, N_horizon) * wheels_radius/2
+G_rw = matrix_G_array(g_r, N_uw, N_horizon) * wheels_radius/wheels_distance
+G_rv = matrix_G_array(g_r, N_uv, N_horizon) * wheels_radius/2
 
 G = np.block([
     [G_lw, G_lv], 
@@ -270,7 +270,7 @@ while True:
     #print("distance", future_distance)
     #print("angle", future_theta)
 
-    angle = make_step(4*3.14159, N_horizon)
+    angle = make_step(3.14159, N_horizon)
     distante = make_step(0.01, N_horizon)
 
     #print(future_points)
