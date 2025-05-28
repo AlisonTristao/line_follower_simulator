@@ -209,9 +209,9 @@ Q = np.block([
 g_l = matriz_por_indices("car_modeling/g.csv", [0])
 g_r = matriz_por_indices("car_modeling/g.csv", [1])
 
-G_lw = matrix_G_array(g_l, N_uw) * wheels_radius/wheels_distance
+G_lw = matrix_G_array(g_l, N_uw) * -wheels_radius/wheels_distance
 G_lv = matrix_G_array(g_l, N_uv) * wheels_radius/2
-G_rw = matrix_G_array(g_r, N_uw) * -wheels_radius/wheels_distance
+G_rw = matrix_G_array(g_r, N_uw) * wheels_radius/wheels_distance
 G_rv = matrix_G_array(g_r, N_uv) * wheels_radius/2
 
 G = np.block([
@@ -243,6 +243,11 @@ while True:
     last_theta_l.append(last_theta_l[-1] + omega_wheels[0] * z)
     last_theta_r.append(last_theta_r[-1] + omega_wheels[1] * z)
     if len(last_theta_l) > 3:
+        '''value_l = last_theta_l[0]
+        value_r = last_theta_r[0]
+        for i in range(3):
+            last_theta_l[i] -= value_l
+            last_theta_r[i] -= value_r'''
         last_theta_l.pop(0)
         last_theta_r.pop(0)
 
@@ -256,16 +261,16 @@ while True:
 
     for i in range(len(free_future_l)):
         future_distance.append((free_future_l[i] + free_future_r[i]) * wheels_radius/2)
-        future_theta.append((-free_future_l[i] + free_future_r[i]) * wheels_radius/wheels_distance)
+        future_theta.append((free_future_l[i] - free_future_r[i]) * wheels_radius/wheels_distance)
 
     #print("left", free_future_l[0], last_theta_l[-1], "right", free_future_r[0], last_theta_r[-1])
     #print(last_theta_l[-1], last_theta_r[-1])
     #print("dist", future_distance[1], speed)
-    #print("theta", future_theta[0], omega)
+    print("theta", future_theta[0], omega)
     #print("distance", future_distance)
     #print("angle", future_theta)
 
-    angle = make_step(3.14159, N_horizon)
+    angle = make_step(4*3.14159, N_horizon)
     distante = make_step(0.01, N_horizon)
 
     #print(future_points)
