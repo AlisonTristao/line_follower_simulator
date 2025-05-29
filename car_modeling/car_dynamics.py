@@ -34,8 +34,8 @@ class motor:
 
     # first ordem step response
     def step(self, u, q=0):
-        u = self.dead_zone(u)
-        u = self.magnetic_saturation(u)
+        #u = self.dead_zone(u)
+        #u = self.magnetic_saturation(u)
         u = self.saturate(u)
 
         # calculate the step
