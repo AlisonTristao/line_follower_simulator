@@ -2,7 +2,7 @@ from simulator import *
 import pandas as pd
 
 # screen settings => sizes FULL, MEDIUM, SMALL
-screen_size = MEDIUM
+screen_size = FULL
 screen_fps = 80
 z = 1/screen_fps
 track_seed = 1112
@@ -23,11 +23,11 @@ accommodation_time_r = 0.58 # seconds
 
 # track caracteristics
 track_type          = LEMNISCATE
-track_length        = 0.02 # metersref_theta
+track_length        = 0.02 # meters
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 45    # number of future points
+future_points       = 45   # number of future points
 future_spacing      = 3    # resolutuin of the track
 
 # setup the simulation
@@ -99,12 +99,12 @@ N_uw = 2
 N_uv = 5
 
 lamb_d = 1e-2
-lamb_a = 1e-1
+lamb_a = 5e-1
 epsl_d = 1
-epsl_a = 1
+epsl_a = 0.5
 
-v1 = 1
-v2 = 1
+v1 = 0
+v2 = 0
 
 delta_u_l = 0
 delta_u_r = 0
@@ -212,7 +212,7 @@ while True:
 
     erro = np.concatenate((erro_theta, erro_distance), axis=0)
 
-    # --- optimal control law --- #
+    # --- optimal control --- #
 
     delta_u = K @ erro
     delta_u_r = delta_u[0]

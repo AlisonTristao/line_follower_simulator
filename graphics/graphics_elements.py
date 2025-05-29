@@ -622,10 +622,19 @@ class Display(Shape):
 
     # draw title 
     def __draw_title(self, surface, title, graph_width, graph_x, graph_y):
-        font = pygame.font.Font(None, 20)
+        font = pygame.font.SysFont(None, 20)
         title_label = font.render(title, True, (0, 0, 0))
-        offset = len(title) * 2
-        surface.blit(title_label, (graph_x + graph_width // 2 - offset, graph_y + 10))
+        text_width = title_label.get_width()
+        text_height = title_label.get_height()
+
+        # Centraliza o retângulo e o texto
+        rect_x = graph_x + graph_width // 2 - text_width // 2 - 10  # 10 de padding
+        rect_y = graph_y + 10
+        rect_width = text_width + 20  # 10 de padding em cada lado
+        rect_height = text_height + 10
+
+        pygame.draw.rect(surface, (255, 255, 255), (rect_x, rect_y, rect_width, rect_height))
+        surface.blit(title_label, (graph_x + graph_width // 2 - text_width // 2, rect_y + 5))
 
     # draw each line in the graph
     def __draw_graph_separate(self, surface, lines, title, graph_width, graph_height, graph_x, graph_y):
@@ -686,14 +695,14 @@ class Display(Shape):
         # draw grid lines
         self.__draw_grid(surface, graph_width, graph_height, graph_x, graph_y)
 
+        # draw each line in the graph
+        self.__draw_graph_separate(surface, lines, title, graph_width, graph_height, graph_x, graph_y)
+
         # draw axes values
         self.__draw_axis_values(surface, graph_height, graph_x, graph_y)
 
         # draw title
         self.__draw_title(surface, title, graph_width, graph_x, graph_y)
-
-        # draw each line in the graph
-        self.__draw_graph_separate(surface, lines, title, graph_width, graph_height, graph_x, graph_y)
 
         # draw legend
         self.__draw_legend(surface, graph_x, graph_y, title)
