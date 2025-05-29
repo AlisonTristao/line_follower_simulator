@@ -1,6 +1,6 @@
 pkg load control
 
-horizon = 40;
+horizon = 200;
 
 fps = 80;
 Ts = 1/fps;

@@ -47,16 +47,14 @@ class SimulatorController:
 
         self.future_points_count = 10
         self.future_space = 30
-        self.future_omega = [1] * 10
-        self.future_v = [1] * 10
-        self.free_response_omega = [1] * 10
-        self.free_response_v = [1] * 10
-        self.forced_response_omega = [1] * 10
-        self.forced_response_v = [1] * 10
-        self.future_control_left = [1] * 10
-        self.future_control_right = [1] * 10
-        self.error_omega = [1] * 10
-        self.error_v = [1] * 10
+        self.future_omega = [0] * 10
+        self.future_v = [0] * 10
+        self.free_response_omega = [0] * 10
+        self.free_response_v = [0] * 10
+        self.future_control_left = [0] * 10
+        self.future_control_right = [0] * 10
+        self.error_omega = [0] * 10
+        self.error_v = [0] * 10
 
     def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke_l=1, ke_r=1, kq=1, accommodation_time_l=1.0, accommodation_time_r=1.0, sensor_distance=0.1, sensor_count=8):
         z = 1/self.FPS
@@ -101,7 +99,7 @@ class SimulatorController:
         self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1]))
 
         # create future points
-        self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length*1.5*self.SCALE)
+        self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length*0.5*self.SCALE)
 
         # create minimap
         minimap_position = (0.9 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1])
@@ -194,10 +192,6 @@ class SimulatorController:
         self.display.add_line_to_graph("reference", "d", color=self.get_rand_color())
         self.display.add_line_to_graph("reference", "θ", color=self.get_rand_color())
 
-        self.display.add_graph("forced_response")
-        self.display.add_line_to_graph("forced_response", "d", color=self.get_rand_color())
-        self.display.add_line_to_graph("forced_response", "θ", color=self.get_rand_color())
-
         self.display.add_graph("error")
         self.display.add_line_to_graph("error", "d", color=self.get_rand_color())
         self.display.add_line_to_graph("error", "θ", color=self.get_rand_color())
@@ -217,8 +211,6 @@ class SimulatorController:
         self.display.set_graph_data("reference", "θ", self.future_omega)
         self.display.set_graph_data("free_response", "d", self.free_response_v)
         self.display.set_graph_data("free_response", "θ", self.free_response_omega)
-        self.display.set_graph_data("forced_response", "d", self.forced_response_v)
-        self.display.set_graph_data("forced_response", "θ", self.forced_response_omega)
         self.display.set_graph_data("error", "d", self.error_v)
         self.display.set_graph_data("error", "θ", self.error_omega)
 

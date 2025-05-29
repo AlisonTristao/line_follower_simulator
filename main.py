@@ -27,8 +27,8 @@ track_length        = 0.02 # metersref_theta
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 40    # number of future points
-future_spacing      = 10    # resolutuin of the track
+future_points       = 45    # number of future points
+future_spacing      = 3    # resolutuin of the track
 
 # setup the simulation
 start_simulation(screen_size, screen_fps, seed=track_seed, track_type=track_type, track_length=track_length, sensor_spacing=sensor_spacing)
@@ -39,13 +39,6 @@ set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, accommo
 # setup the future points
 set_future_points(future_points, future_spacing)
 
-def make_ramp(alpha, len):
-    # --- make ramp ---
-    ramp = []
-    for i in range(len):
-        ramp.append(i * alpha)
-    return ramp
-
 def make_step(alpha, len):
     # --- make step ---
     step = []
@@ -53,77 +46,16 @@ def make_step(alpha, len):
         step.append(alpha)
     return step
 
-def angle_between_vectors(v1, v2):
-    # Produto vetorial (em 2D é um escalar)
-    det = v1[0] * v2[1] - v1[1] * v2[0]
-    # Produto escalar
-    dot = v1[0] * v2[0] + v1[1] * v2[1]
-    return math.atan2(det, dot)
-
-def converte_array(array):
-    angle_list = []
-    distance_list = []
-    total_angle = 0
-    total_distance = 0
-
-    for i in range(1, len(array)):
-        p0 = array[i - 1]
-        p1 = array[i]
-        v1 = np.subtract(p1, p0)
-        dist = np.linalg.norm(v1)
-        total_distance += dist
-        distance_list.append(total_distance)
-
-        if i == 1:
-            angle_list.append(0)  # sem ângulo no primeiro segmento
-            continue
-
-        p_1 = array[i - 2]
-        v0 = np.subtract(p0, p_1)
-
-        angle = angle_between_vectors(v0, v1)
-        total_angle += angle
-        angle_list.append(total_angle)
-
-    return np.array(angle_list), np.array(distance_list)
-
-def converte_xy_to_theta(x, y):
-    return math.atan2(x, y)
-
-def calculates_hipotenusa(x, y):
-    return math.sqrt(x**2 + y**2)
-
-def matriz_por_indices(caminho_csv, indices_colunas):
+def matriz_por_indices(caminho_csv, indices_colunas, limit=-1):
     try:
         df = pd.read_csv(caminho_csv, header=None)
         if max(indices_colunas) >= len(df.columns):
             raise IndexError("Um dos índices fornecidos excede o número de colunas no CSV.")
-        return df.iloc[:, indices_colunas].values.tolist()
+        # stop on limit
+        return df.iloc[:, indices_colunas].values[:limit].tolist()
     except Exception as e:
         print(f"Erro ao processar o CSV: {e}")
         return []
-
-def rotate_point(x, y, angle):
-    # Rotaciona o vetor (x, y) pelo ângulo dado (em radianos)
-    cos_a = math.cos(-angle)  # sinal negativo para rotacionar sistema de coordenadas
-    sin_a = math.sin(-angle)
-    x_rot = x * cos_a - y * sin_a
-    y_rot = x * sin_a + y * cos_a
-    return x_rot, y_rot
-
-def resp_degrau(alpha, k):
-    return (1 - alpha**k)
-
-def matrix_G(N, N_u, alpha=0.8, beta=0.2):
-    # --- matriz de convolução ---
-    G = np.zeros((N, N))
-    for i in range(N):
-        for j in range(N):
-            if j <= i:
-                G[i][j] = resp_degrau(alpha, i-j + 1) * beta/(1 - alpha)
-    # return just the N_u first columns
-    G = G[:, :N_u]
-    return G
 
 def matrix_G_array(array_g, N_u, N):
     # --- matriz de convolução ---
@@ -150,13 +82,6 @@ def free_GPC(free_matrix, last_y):
     
     return future
 
-def make_interp(array, len_):
-    x_original = np.linspace(0, 1, len(array))  # Posições originais
-    x_interp = np.linspace(0, 1, len_)  # Posições desejadas
-    array_result = np.interp(x_interp, x_original, array)  # Interpolação linear
-    
-    return array_result
-
 # --- insert your code here --- #
 
 alpha_l = math.exp(-z*5/accommodation_time_l)
@@ -169,14 +94,14 @@ print("alpha_r: ", round(alpha_r, 5))
 print("beta_l: ", round(beta_l, 3))
 print("beta_r: ", round(beta_r, 3))
 
-N_horizon = 40 #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
-N_uw = N_horizon
-N_uv = N_horizon
+N_horizon = future_points #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
+N_uw = 2
+N_uv = 5
 
-lamb_v = 0.01
-lamb_w = 0.01
-epsl_v = 0.001
-epsl_w = 1
+lamb_d = 1e-2
+lamb_a = 1e-1
+epsl_d = 1
+epsl_a = 1
 
 v1 = 1
 v2 = 1
@@ -185,22 +110,22 @@ delta_u_l = 0
 delta_u_r = 0
 
 order = 3
-free_l = matriz_por_indices("car_modeling/coeffs.csv", [0, 1, 2])
-free_r = matriz_por_indices("car_modeling/coeffs.csv", [3, 4, 5])
+free_l = matriz_por_indices("car_modeling/coeffs.csv", [0, 1, 2], N_horizon)
+free_r = matriz_por_indices("car_modeling/coeffs.csv", [3, 4, 5], N_horizon)
 last_theta_l = [0, 0, 0]
 last_theta_r = [0, 0, 0]
 
 # --- matrizes do controle --- #
 
-R_v = np.eye(N_uv) * lamb_v
-R_w = np.eye(N_uw) * lamb_w
+R_v = np.eye(N_uv) * lamb_d
+R_w = np.eye(N_uw) * lamb_a
 R = np.block([
     [R_w, np.zeros((N_uw, N_uv))],
     [np.zeros((N_uv, N_uw)), R_v]
 ])
 
-Q_v = np.eye(N_horizon) * epsl_v
-Q_w = np.eye(N_horizon) * epsl_w
+Q_v = np.eye(N_horizon) * epsl_d
+Q_w = np.eye(N_horizon) * epsl_a
 Q = np.block([
     [Q_w, np.zeros((N_horizon, N_horizon))],
     [np.zeros((N_horizon, N_horizon)), Q_v]
@@ -237,14 +162,17 @@ while True:
     if data is None: 
         break
     else:
-        line, future_points, speed, omega, omega_wheels = data
+        line, future_points, speed, theta, omega_wheels = data
 
-    # --- calculate free response --- #
+    # --- integrate the oemga signal --- #
+
     last_theta_l.append(last_theta_l[-1] + omega_wheels[0] * z)
     last_theta_r.append(last_theta_r[-1] + omega_wheels[1] * z)
     if len(last_theta_l) > 3:
         last_theta_l.pop(0)
         last_theta_r.pop(0)
+
+    # --- calculate the free future response --- #
 
     free_future_l = free_GPC(free_l, last_theta_l.copy())
     free_future_r = free_GPC(free_r, last_theta_r.copy())
@@ -252,26 +180,47 @@ while True:
     future_distance = []
     future_theta = []
 
+    # --- calculate the current theta and distance --- #
+
+    current_theta = (last_theta_l[-1] - last_theta_r[-1]) * wheels_radius/wheels_distance
+    current_distance = (last_theta_l[-1] + last_theta_r[-1]) * wheels_radius/2
+
     for i in range(len(free_future_l)):
         future_distance.append((free_future_l[i] + free_future_r[i]) * wheels_radius/2)
         future_theta.append((free_future_l[i] - free_future_r[i]) * wheels_radius/wheels_distance)
 
-    angle = make_step(3.14159, N_horizon)
-    distante = make_step(0.01, N_horizon)
-
-    set_graph_reference(angle, distante)
-    set_graph_free_response(future_theta, future_distance)
-
-    angle = np.array(angle)
-    distante = np.array(distante)
     future_theta = np.array(future_theta)
     future_distance = np.array(future_distance)
 
-    erro_theta = angle - future_theta
-    erro_distante = distante - future_distance
+    # --- convert to delta --- #
 
-    erro = np.concatenate((erro_theta, erro_distante), axis=0)
+    future_theta = future_theta - current_theta
+    future_distance = future_distance - current_distance
+
+    # --- reference using linearization --- #
+
+    x = [future_points[i][0] for i in range(len(future_points))]
+    y = [future_points[i][1] for i in range(len(future_points))]
+
+    angle = np.array(x)/0.34
+    distance = np.array(y)
+
+    # --- error of reference --- #
+
+    erro_theta = angle - future_theta
+    erro_distance = distance - future_distance
+
+    erro = np.concatenate((erro_theta, erro_distance), axis=0)
+
+    # --- optimal control law --- #
 
     delta_u = K @ erro
     delta_u_r = delta_u[0]
     delta_u_l = delta_u[N_uw]
+
+    # --- update the graphs --- #
+
+    set_graph_reference(angle * 30, distance * 30)
+    set_graph_free_response(future_theta * 30, future_distance * 30)
+    set_graph_error(erro_theta * 30, erro_distance * 30)
+    set_graph_future_control(delta_u[:N_uw] * 30, delta_u[N_uw:] * 30)
