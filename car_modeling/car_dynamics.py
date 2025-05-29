@@ -1,5 +1,4 @@
 import math
-import random
 
 class motor:
     def __init__(self):
@@ -13,29 +12,39 @@ class motor:
         self._b = b
         self._c = c
 
-    def saturate(self):
-        if self._y > 100:
-            self._y = 100
-        elif self._y < -100:
-            self._y = -100
+        self.dead_zone_const = 20
+        self.magnetic_saturation_const = 90
+
 
     def get_y(self):
         return self._y
 
+    def saturate(self, u):
+        # saturate output
+        return max(-100, min(100, u))
+
+    def dead_zone(self, u):
+        # apply dead zone
+        return u if abs(u) >= self.dead_zone_const else 0
+    
+    def magnetic_saturation(self, u):
+        # apply magnetic saturation
+        s = self.magnetic_saturation_const
+        return u if abs(u) <= s else s + (u-s)/3
+
     # first ordem step response
     def step(self, u, q=0):
-        #if abs(u) <= 10:
-        #    u = 0
+        u = self.dead_zone(u)
+        u = self.magnetic_saturation(u)
+        u = self.saturate(u)
 
         # calculate the step
         self._y = (self._a[0] * self._y + self._b[0] * u + self._c[0] * q)
-
-        # saturate output
-        #self.saturate()
     
 class car_dynamics:
     def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.2, wheels_RPM=1000, ke_l=1, ke_r=1, kq=1, accommodation_time_l=1.0, accommodation_time_r=1.0):
         self.z = z
+
         self.v1 = 0
         self.v2 = 0
         self._wheels_radius = wheels_radius
