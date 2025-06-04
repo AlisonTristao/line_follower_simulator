@@ -398,6 +398,7 @@ def step_simulation(v1, v2):
     data = simulator.step(v1, v2)
 
     if data is None:
+        pygame.quit()
         return None
 
     # integrate the time simulation

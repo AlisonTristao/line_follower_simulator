@@ -95,11 +95,11 @@ print("beta_l: ", round(beta_l, 3))
 print("beta_r: ", round(beta_r, 3))
 
 N_horizon = future_points #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
-N_uw = 2
-N_uv = 5
+N_ul = 3
+N_ur = 3
 
-lamb_d = 1e-2
-lamb_a = 5e-1
+lamb_l = 5e-2
+lamb_r = 5e-2
 epsl_d = 1
 epsl_a = 0.5
 
@@ -117,11 +117,11 @@ last_theta_r = [0, 0, 0]
 
 # --- matrizes do controle --- #
 
-R_v = np.eye(N_uv) * lamb_d
-R_w = np.eye(N_uw) * lamb_a
+R_l = np.eye(N_ul) * lamb_l
+R_r = np.eye(N_ur) * lamb_r
 R = np.block([
-    [R_w, np.zeros((N_uw, N_uv))],
-    [np.zeros((N_uv, N_uw)), R_v]
+    [R_l, np.zeros((N_ur, N_ul))],
+    [np.zeros((N_ul, N_ur)), R_r]
 ])
 
 Q_v = np.eye(N_horizon) * epsl_d
@@ -134,10 +134,10 @@ Q = np.block([
 g_l = matriz_por_indices("car_modeling/g.csv", [0])
 g_r = matriz_por_indices("car_modeling/g.csv", [1])
 
-G_lw = matrix_G_array(g_l, N_uw, N_horizon) * -wheels_radius/wheels_distance
-G_lv = matrix_G_array(g_l, N_uv, N_horizon) * wheels_radius/2
-G_rw = matrix_G_array(g_r, N_uw, N_horizon) * wheels_radius/wheels_distance
-G_rv = matrix_G_array(g_r, N_uv, N_horizon) * wheels_radius/2
+G_lw = matrix_G_array(g_l, N_ul, N_horizon) * -wheels_radius/wheels_distance
+G_lv = matrix_G_array(g_l, N_ul, N_horizon) * wheels_radius/2
+G_rw = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/wheels_distance
+G_rv = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/2
 
 G = np.block([
     [G_lw, G_lv], 
@@ -216,11 +216,11 @@ while True:
 
     delta_u = K @ erro
     delta_u_r = delta_u[0]
-    delta_u_l = delta_u[N_uw]
+    delta_u_l = delta_u[N_ul]
 
     # --- update the graphs --- #
 
     set_graph_reference(angle * 30, distance * 30)
     set_graph_free_response(future_theta * 30, future_distance * 30)
-    set_graph_error(erro_theta * 30, erro_distance * 30)
-    set_graph_future_control(delta_u[:N_uw] * 30, delta_u[N_uw:] * 30)
+    set_graph_error(erro_theta, erro_distance)
+    set_graph_future_control(delta_u[:N_ul] * 30, delta_u[N_ul:] * 30)
