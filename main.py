@@ -2,7 +2,7 @@ from simulator import *
 import pandas as pd
 
 # screen settings => sizes FULL, MEDIUM, SMALL
-screen_size = FULL
+screen_size = MEDIUM
 screen_fps = 80
 z = 1/screen_fps
 track_seed = 1112
@@ -95,11 +95,11 @@ print("beta_l: ", round(beta_l, 3))
 print("beta_r: ", round(beta_r, 3))
 
 N_horizon = future_points #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
-N_ul = 3
-N_ur = 3
+N_ul = 5
+N_ur = 5
 
-lamb_l = 5e-2
-lamb_r = 5e-2
+lamb_l = 5e-3
+lamb_r = 5e-3
 epsl_d = 1
 epsl_a = 0.5
 
@@ -134,10 +134,10 @@ Q = np.block([
 g_l = matriz_por_indices("car_modeling/g.csv", [0])
 g_r = matriz_por_indices("car_modeling/g.csv", [1])
 
-G_lw = matrix_G_array(g_l, N_ul, N_horizon) * -wheels_radius/wheels_distance
-G_lv = matrix_G_array(g_l, N_ul, N_horizon) * wheels_radius/2
-G_rw = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/wheels_distance
-G_rv = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/2
+G_lw = matrix_G_array(g_l, N_ul, N_horizon) * -wheels_radius/(2*wheels_distance)
+G_lv = matrix_G_array(g_l, N_ul, N_horizon) * wheels_radius/4
+G_rw = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/(2*wheels_distance)
+G_rv = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/4
 
 G = np.block([
     [G_lw, G_lv], 
@@ -217,6 +217,30 @@ while True:
     delta_u = K @ erro
     delta_u_r = delta_u[0]
     delta_u_l = delta_u[N_ul]
+
+    # --- calculate the real points --- #
+    delta_u_l_arr = delta_u[:N_ul]
+    delta_u_r_arr = delta_u[N_ul:]
+
+    # sum the force responde with the free response
+    f = G @ delta_u
+    f_theta = f[:N_horizon]
+    f_d = f[N_horizon:]
+
+    f_theta += future_theta
+    f_d += future_distance
+
+    f_d = f_d[i] + future_distance
+    f_d -= f_d[0]
+    f_t = f_theta[i] + future_theta
+
+    points = []
+    for i in range(len(future_points)):
+        y = -(f_d[i] * np.cos(f_t[i]) * 300) + 720
+        x = (f_d[i] * np.sin(f_t[i]) * 300 * 0.34) + 952.86
+        points.append((x, y))
+
+    set_real_future_points(points)
 
     # --- update the graphs --- #
 

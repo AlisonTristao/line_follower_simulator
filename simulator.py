@@ -41,6 +41,7 @@ class SimulatorController:
         self.compass = None
         self.line_sensor = None
         self.future_points = None
+        self.real_future_points = None
         self.track_percentage = None
         self.points = None
         self.win = None
@@ -91,7 +92,9 @@ class SimulatorController:
 
         # create car
         self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.8))
-        
+        print("center:", self.car_draw.get_center())
+        print("scale:", self.SCALE)
+
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
 
@@ -100,6 +103,9 @@ class SimulatorController:
 
         # create future points
         self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length*0.5*self.SCALE)
+
+        # create real future points
+        self.real_future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length*0.5*self.SCALE, color=(0, 255, 0))
 
         # create minimap
         minimap_position = (0.9 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1])
@@ -151,6 +157,7 @@ class SimulatorController:
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
         self.simulator.add(self.future_points)
+        self.simulator.add(self.real_future_points)
         self.simulator.add(self.track_percentage)
         self.simulator.add(self.points)
         self.simulator.add(self.display)
@@ -365,6 +372,14 @@ def set_graph_error(omega, v):
 
     simulator.error_omega = omega
     simulator.error_v = v
+
+def set_real_future_points(points):
+    # check if the simulator is initialized
+    if simulator is None:
+        print("Simulator not initialized")
+        return
+
+    simulator.real_future_points.set_points(points)
 
 def step_simulation(v1, v2):
     global timer
