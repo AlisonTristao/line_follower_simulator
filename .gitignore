@@ -1,3 +1,13 @@
 .gitignore
 __pycache__/
 *.pyc
+*.aux
+*.log
+*.bbl
+*.blg
+*.toc
+*.out
+*.synctex.gz
+*.fls
+*.fdb_latexmk
+*.bbl

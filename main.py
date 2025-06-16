@@ -27,7 +27,7 @@ track_length        = 0.02 # meters
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 45   # number of future points
+future_points       = 25   # number of future points
 future_spacing      = 3    # resolutuin of the track
 
 # setup the simulation
@@ -98,8 +98,8 @@ N_horizon = future_points #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_ul = 5
 N_ur = 5
 
-lamb_l = 5e-3
-lamb_r = 5e-3
+lamb_l = 1e-3
+lamb_r = 1e-3
 epsl_d = 1
 epsl_a = 0.5
 
@@ -202,7 +202,8 @@ while True:
     x = [future_points[i][0] for i in range(len(future_points))]
     y = [future_points[i][1] for i in range(len(future_points))]
 
-    angle = np.array(x)/0.34
+    d0 = 0.25
+    angle = np.array(x)/d0
     distance = np.array(y)
 
     # --- error of reference --- #
@@ -227,17 +228,13 @@ while True:
     f_theta = f[:N_horizon]
     f_d = f[N_horizon:]
 
-    f_theta += future_theta
+    f_theta -= future_theta
     f_d += future_distance
-
-    f_d = f_d[i] + future_distance
-    f_d -= f_d[0]
-    f_t = f_theta[i] + future_theta
 
     points = []
     for i in range(len(future_points)):
-        y = -(f_d[i] * np.cos(f_t[i]) * 300) + 720
-        x = (f_d[i] * np.sin(f_t[i]) * 300 * 0.34) + 952.86
+        y = -(f_d[i] * np.cos(f_theta[i]) * 300) + 720
+        x = -(f_d[i] * np.sin(f_theta[i]) * 300) + 952.86
         points.append((x, y))
 
     set_real_future_points(points)
