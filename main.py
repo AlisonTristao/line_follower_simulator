@@ -140,8 +140,8 @@ G_rw = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/(2*wheels_distance)
 G_rv = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/4
 
 G = np.block([
-    [G_lw, G_lv], 
-    [G_rw, G_rv]
+    [G_lw, G_rw], 
+    [G_lv, G_rv]
 ])
 
 # solution of quadratic problem
