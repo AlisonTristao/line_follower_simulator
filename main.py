@@ -27,7 +27,7 @@ track_length        = 0.02 # meters
 sensor_spacing      = 0.008 # meters
 
 # future points
-future_points       = 25   # number of future points
+future_points       = 45   # number of future points
 future_spacing      = 3    # resolutuin of the track
 
 # setup the simulation
@@ -98,10 +98,10 @@ N_horizon = future_points #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_ul = 5
 N_ur = 5
 
-lamb_l = 1e-3
-lamb_r = 1e-3
-epsl_d = 1
-epsl_a = 0.5
+lamb_l = 1e-3   /N_ul
+lamb_r = 1e-3   /N_ur
+epsl_d = 1      /N_horizon
+epsl_a = 5e-1   /N_horizon
 
 v1 = 0
 v2 = 0
@@ -202,8 +202,9 @@ while True:
     x = [future_points[i][0] for i in range(len(future_points))]
     y = [future_points[i][1] for i in range(len(future_points))]
 
-    d0 = 0.25
+    d0 = 0.34
     angle = np.array(x)/d0
+    #angle = np.array(x) / np.array(y)
     distance = np.array(y)
 
     # --- error of reference --- #

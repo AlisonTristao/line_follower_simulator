@@ -8,7 +8,7 @@ z = tf('z', Ts);
 z_inv = tf('z^-1', Ts);
 
 % delta
-delta = (z - 1);
+delta = (1 - z^-1);
 
 % beta = Ke/(1 - alpha)
 % Ke = 2pi * RPM/60 * 1/100
@@ -22,8 +22,8 @@ beta_left   = Ke*(1 - alpha_left);
 beta_right  = Ke*(1 - alpha_right);
 
 % wheels
-sl = beta_left/(z-alpha_left) * z/delta * Ts
-sr = beta_right/(z-alpha_right) * z/delta * Ts
+sl = beta_left/(z-alpha_left) * 1/delta * Ts
+sr = beta_right/(z-alpha_right) * 1/delta * Ts
 
 % system to delta_u control
 system_left = sl * 1/delta %* (z_inv / z_inv)
