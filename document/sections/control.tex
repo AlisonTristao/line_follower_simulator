@@ -80,19 +80,23 @@ J_u = \boldsymbol{\delta} (\hat{\mathbf{y}} - \mathbf{w})^2 + \boldsymbol{\lambd
 \mathbf{G}_{d s} & \mathbf{G}_{e s}\\
 \mathbf{G}_{d \theta}  & \mathbf{G}_{e \theta}
 \end{bmatrix}
-\qquad
-\qquad
+\quad
 \mathbf{\Delta u} =
 \begin{bmatrix}
 \mathbf{\Delta u_d} \\
 \mathbf{\Delta u_e}
 \end{bmatrix}
-\qquad
-\qquad
+\quad
 \mathbf{F}(z^{-1}) =
 \begin{bmatrix}
-\mathbf{F}_{s}(z^{-1}) \\
-\mathbf{F}_{\theta}(z^{-1})
+\mathbf{F}_{s}(z^{-1}) & 0\\
+0 & \mathbf{F}_{\theta}(z^{-1})
+\end{bmatrix}
+\quad
+\mathbf{y}[k] =
+\begin{bmatrix}
+\mathbf{s}[k] \\
+\mathbf{\theta}[k]
 \end{bmatrix}
 \]
 
