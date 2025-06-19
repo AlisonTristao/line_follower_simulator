@@ -1,0 +1,99 @@
+\section{Controle Preditivo Generalizado (GPC)}
+
+O Controle Preditivo Generalizado (GPC) é uma 
+técnica avançada de controle preditivo (MPC) 
+que adota a função de transferência do sistema 
+como modelo. No qual, nesse trabalho a função de transferência é proveniente 
+da equação descrita em \ref{eq:robot_dynamics}.
+
+\vspace{1em}
+Nota-se que o sistema descrito possui um comportamento dinâmico linear de
+\textbf{primeira ordem}, onde é possivel encontrar as matrizes que contêm 
+as constantes de tempo e ganhos estáticos do sistema:
+\begin{equation}
+\boldsymbol{\tau} = \mathbf{B}^{-1} \mathbf{M} \\
+\qquad
+\qquad
+\mathbf{K}_u = \mathbf{B}^{-1} \mathbf{K}
+\end{equation}
+
+Permitindo que encontremos a função de transferência das variáveis 
+de controle para cada uma das variáveis de saída do sistema. 
+Que ao utilizarmos $u_d$, $u_e$, $v$ e $\omega$,
+no domínio discreto, usando a transformada $z$, elas são dadas por:
+\[
+\mathbf{H}_{d v}(z^{-1}) = \frac{b_{d v} z^{-1}}{1 - a_{d} z^{-1}} \\
+\qquad
+\mathbf{H}_{d \omega}(z^{-1}) = \frac{b_{d \omega} z^{-1}}{1 - a_{d} z^{-1}} \\
+\]
+\[
+\mathbf{H}_{e v}(z^{-1}) = \frac{b_{e v} z^{-1}}{1 - a_{e} z^{-1}} \\
+\qquad
+\mathbf{H}_{e \omega}(z^{-1}) = \frac{b_{e \omega} z^{-1}}{1 - a_{e} z^{-1}}
+\]
+
+Onde os parâmetros $b$ e $a$ são obtidos a partir da discretização 
+da constante de tempo e ganho estático extraídos das matrizes
+$\mathbf{K}$ e $\boldsymbol{\tau}$.
+
+\vspace{1em}
+Integrando os valores das velocidades para obter as posições 
+(sendo $T$ o período de amostragem) e utilizando os incrementos 
+de controle $\Delta u$, conforme a implementação típica do GPC, 
+obtêm-se as funções de transferência discretas para cada variável 
+de controle e saída do sistema $\frac{Y(z)}{\Delta U(z)}$.
+
+\[
+\mathbf{H}_{d s}(z^{-1}) = \frac{b_{d v} z^{-1}}{1 - a_{d} z^{-1}} \; \frac{T}{(1 - z^{-1})^2}\\
+\qquad
+\mathbf{H}_{d \theta}(z^{-1}) = \frac{b_{d \theta} z^{-1}}{1 - a_{d} z^{-1}} \; \frac{T}{(1 - z^{-1})^2}\\
+\]
+\[
+\mathbf{H}_{e s}(z^{-1}) = \frac{b_{e v} z^{-1}}{1 - a_{e} z^{-1}} \; \frac{T}{(1 - z^{-1})^2}\\
+\qquad
+\mathbf{H}_{e \theta}(z^{-1}) = \frac{b_{e \theta} z^{-1}}{1 - a_{e} z^{-1}} \; \frac{T}{(1 - z^{-1})^2}
+\]
+
+Por fim, a partir das funções de transferência do sistema,
+podemos definir o modelo que será utilizado no GPC.
+Nesse modelo, a matriz $G$ representa a resposta ao degrau para cada variável de controle,
+enquanto $F$ é a matriz de polinômios responsável pelo cálculo da
+resposta livre a partir de $y[k]$.
+
+Assim podemos definir a predição futura como: 
+
+\begin{equation}
+\hat{\mathbf{y}} = \mathbf{G} \Delta \mathbf{u} + \mathbf{F}(z^{-1}) \mathbf{y}[k]
+\end{equation}
+
+Resultando na função de custo do GPC, em que $\mathbf{w}$ representa o valor de 
+referência, e $\boldsymbol{\delta}$ e $\boldsymbol{\lambda}$ são os pesos associados, 
+respectivamente, à ação de controle e ao erro de predição."
+
+\begin{equation}
+J_u = \boldsymbol{\delta} (\hat{\mathbf{y}} - \mathbf{w})^2 + \boldsymbol{\lambda} \mathbf{\Delta u}^2
+\end{equation}
+
+\[
+\mathbf{G} = 
+\begin{bmatrix}
+\mathbf{G}_{d s} & \mathbf{G}_{e s}\\
+\mathbf{G}_{d \theta}  & \mathbf{G}_{e \theta}
+\end{bmatrix}
+\qquad
+\qquad
+\mathbf{\Delta u} =
+\begin{bmatrix}
+\mathbf{\Delta u_d} \\
+\mathbf{\Delta u_e}
+\end{bmatrix}
+\qquad
+\qquad
+\mathbf{F}(z^{-1}) =
+\begin{bmatrix}
+\mathbf{F}_{s}(z^{-1}) \\
+\mathbf{F}_{\theta}(z^{-1})
+\end{bmatrix}
+\]
+
+\subsection{Restrições}
