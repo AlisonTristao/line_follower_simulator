@@ -1,5 +1,6 @@
 from simulator import *
 import pandas as pd
+import cvxpy as cp
 
 # screen settings => sizes FULL, MEDIUM, SMALL
 screen_size = MEDIUM
@@ -145,18 +146,28 @@ G = np.block([
 ])
 
 # solution of quadratic problem
-K = np.linalg.inv(G.T @ Q @ G + R) @ G.T @ Q
-K1 = K[0]
+#K = np.linalg.inv(G.T @ Q @ G + R) @ G.T @ Q
+#K1 = K[0]
+
+delta_u = cp.Variable(N_ul + N_ur)
+
+H = 2 * (G.T @ Q @ G + R)
+H = (H + H.T) / 2  # ensure symmetry
+
+delta_u_max = 1
+delta_u_min = -1
+u_max = 100
+u_min = -100
 
 while True:
     # saturate the inputs
     v1 += delta_u_l
     v2 += delta_u_r
 
-    v1 = max(min(v1, 100), -100)
-    v2 = max(min(v2, 100), -100)
+    v1 = max(min(v1, u_max), u_min)
+    v2 = max(min(v2, u_max), u_min)
 
-    # --- step the simulaine, future_points, speed, omega tion here --- #
+    # --- step the simulation, future_points, speed, omega here --- #
 
     data = step_simulation(v1, v2)
     if data is None: 
@@ -164,7 +175,7 @@ while True:
     else:
         line, future_points, speed, theta, omega_wheels = data
 
-    # --- integrate the oemga signal --- #
+    # --- integrate the omega signal --- #
 
     last_theta_l.append(last_theta_l[-1] + omega_wheels[0] * z)
     last_theta_r.append(last_theta_r[-1] + omega_wheels[1] * z)
@@ -209,15 +220,33 @@ while True:
     # --- error of reference --- #
 
     erro_theta = angle - future_theta
-    erro_distance = distance - future_distance
+    erro_distance = -(distance - future_distance)
 
     erro = np.concatenate((erro_theta, erro_distance), axis=0)
 
     # --- optimal control --- #
 
-    delta_u = K @ erro
-    delta_u_r = delta_u[0]
-    delta_u_l = delta_u[N_ul]
+    # define the quadratic problem
+    c = 2* (G.T @ Q @ erro)
+    cost = 0.5 * (delta_u.T @ H @ delta_u) + c.T @ delta_u
+    
+    constraints = [
+        # delta u limit
+        delta_u <= delta_u_max,
+        delta_u >= delta_u_min,
+        # u limit
+        cp.sum(delta_u[:N_ul]) + v1 <= u_max,
+        cp.sum(delta_u[:N_ul]) + v2 >= u_min,
+        cp.sum(delta_u[N_ul:]) + v1 <= u_max,
+        cp.sum(delta_u[N_ul:]) + v2 >= u_min,
+    ]
+
+    prob = cp.Problem(cp.Minimize(cost), constraints)
+
+    prob.solve(solver=cp.OSQP)
+
+    delta_u_l = delta_u.value[0]
+    delta_u_r = delta_u.value[N_ul]
 
     # --- update the graphs --- #
 

@@ -42,7 +42,7 @@ class SimulatorController:
         self.line_sensor = None
         self.future_points = None
         self.track_percentage = None
-        self.points = None
+        self.timer_simu = None
         self.win = None
 
         self.future_points_count = 10
@@ -138,7 +138,7 @@ class SimulatorController:
         self.track_percentage = Statistics((1.0 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1]))
 
         # pontuation of the track
-        self.points = Statistics((0.25 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1]))
+        self.timer_simu = Statistics((0.25 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1]))
 
         # create compass
         self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1]))
@@ -154,7 +154,7 @@ class SimulatorController:
         self.simulator.add(self.compass)
         self.simulator.add(self.future_points)
         self.simulator.add(self.track_percentage)
-        self.simulator.add(self.points)
+        self.simulator.add(self.timer_simu)
         self.simulator.add(self.display)
 
         # configurate the cluster
@@ -234,11 +234,11 @@ class SimulatorController:
         """
         self.track_percentage.set_text(f"covered: {coverage}")
 
-    def update_points(self, points):
+    def update_timer_simu(self, timer_simu):
         """
-        update the points display with the given value.
+        update the timer_simu display with the given value.
         """
-        self.points.set_text(f"score: {points}")
+        self.timer_simu.set_text(f"time: {timer_simu}")
 
     def step(self, v1, v2, q1=0, q2=0):
         """
@@ -422,7 +422,7 @@ def step_simulation(v1, v2):
     simulator.update_coverage("{:.2f}%".format(coverage))
 
     # calculate the points of the track
-    simulator.update_points("{:.2f}".format(100*coverage/simulator.time_simulation))
+    simulator.update_timer_simu("{:.2f}".format(simulator.time_simulation))
 
     # fix the fps
     while (time.time() - timer) < 1/simulator.FPS:
