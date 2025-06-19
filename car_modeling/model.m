@@ -21,9 +21,9 @@ alpha_right = 0.89784;
 beta_left   = Ke*(1 - alpha_left);
 beta_right  = Ke*(1 - alpha_right);
 
-% wheels
-sl = beta_left/(z-alpha_left) * 1/delta * Ts
-sr = beta_right/(z-alpha_right) * 1/delta * Ts
+% wheels (add z to direct transfer)
+sl = beta_left/(z-alpha_left) * 1/delta * Ts * z
+sr = beta_right/(z-alpha_right) * 1/delta * Ts * z
 
 % system to delta_u control
 system_left = sl * 1/delta %* (z_inv / z_inv)
