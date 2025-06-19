@@ -53,6 +53,8 @@ class SimulatorController:
         self.free_response_v = [0] * 10
         self.future_control_left = [0] * 10
         self.future_control_right = [0] * 10
+        self.perturbation_left = [0] * 10
+        self.perturbation_right = [0] * 10
         self.error_omega = [0] * 10
         self.error_v = [0] * 10
 
@@ -180,6 +182,10 @@ class SimulatorController:
         self.display.add_line_to_graph("control", "left", color=self.get_rand_color())
         self.display.add_line_to_graph("control", "right", color=self.get_rand_color())
 
+        self.display.add_graph("perturbation")
+        self.display.add_line_to_graph("perturbation", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("perturbation", "right", color=self.get_rand_color())
+
         self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "d", color=self.get_rand_color())
         self.display.add_line_to_graph("free_response", "θ", color=self.get_rand_color())
@@ -205,6 +211,8 @@ class SimulatorController:
         self.display.update_graph_data("car", "ω", self.car.omega_norm())
         self.display.update_graph_data("control", "left", self.car.v1)
         self.display.update_graph_data("control", "right", self.car.v2)
+        self.display.update_graph_data("perturbation", "left", self.car.q1)
+        self.display.update_graph_data("perturbation", "right", self.car.q2)
         self.display.set_graph_data("future_control", "left", self.future_control_left)
         self.display.set_graph_data("future_control", "right", self.future_control_right)
         self.display.set_graph_data("reference", "d", self.future_v)
@@ -232,12 +240,12 @@ class SimulatorController:
         """
         self.points.set_text(f"score: {points}")
 
-    def step(self, v1, v2):
+    def step(self, v1, v2, q1=0, q2=0):
         """
         perform one simulation step with given movement and rotation inputs.
         """
         # step the car dynamics
-        self.car.step(v1, v2)
+        self.car.step(v1, v2, q1, q2)
 
         # calculates the car values normalized
         simulator._update_graps()
@@ -289,6 +297,7 @@ class SimulatorController:
     
 simulator = None #SimulatorController()
 timer = time.time()
+perturbation = 0.0
 
 def start_simulation(screen_size=MEDIUM, fps=120, length=100, width=100, scale=300, render=4, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
     # define the seed
@@ -311,7 +320,7 @@ def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, acc
         print("Simulator not initialized")
         return
 
-    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, 0, accommodation_time_l, accommodation_time_r, sensor_distance, sensor_count)
+    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, 1, accommodation_time_l, accommodation_time_r, sensor_distance, sensor_count)
 
 def set_future_points(count, space):
     # check if the simulator is initialized
@@ -368,6 +377,7 @@ def set_graph_error(omega, v):
 
 def step_simulation(v1, v2):
     global timer
+    global perturbation
 
     # check if the simulator is initialized
     if simulator is None or simulator.car is None:
@@ -390,12 +400,15 @@ def step_simulation(v1, v2):
         # Detecta quando a tecla 'P' é pressionada
         if event.type == pygame.KEYDOWN:
             if event.key == pygame.K_p:
-                input("Pressione 'Enter' para continuar a simulação...")
+                result = input("Enter perturbation value (default is 0.0): ")
+                perturbation = float(result)
+                perturbation = -float(result)
+                print(f"Perturbation set to {perturbation}")
 
         simulator.display.verify_checkbox(event)
 
     # render the simulator
-    data = simulator.step(v1, v2)
+    data = simulator.step(v1, v2, perturbation, -perturbation)
 
     if data is None:
         pygame.quit()

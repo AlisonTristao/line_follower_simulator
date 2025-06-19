@@ -15,7 +15,6 @@ class motor:
         self.dead_zone_const = 20
         self.magnetic_saturation_const = 90
 
-
     def get_y(self):
         return self._y
 
@@ -33,7 +32,7 @@ class motor:
         return u if abs(u) <= s else s + (u-s)/3
 
     # first ordem step response
-    def step(self, u, q=0):
+    def step(self, u, q):
         #u = self.dead_zone(u)
         #u = self.magnetic_saturation(u)
         u = self.saturate(u)
@@ -47,6 +46,8 @@ class car_dynamics:
 
         self.v1 = 0
         self.v2 = 0
+        self.q1 = 0
+        self.q2 = 0
         self._wheels_radius = wheels_radius
         self._wheels_distance = wheels_distance
         self._wheels_speed_rad_s = (2 * math.pi * wheels_RPM)/(60*100) # divide by 100%
@@ -79,12 +80,13 @@ class car_dynamics:
         a2 = math.exp(-z/self.tau_r)
 
         # control gain
-        b1 = (ke_l - a1)
-        b2 = (ke_r - a2)
+        b1 = ke_l * (1 - a1)
+        b2 = ke_r * (1 - a2)
 
         # noise gain
         c1 = kq * (1 - a1)
         c2 = kq * (1 - a2)
+        print(c1, c2)
 
         self._ml.set_constants([a1], [b1], [c1])
         self._mr.set_constants([a2], [b2], [c2])
@@ -134,7 +136,7 @@ class car_dynamics:
     def get_wheels_speed(self):
         return self._ml.get_y(), self._mr.get_y()
 
-    def step(self, u1, u2, q1=0, q2=0):
+    def step(self, u1, u2, q1, q2):
         # saturate
         #u1 = max(-100, min(100, u1))
         #u2 = max(-100, min(100, u2))
@@ -142,6 +144,8 @@ class car_dynamics:
         self._ml.step(u1, q1), self._mr.step(u2, q2)
         self.v1 = u1
         self.v2 = u2
+        self.q1 = q1
+        self.q2 = q2
         #return self.speed(), self.omega()
 
     def get_size(self):
