@@ -202,9 +202,8 @@ while True:
     x = [future_points[i][0] for i in range(len(future_points))]
     y = [future_points[i][1] for i in range(len(future_points))]
 
-    d0 = 0.34
+    d0 = 0.3
     angle = np.array(x)/d0
-    #angle = np.array(x) / np.array(y)
     distance = np.array(y)
 
     # --- error of reference --- #
@@ -219,26 +218,6 @@ while True:
     delta_u = K @ erro
     delta_u_r = delta_u[0]
     delta_u_l = delta_u[N_ul]
-
-    # --- calculate the real points --- #
-    delta_u_l_arr = delta_u[:N_ul]
-    delta_u_r_arr = delta_u[N_ul:]
-
-    # sum the force responde with the free response
-    f = G @ delta_u
-    f_theta = f[:N_horizon]
-    f_d = f[N_horizon:]
-
-    f_theta -= future_theta
-    f_d += future_distance
-
-    points = []
-    for i in range(len(future_points)):
-        y = -(f_d[i] * np.cos(f_theta[i]) * 300) + 720
-        x = -(f_d[i] * np.sin(f_theta[i]) * 300) + 952.86
-        points.append((x, y))
-
-    set_real_future_points(points)
 
     # --- update the graphs --- #
 
