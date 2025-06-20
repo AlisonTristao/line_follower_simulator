@@ -402,7 +402,6 @@ def step_simulation(v1, v2):
             if event.key == pygame.K_p:
                 result = input("Enter perturbation value (default is 0.0): ")
                 perturbation = float(result)
-                perturbation = -float(result)
                 print(f"Perturbation set to {perturbation}")
 
         simulator.display.verify_checkbox(event)
