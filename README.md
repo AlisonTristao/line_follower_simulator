@@ -21,5 +21,8 @@ The **Line Follower Simulator** is a simulator for a line-following robot. It al
 - Python 3.10 or higher.
 - Required libraries:
   - `pygame`
+  - `pandas`
   - `numpy`
+  - `time`
   - `scipy`
+  - `random`
