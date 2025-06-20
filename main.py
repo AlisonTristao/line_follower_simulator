@@ -156,15 +156,15 @@ while True:
     v1 = max(min(v1, 100), -100)
     v2 = max(min(v2, 100), -100)
 
-    # --- step the simulaine, future_points, speed, omega tion here --- #
+    # --- step the simulation, future_points, speed, omega here --- #
 
     data = step_simulation(v1, v2)
     if data is None: 
         break
     else:
-        line, future_points, speed, theta, omega_wheels = data
+        line, future_points, speed, omega, omega_wheels = data
 
-    # --- integrate the oemga signal --- #
+    # --- integrate the omega signal --- #
 
     last_theta_l.append(last_theta_l[-1] + omega_wheels[0] * z)
     last_theta_r.append(last_theta_r[-1] + omega_wheels[1] * z)
