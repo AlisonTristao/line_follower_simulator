@@ -12,8 +12,7 @@ The **Line Follower Simulator** is a simulator for a line-following robot. It al
 
 ## Project Structure
 - `main.py`: Main file to start the simulation.
-- `simulator.py`: Implementation of the simulator and simulation control.
-- `control.py`: Class for PID control (example of closed-loop control).
+- `simulator.py`: Implementation of the simulator.
 - `car_dynamics.py`: Modeling of the car's dynamics.
 - `track_generator.py`: Track generation.
 - `graphics_elements.py`: Graphical elements for rendering.
