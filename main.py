@@ -152,7 +152,6 @@ G = np.block([
 delta_u = cp.Variable(N_ul + N_ur)
 
 H = 2 * (G.T @ Q @ G + R)
-H = (H + H.T) / 2  # ensure symmetry
 
 delta_u_max = 1
 delta_u_min = -1

@@ -867,7 +867,7 @@ class Simulator:
             height = info.current_h
         elif win == MEDIUM:
             width = 1400
-            height = 800
+            height = 750
         elif win == SMALL:
             width = 800
             height = 600
