@@ -218,15 +218,15 @@ while True:
 
     # --- error of reference --- #
 
-    erro_theta = angle - future_theta
-    erro_distance = -(distance - future_distance)
+    erro_theta = -angle + future_theta
+    erro_distance = distance - future_distance
 
     erro = np.concatenate((erro_theta, erro_distance), axis=0)
 
     # --- optimal control --- #
 
     # define the quadratic problem
-    c = 2* (G.T @ Q @ erro)
+    c = 2 * -(G.T @ Q @ erro)
     cost = 0.5 * (delta_u.T @ H @ delta_u) + c.T @ delta_u
     
     constraints = [
