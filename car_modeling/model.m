@@ -7,9 +7,6 @@ Ts = 1/fps;
 z = tf('z', Ts);
 z_inv = tf('z^-1', Ts);
 
-% delta
-delta = (1 - z^-1);
-
 % beta = Ke/(1 - alpha)
 % Ke = 2pi * RPM/60 * 1/100
 
@@ -21,13 +18,10 @@ alpha_right = 0.89784;
 beta_left   = Ke*(1 - alpha_left);
 beta_right  = Ke*(1 - alpha_right);
 
-% wheels (add z to direct transfer)
-sl = beta_left/(z-alpha_left) * 1/delta * Ts * z
-sr = beta_right/(z-alpha_right) * 1/delta * Ts * z
-
-% system to delta_u control
-system_left = sl * 1/delta %* (z_inv / z_inv)
-system_right = sr * 1/delta %* (z_inv / z_inv)
+% wheels (add z to direct transmission)
+delta = (z - 1)/(z*Ts);
+system_left = beta_left/(z-alpha_left) * 1/delta^2 * z
+system_right = beta_right/(z-alpha_right) * 1/delta^2 * z
 
 % Pega coeficientes numerador e denominador
 den_left = system_left.den{1}(2:end) * -1;
@@ -45,8 +39,8 @@ for i = 1:horizon
     resultados = [resultados; linha];
 end
 
-g_l = step(sl, (horizon)/fps);
-g_r = step(sr, (horizon)/fps);
+g_l = impulse(system_left, (horizon)/fps);
+g_r = impulse(system_right, (horizon)/fps);
 
 % transforma em colunas
 g_l = g_l(:);
