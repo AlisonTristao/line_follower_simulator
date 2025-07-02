@@ -94,20 +94,32 @@ print("alpha_r: ", round(alpha_r, 5))
 print("beta_l: ", round(beta_l, 3))
 print("beta_r: ", round(beta_r, 3))
 
+
 N_horizon = future_points #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_ul = 5
 N_ur = 5
+
+# --- step response --- #
+
+g_l = matriz_por_indices("car_modeling/g.csv", [0])
+g_r = matriz_por_indices("car_modeling/g.csv", [1])
+
+G_lw = matrix_G_array(g_l, N_ul, N_horizon) * -wheels_radius/(2*wheels_distance)
+G_lv = matrix_G_array(g_l, N_ul, N_horizon) * wheels_radius/4
+G_rw = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/(2*wheels_distance)
+G_rv = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/4
+
+G = np.block([
+    [G_lw, G_rw], 
+    [G_lv, G_rv]
+])
+
+# --- matrices of the control --- #
 
 lamb_l = 1e-3   /N_ul
 lamb_r = 1e-3   /N_ur
 epsl_d = 1      /N_horizon
 epsl_a = 5e-1   /N_horizon
-
-v1 = 0
-v2 = 0
-
-delta_u_l = 0
-delta_u_r = 0
 
 order = 3
 free_l = matriz_por_indices("car_modeling/coeffs.csv", [0, 1, 2], N_horizon)
@@ -131,22 +143,19 @@ Q = np.block([
     [np.zeros((N_horizon, N_horizon)), Q_v]
 ])
 
-g_l = matriz_por_indices("car_modeling/g.csv", [0])
-g_r = matriz_por_indices("car_modeling/g.csv", [1])
-
-G_lw = matrix_G_array(g_l, N_ul, N_horizon) * -wheels_radius/(2*wheels_distance)
-G_lv = matrix_G_array(g_l, N_ul, N_horizon) * wheels_radius/4
-G_rw = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/(2*wheels_distance)
-G_rv = matrix_G_array(g_r, N_ur, N_horizon) * wheels_radius/4
-
-G = np.block([
-    [G_lw, G_rw], 
-    [G_lv, G_rv]
-])
-
 # solution of quadratic problem
 K = np.linalg.inv(G.T @ Q @ G + R) @ G.T @ Q
 K1 = K[0]
+
+# --- initial values of the control inputs --- #
+
+v1 = 0
+v2 = 0
+
+delta_u_l = 0
+delta_u_r = 0
+
+d0 = 0.3
 
 while True:
     # saturate the inputs
@@ -168,7 +177,13 @@ while True:
 
     last_theta_l.append(last_theta_l[-1] + omega_wheels[0] * z)
     last_theta_r.append(last_theta_r[-1] + omega_wheels[1] * z)
+
+    # --- convert to delta theta --- #
+
     if len(last_theta_l) > 3:
+        for i in range(1, len(last_theta_l)):
+            last_theta_l[i] = last_theta_l[i] - last_theta_l[0]
+            last_theta_r[i] = last_theta_r[i] - last_theta_r[0]
         last_theta_l.pop(0)
         last_theta_r.pop(0)
 
@@ -182,9 +197,6 @@ while True:
 
     # --- calculate the current theta and distance --- #
 
-    current_theta = (last_theta_l[-1] - last_theta_r[-1]) * wheels_radius/wheels_distance
-    current_distance = (last_theta_l[-1] + last_theta_r[-1]) * wheels_radius/2
-
     for i in range(len(free_future_l)):
         future_distance.append((free_future_l[i] + free_future_r[i]) * wheels_radius/2)
         future_theta.append((free_future_l[i] - free_future_r[i]) * wheels_radius/wheels_distance)
@@ -192,17 +204,11 @@ while True:
     future_theta = np.array(future_theta)
     future_distance = np.array(future_distance)
 
-    # --- convert to delta --- #
-
-    future_theta = future_theta - current_theta
-    future_distance = future_distance - current_distance
-
     # --- reference using linearization --- #
 
     x = [future_points[i][0] for i in range(len(future_points))]
     y = [future_points[i][1] for i in range(len(future_points))]
 
-    d0 = 0.3
     angle = np.array(x)/d0
     distance = np.array(y)
 
