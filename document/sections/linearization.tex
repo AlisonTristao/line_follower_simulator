@@ -9,7 +9,7 @@ na minimização de funções quadráticas.
 \vspace{1em}
 Para reduzir o custo computacional do controle, 
 utilizaremos a linearização por meio de séries de Taylor 
-em torno de $\omega_0$ e $v_0$.
+em torno de $\theta_0$ e $v_0$.
 
 \vspace{1em}
 Assumiremos que o centro do referencial está localizado no 
@@ -26,10 +26,10 @@ fixa em 0 graus em relação ao eixo $x$.
 Utilizando a aproximação por séries de Taylor:
 
 \[
-x = x_0 + \frac{\partial x}{\partial v} \bigg|_{v_0} \Delta v + \frac{\partial x}{\partial \omega} \bigg|_{\omega_0} \Delta \theta
+x = x_0 + \frac{\partial x}{\partial v} \bigg|_{v_0} \Delta v + \frac{\partial x}{\partial \theta} \bigg|_{\theta_0} \Delta \theta
 \]
 \[
-y = y_0 + \frac{\partial y}{\partial v} \bigg|_{v_0} \Delta v + \frac{\partial y}{\partial \omega} \bigg|_{\omega_0} \Delta \theta
+y = y_0 + \frac{\partial y}{\partial v} \bigg|_{v_0} \Delta v + \frac{\partial y}{\partial \theta} \bigg|_{\theta_0} \Delta \theta
 \]
 
 Assim, o modelo cinemático definido na Equação~\ref{eq:cinematic_velocity} 
@@ -37,12 +37,12 @@ pode ser representado em $(x, y)$ como:
 
 \begin{equation}
 \begin{cases}
-x \approx v_0 \cos(\omega_0) + \cos(\omega_0) \Delta v - v_0 \sin(\omega_0) \Delta \theta \\
-y \approx v_0 \sin(\omega_0) + \sin(\omega_0) \Delta v + v_0 \cos(\omega_0) \Delta \theta
+x \approx v_0 \cos(\theta_0) + \cos(\theta_0) \Delta v - v_0 \sin(\theta_0) \Delta \theta \\
+y \approx v_0 \sin(\theta_0) + \sin(\theta_0) \Delta v + v_0 \cos(\theta_0) \Delta \theta
 \end{cases}
 \end{equation}
 
-Considerando os valores numéricos com $\omega_0 = 0$, temos:
+Considerando os valores numéricos com $\theta_0 = 0$, temos:
 
 \begin{equation}
 \begin{cases}
