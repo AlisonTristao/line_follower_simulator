@@ -165,7 +165,7 @@ e suas velocidades é dada por:
 \label{eq:force_torque}
 \end{equation}
 
-Finalmente, ao aplicarmos a matriz de transformação $\mathbf{\prescript{\text{v}}{}{T_{\omega}}}$, 
+Finalmente, ao aplicarmos a matriz de transformação $\mathbf{\prescript{\text{f}}{}{T_t}}$, 
 que projeta os torques das rodas nos eixos do referencial do robô, obtendo
  a equação que relaciona os esforços totais resultantes 
 $\mathbf{f}$ com os torques aplicados $\mathbf{t}$, 
@@ -174,7 +174,7 @@ encontrando a relação que define as velocidades do robô aos esforços aplicad
 \begin{equation}
 \mathbf{f}
 =
-\mathbf{\prescript{\text{v}}{}{T_{\omega}}} \mathbf{t}
+\mathbf{\prescript{\text{f}}{}{T_t}} \mathbf{t}
 \end{equation}
 
 Onde:
@@ -230,7 +230,7 @@ J_d & 0 \\
 0 & J_e
 \end{bmatrix}
 \qquad
-\mathbf{\prescript{\text{v}}{}{T_{\omega}}} =
+\mathbf{\prescript{\text{f}}{}{T_t}} =
 \begin{bmatrix}
 \frac{1}{r_d} & \frac{1}{r_e} \\
 \frac{d}{2r_d} & -\frac{d}{2r_e}
@@ -299,17 +299,17 @@ termos da tensão aplicada nos motores:
 
 \begin{equation}
 \mathbf{M}_{robo} \dot{\mathbf{v}} + \mathbf{B}_{robo} \mathbf{v} = 
-\mathbf{\prescript{\text{v}}{}{T_{\omega}}} (\mathbf{K}_{mot} \mathbf{u} - \mathbf{B}_{mot} \mathbf{\prescript{\omega}{}{T_v}} \mathbf{v} - \mathbf{J}_{mot} \mathbf{\prescript{\omega}{}{T_v}} \dot{\mathbf{v}})
+\mathbf{\prescript{\text{f}}{}{T_t}} (\mathbf{K}_{mot} \mathbf{u} - \mathbf{B}_{mot} \mathbf{\prescript{\omega}{}{T_v}} \mathbf{v} - \mathbf{J}_{mot} \mathbf{\prescript{\omega}{}{T_v}} \dot{\mathbf{v}})
 \end{equation}
 
 Deixando $\mathbf{v}$ em função de $\mathbf{u}$, temos:
 
 \begin{equation}
-(\mathbf{M}_{robo} + \mathbf{\prescript{\text{v}}{}{T_{\omega}}} \mathbf{J}_{mot} \mathbf{\prescript{\omega}{}{T_v}}) \dot{\mathbf{v}}
+(\mathbf{M}_{robo} + \mathbf{\prescript{\text{f}}{}{T_t}} \mathbf{J}_{mot} \mathbf{\prescript{\omega}{}{T_v}}) \dot{\mathbf{v}}
 +
-(\mathbf{B}_{robo} + \mathbf{\prescript{\text{v}}{}{T_{\omega}}} \mathbf{B}_{mot} \mathbf{\prescript{\omega}{}{T_v}}) \mathbf{v}
+(\mathbf{B}_{robo} + \mathbf{\prescript{\text{f}}{}{T_t}} \mathbf{B}_{mot} \mathbf{\prescript{\omega}{}{T_v}}) \mathbf{v}
 =
-\mathbf{\prescript{\text{v}}{}{T_{\omega}}} \mathbf{K}_{mot} \mathbf{u}
+\mathbf{\prescript{\text{f}}{}{T_t}} \mathbf{K}_{mot} \mathbf{u}
 \end{equation}
 
 Onde $\mathbf{M}$ é a matriz de massa e inércia do robô e 
@@ -338,11 +338,11 @@ Por fim, a dinâmica do robô pode ser expressa como:
 
 Onde:
 \[
-\mathbf{M} = \mathbf{M}_{robo} + \mathbf{\prescript{\text{v}}{}{T_{\omega}}} \mathbf{J}_{mot} \mathbf{\prescript{\omega}{}{T_v}}
+\mathbf{M} = \mathbf{M}_{robo} + \mathbf{\prescript{\text{f}}{}{T_t}} \mathbf{J}_{mot} \mathbf{\prescript{\omega}{}{T_v}}
 \qquad
-\mathbf{B} = \mathbf{B}_{robo} + \mathbf{\prescript{\text{v}}{}{T_{\omega}}} \mathbf{B}_{mot} \mathbf{\prescript{\omega}{}{T_v}}
+\mathbf{B} = \mathbf{B}_{robo} + \mathbf{\prescript{\text{f}}{}{T_t}} \mathbf{B}_{mot} \mathbf{\prescript{\omega}{}{T_v}}
 \qquad
-\mathbf{K} = \mathbf{\prescript{\text{v}}{}{T_{\omega}}} \mathbf{K}_{mot}
+\mathbf{K} = \mathbf{\prescript{\text{f}}{}{T_t}} \mathbf{K}_{mot}
 \]
 
 O sistema apresenta um comportamento dinâmico linear de 
