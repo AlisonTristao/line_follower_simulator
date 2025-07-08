@@ -189,8 +189,8 @@ while True:
 
     # --- calculate the free future response --- #
 
-    free_future_l = free_GPC(free_l, last_theta_l.copy())
-    free_future_r = free_GPC(free_r, last_theta_r.copy())
+    free_future_l = free_GPC(free_l, np.array(last_theta_l.copy()) - last_theta_l[2])
+    free_future_r = free_GPC(free_r, np.array(last_theta_r.copy()) - last_theta_r[2])
 
     future_distance = []
     future_theta = []
