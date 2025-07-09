@@ -86,14 +86,13 @@ def free_GPC(free_matrix, last_y):
 
 alpha_l = math.exp(-z*5/accommodation_time_l)
 alpha_r = math.exp(-z*5/accommodation_time_r)
-beta_l = ke_l - alpha_l
-beta_r = ke_r - alpha_r
+beta_l = ke_r * (1 - alpha_l)
+beta_r = ke_l * (1 - alpha_r)
 
 print("alpha_l: ", round(alpha_l, 5))
 print("alpha_r: ", round(alpha_r, 5))
 print("beta_l: ", round(beta_l, 3))
 print("beta_r: ", round(beta_r, 3))
-
 
 N_horizon = future_points #int(math.log(0.01)/math.log(max(alpha_l, alpha_r)))
 N_ul = 5
