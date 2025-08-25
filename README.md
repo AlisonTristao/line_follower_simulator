@@ -2,7 +2,7 @@
 
 ![Simulator Image](imagens/image.png)
 
-# get the clean code on the alison branch
+# get the clean code on the clean_project branch
 
 ## Description
 The **Line Follower Simulator** is a simulator for a line-following robot. It allows testing control algorithms and simulating the behavior of a robot on different types of tracks.
