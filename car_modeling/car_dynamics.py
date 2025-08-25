@@ -86,7 +86,6 @@ class car_dynamics:
         # noise gain
         c1 = kq * (1 - a1)
         c2 = kq * (1 - a2)
-        print(c1, c2)
 
         self._ml.set_constants([a1], [b1], [c1])
         self._mr.set_constants([a2], [b2], [c2])
