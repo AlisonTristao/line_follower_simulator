@@ -1,6 +1,14 @@
 from dataclasses import dataclass
-
+import random
 from simulator import GameSimulation, SimulationConfig, MEDIUM, LEMNISCATE
+
+# fix the seed for reproducibility
+seed = 42 # None
+random.seed(seed)
+
+print("press esc to quit")
+print("press p to pause/unpause the simulation and aplly perturbations")
+print("seed =", seed)
 
 @dataclass
 class CarConfig:
