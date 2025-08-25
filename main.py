@@ -2,7 +2,7 @@ from simulator import *
 import pandas as pd
 
 # screen settings => sizes FULL, MEDIUM, SMALL
-screen_size = MEDIUM
+screen_size = SMALL
 screen_fps = 80
 z = 1/screen_fps
 track_seed = 1112
@@ -171,6 +171,10 @@ while True:
         break
     else:
         line, future_points, speed, omega, omega_wheels = data
+
+    # degrau interpolate
+    mean = np.sum([line[i] * (i+1) * 100 for i in range(len(line))]) / np.sum([(i+1) * 100 for i in range(len(line))])
+    print(len(line))
 
     # --- integrate the omega signal --- #
 
