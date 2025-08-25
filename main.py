@@ -69,6 +69,8 @@ def main() -> None:
 
         # TODO: Implement control algorithm to update v1 and v2
         # currently the car will remain stationary
+
+        v1 = v2 = 10
         
 if __name__ == "__main__":
     main()
