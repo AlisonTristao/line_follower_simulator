@@ -1,34 +1,51 @@
 import pygame
 import random
 import time
+import math
+from dataclasses import dataclass
+
 from graphics.graphics_elements import *
 from graphics.track_generator import *
 from car_modeling.car_dynamics import *
 import numpy as np
 
-class SimulatorController:
-    def __init__(self, screen_size, fps, length, width, scale, render,
-                 track_type=0, track_length=0.02, sensor_spacing=0.001):
+@dataclass
+class SimulationConfig:
+    """Configuration values used to start a simulation."""
 
-        self._init_config(screen_size, fps, length, width, scale, render,
-                          track_type, track_length, sensor_spacing)
+    screen_size: int
+    fps: int
+    length: int
+    width: int
+    scale: int
+    render: int
+    track_type: int = 0
+    track_length: float = 0.02
+    sensor_spacing: float = 0.001
+
+class GameSimulation:
+    """High level controller responsible for running the simulation."""
+
+    def __init__(self, config: SimulationConfig):
+        self.config = config
+
+        # copy frequently used values for convenience
+        self.screen_size = config.screen_size
+        self.FPS = config.fps
+        self.LENGTH = config.length
+        self.WIDTH = config.width
+        self.SCALE = config.scale
+        self.RENDER = config.render
+        self.track_type = config.track_type
+        self.track_length = config.track_length
+        self.array_sensor_dist = config.sensor_spacing
+
+        self.time_simulation = 0
+        self.timer = time.time()
+        self.perturbation = 0.0
 
         self._init_simulation_objects()
         self._setup_simulator()
-
-    def _init_config(self, screen_size, fps, length, width, scale, render,
-                     track_type, track_length, sensor_spacing):
-        self.screen_size = screen_size
-        self.FPS = fps
-        self.LENGTH = length
-        self.WIDTH = width
-        self.SCALE = scale
-        self.RENDER = render
-        self.time_simulation = 0
-
-        self.track_type = track_type
-        self.track_length = track_length
-        self.array_sensor_dist = sensor_spacing
 
     def _init_simulation_objects(self):
         self.simulator = Simulator(self.screen_size, self.FPS)
@@ -58,27 +75,51 @@ class SimulatorController:
         self.error_omega = [0] * 10
         self.error_v = [0] * 10
 
-    def setup_car_dynamics(self,  wheels_radius=0.04, wheels_distance=0.1, wheels_RPM=3000, ke_l=1, ke_r=1, kq=1, accommodation_time_l=1.0, accommodation_time_r=1.0, sensor_distance=0.1, sensor_count=8):
-        z = 1/self.FPS
-        self.car = car_dynamics(z, wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, kq, accommodation_time_l, accommodation_time_r)
-        self.car_draw.set_size(self.car.get_size()*self.SCALE)
-        self.line_sensor.set_coordinates((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE))
-        self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist) # 0.05 meter beetween sensors
+    def setup_car_dynamics(
+        self,
+        wheels_radius=0.04,
+        wheels_distance=0.1,
+        wheels_RPM=3000,
+        ke_l=1,
+        ke_r=1,
+        kq=1,
+        accommodation_time_l=1.0,
+        accommodation_time_r=1.0,
+        sensor_distance=0.1,
+        sensor_count=8,
+    ):
+        z = 1 / self.FPS
+        self.car = car_dynamics(
+            z,
+            wheels_radius,
+            wheels_distance,
+            wheels_RPM,
+            ke_l,
+            ke_r,
+            kq,
+            accommodation_time_l,
+            accommodation_time_r,
+        )
+        self.car_draw.set_size(self.car.get_size() * self.SCALE)
+        self.line_sensor.set_coordinates(
+            (self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE)
+        )
+        self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist)  # 0.05 meter between sensors
 
     def set_future_points(self, count, space):
         self.future_points_count = count
         self.future_space = space
-        Cluster.set_master(self.car_draw.get_center(), self.car_draw.get_size())    # set the master point
+        Cluster.set_master(self.car_draw.get_center(), self.car_draw.get_size())  # set the master point
         Cluster.set_future_count(self.future_points_count, self.future_space)     # set the future points count
 
-    # divide the track in clusters for rendering 
+    # divide the track in clusters for rendering
     def configurate_cluster(self):
         # create clusters of points in the track
         cluster_matrix, position = generate_cluster(self.LENGTH, self.WIDTH, self.SCALE, self.x_track, self.y_track)
 
         # create the cluster
         for i in range(len(cluster_matrix)):
-            cluster = Cluster(size=self.track_length*self.SCALE) 
+            cluster = Cluster(size=self.track_length * self.SCALE)
             for k in cluster_matrix[i]:
                 cluster.add_point(k)
             self.track.set_obj(position[i][0], position[i][1], cluster)
@@ -88,8 +129,10 @@ class SimulatorController:
         print("Initializing simulator...")
 
         # generate trajectory
-        self.x_track, self.y_track = generate_track(self.track_type, noise_level=0.225, checkpoints=36, resolution=500, track_rad=30)
-        self.win = len(self.x_track-1)
+        self.x_track, self.y_track = generate_track(
+            self.track_type, noise_level=0.225, checkpoints=36, resolution=500, track_rad=30
+        )
+        self.win = len(self.x_track - 1)
 
         # create car
         self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.8))
@@ -101,7 +144,7 @@ class SimulatorController:
         self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1]))
 
         # create future points
-        self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length*0.5*self.SCALE)
+        self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length * 0.5 * self.SCALE)
 
         # create minimap
         minimap_position = (0.9 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1])
@@ -110,7 +153,9 @@ class SimulatorController:
             self.minimap.add_point((2 * self.x_track[k] / self.LENGTH, 2 * self.y_track[k] / self.WIDTH))
 
         # set track properties
-        self.track.set_coordinates(((self.x_track[0] + self.LENGTH//2) * self.SCALE, (self.y_track[0] + self.WIDTH//2) * self.SCALE))
+        self.track.set_coordinates(
+            ((self.x_track[0] + self.LENGTH // 2) * self.SCALE, (self.y_track[0] + self.WIDTH // 2) * self.SCALE)
+        )
         self.track.set_center(self.car_draw.get_center())
         self.track.set_pivot(self.car_draw.get_center())
 
@@ -134,7 +179,7 @@ class SimulatorController:
         # create statistics displays
         self.fps_display = Statistics((1.99 * self.simulator.get_center()[0], 0.01 * self.simulator.get_center()[1]))
 
-        # create display points 
+        # create display points
         self.track_percentage = Statistics((1.0 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1]))
 
         # pontuation of the track
@@ -201,10 +246,9 @@ class SimulatorController:
         self.display.add_graph("error")
         self.display.add_line_to_graph("error", "d", color=self.get_rand_color())
         self.display.add_line_to_graph("error", "θ", color=self.get_rand_color())
-    def _update_graps(self):
-        """
-        update the graphs with the given values.
-        """
+
+    def _update_graphs(self):
+        """Update all graphs with the current simulation values."""
         self.display.update_graph_data("wheels", "left", self.car.get_wheels_norm()[0])
         self.display.update_graph_data("wheels", "right", self.car.get_wheels_norm()[1])
         self.display.update_graph_data("car", "vm", self.car.speed_norm())
@@ -235,202 +279,227 @@ class SimulatorController:
         self.track_percentage.set_text(f"covered: {coverage}")
 
     def update_points(self, points):
-        """
-        update the points display with the given value.
-        """
+        """Update the points display with the given value."""
         self.points.set_text(f"score: {points}")
 
-    def step(self, v1, v2, q1=0, q2=0):
-        """
-        perform one simulation step with given movement and rotation inputs.
-        """
-        # step the car dynamics
+    # ------------------------------------------------------------------
+    # Simulation main loop helpers
+    # ------------------------------------------------------------------
+    def _handle_events(self) -> bool:
+        """Process pygame events. Returns False when simulation should stop."""
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                pygame.quit()
+                print("Simulation stopped using X button")
+                return False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_ESCAPE:
+                    pygame.quit()
+                    print("Simulation stopped using ESC")
+                    return False
+                if event.key == pygame.K_p:
+                    result = input("Enter perturbation value (default is 0.0): ")
+                    self.perturbation = float(result)
+                    print(f"Perturbation set to {self.perturbation}")
+            self.display.verify_checkbox(event)
+        return True
+
+    def _step_physics(self, v1, v2, q1=0, q2=0):
+        """Simulate physics and render the scene."""
         self.car.step(v1, v2, q1, q2)
+        self._update_graphs()
 
-        # calculates the car values normalized
-        simulator._update_graps()
-
-        # get the car values
         dx, dy, angle = self.car.get_space()
-
         dx *= -self.SCALE
         dy *= -self.SCALE
         angle *= -1
         self.track.step(dx, dy, angle)
 
-        # update compass and coordinates
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
         self.coordinates_display.set_text(
             f"x: {round(self.track.get_center()[0]/self.SCALE, 2):.2f} y: {round(self.track.get_center()[1]/self.SCALE, 2):.2f}"
         )
 
-        # update minimap position
         self.minimap.set_player_position(
-            (2 * self.track.get_center()[0]/(self.SCALE * self.LENGTH) - 1,
-             -2 * self.track.get_center()[1]/(self.SCALE * self.WIDTH) + 1)
+            (2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1,
+             -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1)
         )
 
-        # render the simulator
         self.simulator.draw()
 
-        # verify if win the game
         if Cluster._next_point == self.win:
             print("Congratulations!")
-            print("You win the game, you score is {:.2f}".format(100*100/self.time_simulation))
+            print("You win the game, you score is {:.2f}".format(100 * 100 / self.time_simulation))
             return None
 
-        # get the future points
         future_point = Cluster.get_next_point()
         self.future_points.set_points(future_point)
-        future_point = [((x - self.car_draw.get_center()[0])/self.SCALE, (-y + self.car_draw.get_center()[1])/self.SCALE) for x, y in future_point]
+        future_point = [
+            ((x - self.car_draw.get_center()[0]) / self.SCALE,
+             (-y + self.car_draw.get_center()[1]) / self.SCALE)
+            for x, y in future_point
+        ]
 
-        # return the sensor value
-        line = self.simulator.screen.subsurface((self.line_sensor.get_x() - self.line_sensor.get_size()/2, self.line_sensor.get_y() -1, self.line_sensor.get_size(), 1))
+        line = self.simulator.screen.subsurface(
+            (
+                self.line_sensor.get_x() - self.line_sensor.get_size() / 2,
+                self.line_sensor.get_y() - 1,
+                self.line_sensor.get_size(),
+                1,
+            )
+        )
         line_arr = pygame.surfarray.pixels3d(line)
-        line_pb = line_arr.mean(axis=2)  # calculate the mediam 
-        line_pb = np.array(line_pb[:, 0], dtype=np.uint8)  # remove dimension 
+        line_pb = line_arr.mean(axis=2)  # calculate the mediam
+        line_pb = np.array(line_pb[:, 0], dtype=np.uint8)  # remove dimension
         block_len = int(self.array_sensor_dist * self.SCALE)
         block_count = line_pb.shape[0] // block_len
-        final_line = line_pb[:block_count * block_len].reshape(block_count, block_len).mean(axis=1)
+        final_line = line_pb[: block_count * block_len].reshape(block_count, block_len).mean(axis=1)
 
-        return (1 - final_line/255), future_point, self.car.speed(), self.car.omega(), self.car.get_wheels_speed()
-    
-simulator = None #SimulatorController()
-timer = time.time()
-perturbation = 0.0
+        return (
+            1 - final_line / 255,
+            future_point,
+            self.car.speed(),
+            self.car.omega(),
+            self.car.get_wheels_speed(),
+        )
 
-def start_simulation(screen_size=MEDIUM, fps=120, length=100, width=100, scale=300, render=4, seed=None, track_type=0, track_length=0.02, sensor_spacing=0.001):
-    # define the seed
+    def step(self, v1, v2):
+        """Public method used by external modules to advance the simulation."""
+        if not self._handle_events():
+            return None
+
+        data = self._step_physics(v1, v2, self.perturbation, -self.perturbation)
+        if data is None:
+            pygame.quit()
+            return None
+
+        self.time_simulation += 1 / self.FPS
+        coverage = Cluster._next_point / self.win * 100
+        self.update_coverage("{:.2f}%".format(coverage))
+        self.update_points("{:.2f}".format(100 * coverage / self.time_simulation))
+
+        while (time.time() - self.timer) < 1 / self.FPS:
+            pass
+
+        self.update_FPS("{:.1f}".format(1 / (time.time() - self.timer)))
+        self.timer = time.time()
+
+        return data
+
+_simulation: GameSimulation | None = None
+
+def start_simulation(
+    screen_size=MEDIUM,
+    fps=120,
+    length=100,
+    width=100,
+    scale=300,
+    render=4,
+    seed=None,
+    track_type=0,
+    track_length=0.02,
+    sensor_spacing=0.001,
+):
+    """Create and configure a :class:`GameSimulation` instance."""
     if seed is not None:
         random.seed(seed)
         np.random.seed(seed)
 
-    # check if the simulator is initialized
-    global simulator
-    if simulator is not None:
+    global _simulation
+    if _simulation is not None:
         print("Simulator already initialized")
-        return
-    
-    simulator = SimulatorController(screen_size, fps, length, width, scale, render, track_type, track_length, sensor_spacing)
-    return simulator
+        return _simulation
 
-def set_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, accommodation_time_l, accommodation_time_r, sensor_distance, sensor_count):
-    # check if the simulator is initialized
-    if simulator is None:
+    config = SimulationConfig(
+        screen_size,
+        fps,
+        length,
+        width,
+        scale,
+        render,
+        track_type,
+        track_length,
+        sensor_spacing,
+    )
+    _simulation = GameSimulation(config)
+    return _simulation
+
+def _require_simulation() -> GameSimulation | None:
+    if _simulation is None:
         print("Simulator not initialized")
-        return
+        return None
+    return _simulation
 
-    simulator.setup_car_dynamics(wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, 1, accommodation_time_l, accommodation_time_r, sensor_distance, sensor_count)
+def set_car_dynamics(
+    wheels_radius,
+    wheels_distance,
+    wheels_RPM,
+    ke_l,
+    ke_r,
+    accommodation_time_l,
+    accommodation_time_r,
+    sensor_distance,
+    sensor_count,
+):
+    sim = _require_simulation()
+    if sim is None:
+        return
+    sim.setup_car_dynamics(
+        wheels_radius,
+        wheels_distance,
+        wheels_RPM,
+        ke_l,
+        ke_r,
+        1,
+        accommodation_time_l,
+        accommodation_time_r,
+        sensor_distance,
+        sensor_count,
+    )
 
 def set_future_points(count, space):
-    # check if the simulator is initialized
-    if simulator is None:
-        print("Simulator not initialized")
+    sim = _require_simulation()
+    if sim is None:
         return
-
-    simulator.set_future_points(count, space)
+    sim.set_future_points(count, space)
 
 def set_graph_future_control(left, right):
-    # check if the simulator is initialized
-    if simulator is None:
-        print("Simulator not initialized")
+    sim = _require_simulation()
+    if sim is None:
         return
-
-    simulator.future_control_left = left
-    simulator.future_control_right = right
+    sim.future_control_left = left
+    sim.future_control_right = right
 
 def set_graph_reference(omega, v):
-    # check if the simulator is initialized
-    if simulator is None:
-        print("Simulator not initialized")
+    sim = _require_simulation()
+    if sim is None:
         return
-
-    simulator.future_v = v
-    simulator.future_omega = omega
+    sim.future_v = v
+    sim.future_omega = omega
 
 def set_graph_free_response(omega, v):
-    # check if the simulator is initialized
-    if simulator is None:
-        print("Simulator not initialized")
+    sim = _require_simulation()
+    if sim is None:
         return
-
-    simulator.free_response_omega = omega
-    simulator.free_response_v = v
+    sim.free_response_omega = omega
+    sim.free_response_v = v
 
 def set_graph_forced_response(omega, v):
-    # check if the simulator is initialized
-    if simulator is None:
-        print("Simulator not initialized")
+    sim = _require_simulation()
+    if sim is None:
         return
-
-    simulator.forced_response_omega = omega
-    simulator.forced_response_v = v
+    sim.forced_response_omega = omega
+    sim.forced_response_v = v
 
 def set_graph_error(omega, v):
-    # check if the simulator is initialized
-    if simulator is None:
-        print("Simulator not initialized")
+    sim = _require_simulation()
+    if sim is None:
         return
-
-    simulator.error_omega = omega
-    simulator.error_v = v
+    sim.error_omega = omega
+    sim.error_v = v
 
 def step_simulation(v1, v2):
-    global timer
-    global perturbation
-
-    # check if the simulator is initialized
-    if simulator is None or simulator.car is None:
-        print("Simulator not initialized")
+    sim = _require_simulation()
+    if sim is None or sim.car is None:
         return None
-
-    # check for events
-    for event in pygame.event.get():
-        if event.type == pygame.QUIT:
-            pygame.quit()
-            print("Simulation stopped using X button")
-            return None
-
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_ESCAPE:
-                pygame.quit()
-                print("Simulation stopped using ESC")
-                return None
-            
-        # Detecta quando a tecla 'P' é pressionada
-        if event.type == pygame.KEYDOWN:
-            if event.key == pygame.K_p:
-                result = input("Enter perturbation value (default is 0.0): ")
-                perturbation = float(result)
-                print(f"Perturbation set to {perturbation}")
-
-        simulator.display.verify_checkbox(event)
-
-    # render the simulator
-    data = simulator.step(v1, v2, perturbation, -perturbation)
-
-    if data is None:
-        pygame.quit()
-        return None
-
-    # integrate the time simulation
-    simulator.time_simulation += 1/simulator.FPS
-
-    # calculate coverage percentage
-    coverage = Cluster._next_point/simulator.win * 100
-    simulator.update_coverage("{:.2f}%".format(coverage))
-
-    # calculate the points of the track
-    simulator.update_points("{:.2f}".format(100*coverage/simulator.time_simulation))
-
-    # fix the fps
-    while (time.time() - timer) < 1/simulator.FPS:
-        pass
-
-    # update the fps count
-    simulator.update_FPS("{:.1f}".format(1/(time.time() - timer)))
-
-    # update the timer
-    timer = time.time()
-
-    return data
+    return sim.step(v1, v2)
