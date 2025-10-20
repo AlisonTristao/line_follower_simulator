@@ -2,6 +2,8 @@
 
 ![Simulator Image](imagens/image.png)
 
+# get the clean code on the clean_project branch
+
 ## Description
 The **Line Follower Simulator** is a simulator for a line-following robot. It allows testing control algorithms and simulating the behavior of a robot on different types of tracks.
 
@@ -16,13 +18,3 @@ The **Line Follower Simulator** is a simulator for a line-following robot. It al
 - `car_dynamics.py`: Modeling of the car's dynamics.
 - `track_generator.py`: Track generation.
 - `graphics_elements.py`: Graphical elements for rendering.
-
-## Requirements
-- Python 3.10 or higher.
-- Required libraries:
-  - `pygame`
-  - `pandas`
-  - `numpy`
-  - `time`
-  - `scipy`
-  - `random`
