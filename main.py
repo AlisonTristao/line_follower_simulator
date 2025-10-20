@@ -20,11 +20,11 @@ def main() -> None:
 
     sim_config = SimulationConfig(
         screen_size=MEDIUM,
-        fps=80,
+        fps=160,
         length=100,
         width=100,
-        scale=300,
-        render=4,
+        scale=200,
+        render=2,
         track_type=LEMNISCATE,
         track_length=0.02,
         sensor_spacing=0.008,
@@ -61,6 +61,8 @@ def main() -> None:
 
         # TODO: Implement control algorithm to update v1 and v2
         # currently the car will remain stationary
+
+        v1 = v2 = 10
         
 if __name__ == "__main__":
     main()
