@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 import random
+import numpy as np
 from simulator import GameSimulation, SimulationConfig, MEDIUM, LEMNISCATE
 
 # fix the seed for reproducibility
@@ -9,6 +10,15 @@ random.seed(seed)
 print("press esc to quit")
 print("press p to pause/unpause the simulation and aplly perturbations")
 print("seed =", seed)
+
+last = 0.0
+def calculate_point(line):
+    # index s index n index s index n 
+    arr = np.array(line)
+    mediam = np.median(np.where(arr != 0)[0]) + 1
+    if mediam != None:
+        last = (mediam - len(arr)/2)/len(arr)
+    return last
 
 @dataclass
 class CarConfig:
@@ -60,6 +70,7 @@ def main() -> None:
     # ------------------------------------------------------------------
 
     v1 = v2 = 0.0
+    last_erro = 0.0
     while True:
         data = sim.step(v1, v2)
         if data is None:
@@ -67,10 +78,17 @@ def main() -> None:
 
         line, future_pts, speed, omega, wheel_omega = data
 
-        # TODO: Implement control algorithm to update v1 and v2
-        # currently the car will remain stationary
+        tensao_media = 80
 
-        v1 = v2 = 10
-        
+        erro = calculate_point(line)
+        derivada_erro = (erro - last_erro)/0.0125
+        last_erro = erro
+
+        Kp = 100
+        Kd = 4
+
+        v1 = tensao_media + (Kp * erro + Kd * derivada_erro)
+        v2 = tensao_media - (Kp * erro + Kd * derivada_erro)
+
 if __name__ == "__main__":
     main()
