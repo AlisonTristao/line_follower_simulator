@@ -19,8 +19,8 @@ class CarConfig:
     wheels_RPM: int = 1000
     ke_l: float = 1.0
     ke_r: float = 1.0
-    accommodation_time_l: float = 0.62
-    accommodation_time_r: float = 0.58
+    accommodation_time_l: float = 0.6
+    accommodation_time_r: float = 0.6
     sensor_distance: float = 0.15
     sensor_count: int = 15
 
@@ -65,10 +65,18 @@ def main() -> None:
         if data is None:
             break
 
-        line, future_pts, speed, omega, wheel_omega = data
+        line, future_pts, car = data
+        print(car.get_data())
+        print(car.get_encoders())
+        print(car.get_accelerometer())
+        print(car.get_gyroscope())
+        print(car.get_compass())
+        print(car.get_optical_flow())
 
         # TODO: Implement control algorithm to update v1 and v2
         # currently the car will remain stationary
+
+        v1 = v2 = 30
         
 if __name__ == "__main__":
     main()

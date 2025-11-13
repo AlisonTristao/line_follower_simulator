@@ -309,7 +309,8 @@ class GameSimulation:
         self.car.step(v1, v2, q1, q2)
         self._update_graphs()
 
-        dx, dy, angle = self.car.get_space()
+        self.car.calculate_out_data()
+        dx, dy, angle = self.car.get_delta_space()
         dx *= -self.SCALE
         dy *= -self.SCALE
         angle *= -1
@@ -358,9 +359,7 @@ class GameSimulation:
         return (
             1 - final_line / 255,
             future_point,
-            self.car.speed(),
-            self.car.omega(),
-            self.car.get_wheels_speed(),
+            self.car
         )
 
     def step(self, v1, v2):

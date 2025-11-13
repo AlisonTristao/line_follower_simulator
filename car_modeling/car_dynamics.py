@@ -50,7 +50,24 @@ class car_dynamics:
         self.q2 = 0
         self._wheels_radius = wheels_radius
         self._wheels_distance = wheels_distance
-        self._wheels_speed_rad_s = (2 * math.pi * wheels_RPM)/(60*100) # divide by 100%
+        self._wheels_speed_rad_s = (2 * math.pi * wheels_RPM)/(60*100) # divide by 100
+        
+        # y
+        self.__distance = 0
+        self.__theta = 0
+
+        # y'
+        self.__speed = 0
+        self.__omega = 0
+
+        # y''
+        self.__acceleration = 0
+        self.__alpha = 0
+
+        # enconders precision (angle per pulse)
+        self._encoders_precision = 2 * math.pi/70
+        self._theta_left = 0
+        self._theta_right = 0
 
         # last speed and omega
         self.last_speed = 0
@@ -107,24 +124,63 @@ class car_dynamics:
     
     def omega(self):
         return self._omega() * self._gain_Omega
-    
-    def get_space(self):
+
+    def calculate_out_data(self):
         # get the current speed and omega
-        speed = self.speed()
-        omega = self.omega()
+        self.__speed = self.speed()
+        self.__omega = self.omega()
+        self._theta_left += self._ml.get_y() * self._wheels_speed_rad_s * self.z
+        self._theta_right += self._mr.get_y() * self._wheels_speed_rad_s *  self.z
         
         # calculate the space using trapezoidal rule
-        space = speed * self.z #(self.last_speed + speed) * self.z/2
-        angle = omega * self.z #(self.last_omega + omega) * self.z/2
+        self.__distance += self.__speed * self.z #(self.last_speed + speed) * self.z/2
+        self.__theta += self.__omega * self.z #(self.last_omega + omega) * self.z/2
+
+        # calculate the alpha and acceleration
+        self.__acceleration = (self.__speed - self.last_speed)/self.z
+        self.__alpha = (self.__omega - self.last_omega)/self.z
+
+    def get_data(self):
+        return self.__distance, self.__theta, self.__speed, self.__omega, self.__acceleration, self.__alpha
+
+    def get_delta_space(self):
+        # update last speed and omega
+        dx = self.__distance  * math.sin(self.__theta)
+        dy = self.__distance  * math.cos(self.__theta)
 
         # update last speed and omega
-        dx = space * math.sin(angle)
-        dy = space * math.cos(angle)
+        self.last_speed = self.__speed
+        self.last_omega = self.__omega
 
-        # update last speed and omega
-        self.last_speed = speed
-        self.last_omega = omega
-        return dx, dy, angle
+        return dx, dy, self.__theta
+    
+    def get_encoders(self):
+        # calculate the pulses
+        pulses_left = int(self._theta_left/self._encoders_precision)
+        pulses_right = int(self._theta_right/self._encoders_precision)
+        return pulses_left, pulses_right
+    
+    def get_accelerometer(self):
+        # return the acceleration in x and y axis
+        ax = self.__acceleration * math.sin(self.__theta)
+        ay = self.__acceleration * math.cos(self.__theta)
+
+        return ax, ay
+    
+    def get_gyroscope(self):
+        # return the angular velocity
+        return self.__omega
+    
+    def get_optical_flow(self):
+        # return the speed in x and y axis
+        vx = self.__speed * math.sin(self.__theta)
+        vy = self.__speed * math.cos(self.__theta)
+
+        return vx, vy
+    
+    def get_compass(self):
+        # return the angle
+        return self.__theta
 
     def _get_wheels(self):
         return self._ml.get_y(), self._mr.get_y()
