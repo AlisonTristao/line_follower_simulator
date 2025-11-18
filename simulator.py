@@ -63,17 +63,17 @@ class GameSimulation:
         self.win = None
 
         self.future_points_count = 10
-        self.future_space = 30
-        self.future_omega = [0] * 10
-        self.future_v = [0] * 10
-        self.free_response_omega = [0] * 10
-        self.free_response_v = [0] * 10
-        self.future_control_left = [0] * 10
-        self.future_control_right = [0] * 10
+        #self.future_space = 30
+        #self.future_omega = [0] * 10
+        #self.future_v = [0] * 10
+        #self.free_response_omega = [0] * 10
+        #self.free_response_v = [0] * 10
+        #self.future_control_left = [0] * 10
+        #self.future_control_right = [0] * 10
         self.perturbation_left = [0] * 10
         self.perturbation_right = [0] * 10
-        self.error_omega = [0] * 10
-        self.error_v = [0] * 10
+        #self.error_omega = [0] * 10
+        #self.error_v = [0] * 10
 
     def setup_car_dynamics(
         self,
@@ -105,6 +105,12 @@ class GameSimulation:
             (self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE)
         )
         self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist)  # 0.05 meter between sensors
+
+    def set_encoders_count(self, count):
+        self.car.encoders.set_pulses(count)
+
+    def set_optical_flow_distance(self, distance):
+        self.car.optical_flow.set_distance(distance)
 
     def set_future_points(self, count, space):
         self.future_points_count = count
@@ -231,7 +237,7 @@ class GameSimulation:
         self.display.add_line_to_graph("perturbation", "left", color=self.get_rand_color())
         self.display.add_line_to_graph("perturbation", "right", color=self.get_rand_color())
 
-        self.display.add_graph("free_response")
+        '''self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "d", color=self.get_rand_color())
         self.display.add_line_to_graph("free_response", "θ", color=self.get_rand_color())
 
@@ -245,7 +251,7 @@ class GameSimulation:
 
         self.display.add_graph("error")
         self.display.add_line_to_graph("error", "d", color=self.get_rand_color())
-        self.display.add_line_to_graph("error", "θ", color=self.get_rand_color())
+        self.display.add_line_to_graph("error", "θ", color=self.get_rand_color())'''
 
     def _update_graphs(self):
         """Update all graphs with the current simulation values."""
@@ -257,14 +263,14 @@ class GameSimulation:
         self.display.update_graph_data("control", "right", self.car.v2)
         self.display.update_graph_data("perturbation", "left", self.car.q1)
         self.display.update_graph_data("perturbation", "right", self.car.q2)
-        self.display.set_graph_data("future_control", "left", self.future_control_left)
+        '''self.display.set_graph_data("future_control", "left", self.future_control_left)
         self.display.set_graph_data("future_control", "right", self.future_control_right)
         self.display.set_graph_data("reference", "d", self.future_v)
         self.display.set_graph_data("reference", "θ", self.future_omega)
         self.display.set_graph_data("free_response", "d", self.free_response_v)
         self.display.set_graph_data("free_response", "θ", self.free_response_omega)
         self.display.set_graph_data("error", "d", self.error_v)
-        self.display.set_graph_data("error", "θ", self.error_omega)
+        self.display.set_graph_data("error", "θ", self.error_omega)'''
 
     def update_FPS(self, fps):
         """
@@ -309,7 +315,8 @@ class GameSimulation:
         self.car.step(v1, v2, q1, q2)
         self._update_graphs()
 
-        dx, dy, angle = self.car.get_space()
+        self.car.calculate_out_data()
+        dx, dy, angle = self.car.get_delta_space()
         dx *= -self.SCALE
         dy *= -self.SCALE
         angle *= -1
@@ -358,9 +365,7 @@ class GameSimulation:
         return (
             1 - final_line / 255,
             future_point,
-            self.car.speed(),
-            self.car.omega(),
-            self.car.get_wheels_speed(),
+            self.car
         )
 
     def step(self, v1, v2):
@@ -463,7 +468,7 @@ def set_future_points(count, space):
         return
     sim.set_future_points(count, space)
 
-def set_graph_future_control(left, right):
+'''def set_graph_future_control(left, right):
     sim = _require_simulation()
     if sim is None:
         return
@@ -496,7 +501,7 @@ def set_graph_error(omega, v):
     if sim is None:
         return
     sim.error_omega = omega
-    sim.error_v = v
+    sim.error_v = v'''
 
 def step_simulation(v1, v2):
     sim = _require_simulation()
