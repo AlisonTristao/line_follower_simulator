@@ -59,4 +59,4 @@ def settings():
 
     sim.set_future_points(count=45, space=3)
 
-    return sim, car_cfg
+    return sim
