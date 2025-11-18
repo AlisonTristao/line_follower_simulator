@@ -106,6 +106,12 @@ class GameSimulation:
         )
         self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist)  # 0.05 meter between sensors
 
+    def set_encoders_count(self, count):
+        self.car.encoders.set_pulses(count)
+
+    def set_optical_flow_distance(self, distance):
+        self.car.optical_flow.set_distance(distance)
+
     def set_future_points(self, count, space):
         self.future_points_count = count
         self.future_space = space
@@ -193,7 +199,7 @@ class GameSimulation:
         self.simulator.add(self.track)
         self.simulator.add(self.car_draw)
         self.simulator.add(self.line_sensor)
-        self.simulator.add(self.minimap)
+        #self.simulator.add(self.minimap)
         self.simulator.add(self.fps_display)
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
@@ -309,7 +315,8 @@ class GameSimulation:
         self.car.step(v1, v2, q1, q2)
         self._update_graphs()
 
-        dx, dy, angle = self.car.get_space()
+        self.car.calculate_out_data()
+        dx, dy, angle = self.car.get_delta_space()
         dx *= -self.SCALE
         dy *= -self.SCALE
         angle *= -1
@@ -358,9 +365,7 @@ class GameSimulation:
         return (
             1 - final_line / 255,
             future_point,
-            self.car.speed(),
-            self.car.omega(),
-            self.car.get_wheels_speed(),
+            self.car
         )
 
     def step(self, v1, v2):

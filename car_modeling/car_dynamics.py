@@ -1,4 +1,5 @@
 import math
+import numpy as np
 
 class motor:
     def __init__(self):
@@ -39,6 +40,41 @@ class motor:
 
         # calculate the step
         self._y = (self._a[0] * self._y + self._b[0] * u + self._c[0] * q)
+
+class encoders:
+    def __init__(self, precision=2*math.pi/70):
+        self._precision = precision
+        self.last_residue_left = 0
+        self.last_residue_right = 0
+
+    def get_pulses(self, theta_left, theta_right):
+        # calculate the pulses
+        pulses_left = int(theta_left/self._precision + self.last_residue_left)
+        pulses_right = int(theta_right/self._precision + self.last_residue_right)
+
+        # update residues
+        self.last_residue_left += theta_left/self._precision - pulses_left
+        self.last_residue_right += theta_right/self._precision - pulses_right
+
+        # return a np array
+        return np.array([pulses_left, pulses_right]) * self._precision
+    
+    def set_pulses(self, pulses):
+        precision = 2*math.pi / pulses
+        self._precision = precision
+
+class optical_flow:
+    def __init__(self, distance=-0.1):
+        self._distance = distance
+    
+    def set_distance(self, distance):
+        self._distance = distance
+
+    def get_optical_flow(self, v, omega):
+        dy = v
+        dx = omega * self._distance
+        # return as np array
+        return np.array([dx, dy])
     
 class car_dynamics:
     def __init__(self, z=0.1,  wheels_radius=0.04, wheels_distance=0.2, wheels_RPM=1000, ke_l=1, ke_r=1, kq=1, accommodation_time_l=1.0, accommodation_time_r=1.0):
@@ -50,7 +86,27 @@ class car_dynamics:
         self.q2 = 0
         self._wheels_radius = wheels_radius
         self._wheels_distance = wheels_distance
-        self._wheels_speed_rad_s = (2 * math.pi * wheels_RPM)/(60*100) # divide by 100%
+        self._wheels_speed_rad_s = (2 * math.pi * wheels_RPM)/(60*100) # divide by 100
+
+        # encoders
+        self.encoders = encoders()
+        self.delta_theta_left = 0
+        self.delta_theta_right = 0
+
+        # optical flow
+        self.optical_flow = optical_flow()
+    
+        # y
+        self.__distance = 0
+        self.__theta = 0
+
+        # y'
+        self.__speed = 0
+        self.__omega = 0
+
+        # y''
+        self.__acceleration = 0
+        self.__alpha = 0
 
         # last speed and omega
         self.last_speed = 0
@@ -107,24 +163,58 @@ class car_dynamics:
     
     def omega(self):
         return self._omega() * self._gain_Omega
-    
-    def get_space(self):
+
+    def calculate_out_data(self):
         # get the current speed and omega
-        speed = self.speed()
-        omega = self.omega()
+        self.__speed = self.speed()
+        self.__omega = self.omega()
+        self._delta_theta_left = self._ml.get_y() * self._wheels_speed_rad_s * self.z
+        self._delta_theta_right = self._mr.get_y() * self._wheels_speed_rad_s *  self.z
         
         # calculate the space using trapezoidal rule
-        space = speed * self.z #(self.last_speed + speed) * self.z/2
-        angle = omega * self.z #(self.last_omega + omega) * self.z/2
+        self.__distance += self.__speed * self.z #(self.last_speed + speed) * self.z/2
+        self.__theta += self.__omega * self.z #(self.last_omega + omega) * self.z/2
+
+        # calculate the alpha and acceleration
+        self.__acceleration = (self.__speed - self.last_speed)/self.z
+        self.__alpha = (self.__omega - self.last_omega)/self.z
+
+    def get_data(self):
+        return self.__distance, self.__theta, self.__speed, self.__omega, self.__acceleration, self.__alpha
+
+    def get_delta_space(self):
+        # update last speed and omega
+        dx = self.__distance  * math.sin(self.__theta)
+        dy = self.__distance  * math.cos(self.__theta)
 
         # update last speed and omega
-        dx = space * math.sin(angle)
-        dy = space * math.cos(angle)
+        self.last_speed = self.__speed
+        self.last_omega = self.__omega
 
-        # update last speed and omega
-        self.last_speed = speed
-        self.last_omega = omega
-        return dx, dy, angle
+        return dx, dy, self.__theta
+    
+    def get_encoders(self):
+        # calculate the pulses
+        return self.encoders.get_pulses(self._delta_theta_left, self._delta_theta_right)
+    
+    def get_optical_flow(self):
+        # calculate optical flow
+        return self.optical_flow.get_optical_flow(self.__speed, self.__omega)
+    
+    '''def get_accelerometer(self):
+        # return the acceleration in x and y axis
+        ax = self.__acceleration * math.sin(self.__theta)
+        ay = self.__acceleration * math.cos(self.__theta)
+
+        return ax, ay
+    
+    def get_gyroscope(self):
+        # return the angular velocity
+        return self.__omega
+    
+    def get_compass(self):
+        # return the angle
+        return self.__theta'''
 
     def _get_wheels(self):
         return self._ml.get_y(), self._mr.get_y()
