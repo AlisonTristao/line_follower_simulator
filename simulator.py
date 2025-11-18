@@ -106,6 +106,12 @@ class GameSimulation:
         )
         self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist)  # 0.05 meter between sensors
 
+    def set_encoders_count(self, count):
+        self.car.encoders.set_pulses(count)
+
+    def set_optical_flow_distance(self, distance):
+        self.car.optical_flow.set_distance(distance)
+
     def set_future_points(self, count, space):
         self.future_points_count = count
         self.future_space = space
