@@ -60,6 +60,8 @@ class GameSimulation:
         self.future_points = None
         self.track_percentage = None
         self.points = None
+        self.serial_monitor = None
+        self.serial_monitor_toggle = None
         self.win = None
 
         self.future_points_count = 10
@@ -194,6 +196,25 @@ class GameSimulation:
         # create compass
         self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1]))
 
+        # create serial monitor toggle (checkbox) - positioned above the graph checkboxes
+        display_center = self.display.get_center()
+        display_size = self.display.get_size()
+        toggle_x = display_center[0] + display_size[0] + 5
+        toggle_y = display_center[1] - 25
+        self.serial_monitor_toggle = SerialMonitorToggle((toggle_x, toggle_y))
+
+        # create serial monitor on the right side
+        serial_monitor_width = 380
+        serial_monitor_height = 450
+        serial_monitor_x = self.simulator.get_window_size()[0] - serial_monitor_width - 10
+        serial_monitor_y = 40
+        self.serial_monitor = SerialMonitor(
+            (serial_monitor_x, serial_monitor_y),
+            (serial_monitor_width, serial_monitor_height)
+        )
+        # Link the toggle button to the serial monitor
+        self.serial_monitor.set_toggle_button(self.serial_monitor_toggle)
+
         # add objects to the simulator
         # the order of the objects is the layer order
         self.simulator.add(self.track)
@@ -207,6 +228,8 @@ class GameSimulation:
         self.simulator.add(self.track_percentage)
         self.simulator.add(self.points)
         self.simulator.add(self.display)
+        self.simulator.add(self.serial_monitor)
+        self.simulator.add(self.serial_monitor_toggle)  # Add toggle AFTER monitor so it renders on top
 
         # configurate the cluster
         self.configurate_cluster()
@@ -303,11 +326,14 @@ class GameSimulation:
                     pygame.quit()
                     print("Simulation stopped using ESC")
                     return False
-                if event.key == pygame.K_p:
+                # Only process P if text input is not active
+                if event.key == pygame.K_p and not self.serial_monitor.text_input.active:
                     result = input("Enter perturbation value (default is 0.0): ")
                     self.perturbation = float(result)
                     print(f"Perturbation set to {self.perturbation}")
             self.display.verify_checkbox(event)
+            self.serial_monitor_toggle.handle_event(event)
+            self.serial_monitor.handle_event(event)
         return True
 
     def _step_physics(self, v1, v2, q1=0, q2=0):
@@ -372,6 +398,8 @@ class GameSimulation:
         """Public method used by external modules to advance the simulation."""
         if not self._handle_events():
             return None
+        
+        self.serial_monitor.update()
 
         data = self._step_physics(v1, v2, self.perturbation, -self.perturbation)
         if data is None:

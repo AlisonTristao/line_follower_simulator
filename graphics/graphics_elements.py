@@ -462,13 +462,14 @@ class Track(Shape):
         return np.argwhere(dist_sq < self.__visible ** 2)
 
 class Checkbox:
-    def __init__(self, x, y, size, label="", font_size=24):
+    def __init__(self, x, y, size, label="", font_size=24, text_color=(0, 0, 0)):
         self.rect = pygame.Rect(x, y, size/2, size/2)
         self.color = (0, 0, 0)
         self.checked = False
         self.label = label
+        self.text_color = text_color
         self.font = pygame.font.SysFont(None, font_size)
-        self.label_surface = self.font.render(label, True, (0, 0, 0))
+        self.label_surface = self.font.render(label, True, text_color)
 
     def draw(self, surface):
         pygame.draw.rect(surface, self.color, self.rect, 2)
@@ -845,6 +846,624 @@ class LineSensor(Shape):
     def get_size(self):
         # returns the size of the line sensor
         return self._size
+
+class SerialMonitorToggle(Shape):
+    """
+    represents a toggle button (checkbox) for the serial monitor
+    stays visible even when serial monitor is disabled
+    """
+    def __init__(self, coo=(10, 10), color=(75, 75, 75)):
+        """
+        initializes the serial monitor toggle
+        args:
+            coo (tuple): coordinates of the toggle button
+            color (tuple): background color in rgb format
+        """
+        super().__init__(coo, color, (30, 30))
+        self.checkbox = Checkbox(0, 0, 30, "Serial Monitor")
+        self.checkbox.checked = True
+        self._update_position()
+    
+    def _update_position(self):
+        """update checkbox position"""
+        self.checkbox.set_coordinates((int(self._x), int(self._y)))
+    
+    def set_coordinates(self, coo):
+        """set coordinates and update checkbox"""
+        super().set_coordinates(coo)
+        self._update_position()
+    
+    def handle_event(self, event):
+        """handle events for the checkbox"""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # Update position first to match what's being drawn
+            self.checkbox.set_coordinates((int(self._x), int(self._y)))
+            self.checkbox.handle_event(event)
+    
+    def is_enabled(self):
+        """return if serial monitor is enabled"""
+        return self.checkbox.checked
+    
+    def set_enabled(self, enabled):
+        """set enabled state"""
+        self.checkbox.checked = enabled
+    
+    def draw(self, surface):
+        """draw the toggle checkbox"""
+        self.checkbox.draw(surface)
+
+class Button:
+    """
+    represents a simple clickable button UI element
+    """
+    def __init__(self, x, y, width, height, text="", font_size=16, bg_color=(100, 100, 100), text_color=(255, 255, 255)):
+        """
+        initializes a button
+        args:
+            x (int): x coordinate of the button
+            y (int): y coordinate of the button
+            width (int): width of the button
+            height (int): height of the button
+            text (str): text displayed on the button
+            font_size (int): font size of the text
+            bg_color (tuple): background color in rgb format
+            text_color (tuple): text color in rgb format
+        """
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = text
+        self.font = pygame.font.SysFont(None, font_size)
+        self.bg_color = bg_color
+        self.text_color = text_color
+        self.hovered = False
+
+    def draw(self, surface):
+        # draw button background
+        color = tuple(min(c + 30, 255) for c in self.bg_color) if self.hovered else self.bg_color
+        pygame.draw.rect(surface, color, self.rect, border_radius=5)
+        pygame.draw.rect(surface, (0, 0, 0), self.rect, 2, border_radius=5)
+        
+        # draw button text
+        text_surface = self.font.render(self.text, True, self.text_color)
+        text_rect = text_surface.get_rect(center=self.rect.center)
+        surface.blit(text_surface, text_rect)
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEMOTION:
+            self.hovered = self.rect.collidepoint(event.pos)
+        elif event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(event.pos):
+                return True
+        return False
+
+    def set_position(self, x, y):
+        self.rect.x = x
+        self.rect.y = y
+
+class TextInput:
+    """
+    represents a text input UI element
+    """
+    def __init__(self, x, y, width, height, placeholder="", font_size=16, max_chars=100):
+        """
+        initializes a text input
+        args:
+            x (int): x coordinate of the text input
+            y (int): y coordinate of the text input
+            width (int): width of the text input
+            height (int): height of the text input
+            placeholder (str): placeholder text
+            font_size (int): font size
+            max_chars (int): maximum characters allowed
+        """
+        self.rect = pygame.Rect(x, y, width, height)
+        self.text = ""
+        self.placeholder = placeholder
+        self.font = pygame.font.SysFont(None, font_size)
+        self.max_chars = max_chars
+        self.active = False
+        self.cursor_visible = True
+        self.cursor_blink_time = 0
+        self.submit_pressed = False  # Flag para Enter pressionado
+
+    def _wrap_text(self, text, max_width):
+        """quebra texto simples por caractere"""
+        if not text:
+            return [""]
+        
+        # Estima chars por linha baseado em max_width
+        chars_per_line = max(15, int((max_width - 20) / 7))  # ~7px por char, 20px margin
+        
+        lines = []
+        for i in range(0, len(text), chars_per_line):
+            lines.append(text[i:i+chars_per_line])
+        
+        return lines if lines else [""]
+
+    def draw(self, surface):
+        # draw background
+        pygame.draw.rect(surface, (255, 255, 255), self.rect, border_radius=3)
+        pygame.draw.rect(surface, (0, 0, 0) if self.active else (150, 150, 150), self.rect, 2, border_radius=3)
+        
+        # draw text or placeholder
+        display_text = self.text if self.text else self.placeholder
+        is_placeholder = not self.text
+        text_color = (150, 150, 150) if is_placeholder else (0, 0, 0)
+        
+        # wrap text
+        lines = self._wrap_text(display_text, self.rect.width)
+        
+        # draw lines
+        y_offset = self.rect.y + 5
+        for line in lines:
+            if y_offset > self.rect.bottom:
+                break
+            text_surface = self.font.render(line, True, text_color)
+            surface.blit(text_surface, (self.rect.x + 5, y_offset))
+            y_offset += text_surface.get_height()
+        
+        # draw cursor if active
+        if self.active and self.cursor_visible and lines:
+            last_line = lines[-1]
+            last_line_surface = self.font.render(last_line, True, text_color)
+            cursor_x = self.rect.x + 5 + last_line_surface.get_width()
+            cursor_y = self.rect.y + 5 + (len(lines) - 1) * last_line_surface.get_height()
+            if cursor_y < self.rect.bottom:
+                pygame.draw.line(surface, (0, 0, 0), (cursor_x, cursor_y), (cursor_x, cursor_y + last_line_surface.get_height()), 2)
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            self.active = self.rect.collidepoint(event.pos)
+        elif event.type == pygame.KEYDOWN and self.active:
+            if event.key == pygame.K_BACKSPACE:
+                self.text = self.text[:-1]
+            elif event.key == pygame.K_RETURN:
+                self.submit_pressed = True
+                return self.text
+            elif len(self.text) < self.max_chars:
+                self.text += event.unicode
+        return None
+
+    def update(self):
+        # update cursor blink
+        self.cursor_blink_time += 1
+        if self.cursor_blink_time > 30:
+            self.cursor_visible = not self.cursor_visible
+            self.cursor_blink_time = 0
+
+    def set_position(self, x, y):
+        self.rect.x = x
+        self.rect.y = y
+
+    def get_text(self):
+        return self.text
+
+    def clear(self):
+        self.text = ""
+
+class Dropdown:
+    """
+    represents a dropdown/combobox UI element
+    """
+    def __init__(self, x, y, width, height, options=None, font_size=14):
+        """
+        initializes a dropdown
+        args:
+            x (int): x coordinate of the dropdown
+            y (int): y coordinate of the dropdown
+            width (int): width of the dropdown
+            height (int): height of the dropdown
+            options (list): list of options to display
+            font_size (int): font size
+        """
+        self.rect = pygame.Rect(x, y, width, height)
+        self.options = options or ["Opção 1", "Opção 2"]
+        self.selected_index = 0
+        self.font = pygame.font.SysFont(None, font_size)
+        self.expanded = False
+        self.option_height = height
+
+    def draw(self, surface):
+        # draw main button
+        pygame.draw.rect(surface, (200, 200, 200), self.rect, border_radius=3)
+        pygame.draw.rect(surface, (0, 0, 0), self.rect, 2, border_radius=3)
+        
+        # draw selected text
+        text_surface = self.font.render(self.options[self.selected_index], True, (0, 0, 0))
+        surface.blit(text_surface, (self.rect.x + 5, self.rect.y + 5))
+        
+        # draw dropdown arrow
+        arrow_x = self.rect.right - 15
+        arrow_y = self.rect.centery
+        pygame.draw.polygon(surface, (0, 0, 0), [(arrow_x - 5, arrow_y - 3), (arrow_x + 5, arrow_y - 3), (arrow_x, arrow_y + 3)])
+        
+        # draw dropdown list if expanded
+        if self.expanded:
+            for i, option in enumerate(self.options):
+                option_rect = pygame.Rect(self.rect.x, self.rect.y + self.rect.height + i * self.option_height, 
+                                         self.rect.width, self.option_height)
+                bg_color = (150, 150, 200) if i == self.selected_index else (220, 220, 220)
+                pygame.draw.rect(surface, bg_color, option_rect)
+                pygame.draw.rect(surface, (0, 0, 0), option_rect, 1)
+                
+                text_surface = self.font.render(option, True, (0, 0, 0))
+                surface.blit(text_surface, (option_rect.x + 5, option_rect.y + 5))
+
+    def handle_event(self, event):
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if self.rect.collidepoint(event.pos):
+                self.expanded = not self.expanded
+            elif self.expanded:
+                for i in range(len(self.options)):
+                    option_rect = pygame.Rect(self.rect.x, self.rect.y + self.rect.height + i * self.option_height,
+                                             self.rect.width, self.option_height)
+                    if option_rect.collidepoint(event.pos):
+                        self.selected_index = i
+                        self.expanded = False
+                        return True
+        return False
+
+    def set_position(self, x, y):
+        self.rect.x = x
+        self.rect.y = y
+
+    def get_selected(self):
+        return self.options[self.selected_index]
+
+    def set_options(self, options):
+        self.options = options
+        self.selected_index = 0
+
+class SerialMonitor(Shape):
+    """
+    represents a serial monitor UI element for viewing and sending serial messages
+    """
+    def __init__(self, coo=(0, 0), size=(400, 500), color=(75, 75, 75)):
+        """
+        initializes the serial monitor
+        args:
+            coo (tuple): coordinates of the serial monitor (top-right position)
+            size (tuple): size of the serial monitor (width, height)
+            color (tuple): background color in rgb format
+        """
+        super().__init__(coo, color, size)
+        
+        self.width, self.height = size
+        self.enabled = True
+        self.connected = False
+        
+        # External checkbox reference (will be set by simulator)
+        self.toggle_button = None
+        
+        # Port selection dropdown
+        self.port_dropdown = Dropdown(0, 0, 150, 30, 
+                                     options=["COM1", "COM3", "COM4", "/dev/ttyUSB0", "/dev/ttyUSB1"])
+        
+        # Buttons
+        self.btn_connect = Button(0, 0, 80, 30, "Conectar", 14, (50, 150, 50))
+        self.btn_disconnect = Button(0, 0, 80, 30, "Desconectar", 14, (150, 50, 50))
+        self.btn_clear = Button(0, 0, 80, 30, "Limpar", 14, (100, 100, 150))
+        self.btn_send = Button(0, 0, 60, 30, "Enviar", 14, (100, 150, 100))
+        
+        # Text input for sending messages
+        self.text_input = TextInput(0, 0, 230, 30, max_chars=999999)
+        
+        # Checkbox for clearing message history
+        self.checkbox_limit_messages = Checkbox(0, 0, 30, "", text_color=(255, 255, 255))
+        self.checkbox_limit_messages.checked = False  # Start unchecked (don't limit)
+        
+        # Message history
+        self.messages = []  # list of tuples (text, color)
+        self.messages_wrapped_cache = {}  # cache for wrapped messages to avoid recalculating
+        self.scroll_offset = 0  # Scroll offset for message history
+        
+        # Font for messages (increased size)
+        self.font_small = pygame.font.SysFont("courier", 12)
+        self.font_label = pygame.font.SysFont(None, 12, bold=True)
+        
+        # Position offset (top-right of screen)
+        self._offset_x = 0
+        self._offset_y = 0
+        
+        # Current message color (cycles through options)
+        self.message_colors = [
+            (0, 0, 0),           # Black
+            (0, 100, 200),       # Blue
+            (200, 0, 0),         # Red
+            (0, 150, 0),         # Green
+            (150, 100, 0),       # Brown
+        ]
+        self.current_color_index = 0
+        
+        self._update_ui_positions()
+
+    def _update_ui_positions(self):
+        """update positions of all UI elements based on monitor position"""
+        x, y = self._x, self._y
+        
+        # Header row: port selection (checkbox is now external)
+        self.port_dropdown.set_position(x + 10, y + 10)
+        
+        # Control buttons row with more spacing
+        self.btn_connect.set_position(x + 10, y + 50)
+        self.btn_disconnect.set_position(x + 105, y + 50)
+        self.btn_clear.set_position(x + 200, y + 50)
+        
+        # Message input area with fixed height
+        self.text_input.set_position(x + 10, y + self.height - 55)
+        self.btn_send.set_position(x + self.width - 80, y + self.height - 55)
+
+    def set_coordinates(self, coo):
+        """set coordinates and update UI positions"""
+        super().set_coordinates(coo)
+        self._update_ui_positions()
+
+    def set_toggle_button(self, toggle_button):
+        """set the external toggle button reference"""
+        self.toggle_button = toggle_button
+    
+    def get_max_visible_messages(self):
+        """calculate maximum messages that fit on screen"""
+        messages_height = self.height - 150
+        return int(messages_height / 18)
+
+    def _get_messages_that_fit(self):
+        """calculate how many messages fit in the available space, considering their wrapped height"""
+        messages_width = self.width - 40
+        chars_per_line = max(15, int((messages_width - 20) / 7))
+        messages_height = self.height - 150
+        available_height = messages_height - 10  # Leave 10px margin
+        
+        # Iterate from end to beginning to find how many messages fit
+        total_height = 0
+        messages_count = 0
+        
+        for msg_text, _ in reversed(self.messages):
+            if not msg_text:
+                continue
+            
+            # Calculate wrapped height for this message
+            lines = (len(msg_text) + chars_per_line - 1) // chars_per_line
+            msg_height = max(1, lines) * 18
+            
+            if total_height + msg_height <= available_height:
+                total_height += msg_height
+                messages_count += 1
+            else:
+                break
+        
+        return messages_count if messages_count > 0 else 1  # At least 1 message
+
+
+    def handle_event(self, event):
+        """handle UI events"""
+        # Check if enabled using external toggle button
+        if self.toggle_button:
+            self.enabled = self.toggle_button.is_enabled()
+        
+        # If disabled, don't process other events
+        if not self.enabled:
+            return
+        
+        # Handle scroll with mouse wheel
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            if event.button == 4:  # Scroll up
+                self.scroll_offset = max(0, self.scroll_offset - 6)
+            elif event.button == 5:  # Scroll down
+                self.scroll_offset += 6
+        
+        # Handle buttons
+        if self.btn_connect.handle_event(event):
+            self.connected = True
+            self.add_message("[SISTEMA] Conectado à porta " + self.port_dropdown.get_selected(), (0, 150, 0))
+        
+        if self.btn_disconnect.handle_event(event):
+            self.connected = False
+            self.add_message("[SISTEMA] Desconectado", (150, 0, 0))
+        
+        if self.btn_clear.handle_event(event):
+            self.clear_messages()
+        
+        if self.btn_send.handle_event(event):
+            text = self.text_input.get_text()
+            if text and self.connected:
+                self.add_message(">>> " + text, self.message_colors[self.current_color_index])
+                self.text_input.clear()
+                self.current_color_index = (self.current_color_index + 1) % len(self.message_colors)
+        
+        # Handle other UI elements
+        self.port_dropdown.handle_event(event)
+        self.text_input.handle_event(event)
+        self.checkbox_limit_messages.handle_event(event)
+        
+        # Handle text input submit (Enter key)
+        if self.text_input.submit_pressed:
+            text = self.text_input.get_text()
+            if text and self.connected:
+                self.add_message(">>> " + text, self.message_colors[self.current_color_index])
+                self.text_input.clear()
+                self.current_color_index = (self.current_color_index + 1) % len(self.message_colors)
+            self.text_input.submit_pressed = False
+
+    def update(self):
+        """update UI elements"""
+        self.text_input.update()
+
+    def add_message(self, text, color=None):
+        """add a message to the history"""
+        if color is None:
+            color = (0, 0, 0)
+        if text:
+            self.messages.append((text, color))
+        
+        # Clear wrapped cache when new message added
+        self.messages_wrapped_cache.clear()
+        
+        # If limit checkbox is enabled, keep only messages that fit in display
+        if self.checkbox_limit_messages.checked:
+            num_fit = self._get_messages_that_fit()
+            if len(self.messages) > num_fit:
+                self.messages = self.messages[-num_fit:]
+        else:
+            # Otherwise limit to 500 messages for memory
+            if len(self.messages) > 500:
+                self.messages = self.messages[-500:]
+        
+        # Calculate total height with wrapping
+        total_height = self._calculate_total_message_height()
+        messages_height = self.height - 150
+        
+        # Auto-scroll para bottom - scroll offset = 0 means we're at the bottom
+        if total_height > messages_height:
+            self.scroll_offset = max(0, total_height - messages_height)
+        else:
+            self.scroll_offset = 0
+
+    def clear_messages(self):
+        """clear all messages"""
+        self.messages = []
+        self.messages_wrapped_cache.clear()
+        self.scroll_offset = 0
+    
+    def _calculate_total_message_height(self):
+        """calculate total height of all messages with wrapping (fast estimation)"""
+        messages_width = self.width - 40
+        chars_per_line = max(15, int((messages_width - 20) / 7))
+        total_height = 0
+        
+        # Get messages based on limit checkbox
+        if self.checkbox_limit_messages.checked:
+            # Dynamically calculate how many messages fit
+            num_fit = self._get_messages_that_fit()
+            messages_to_count = self.messages[-num_fit:] if num_fit > 0 else []
+        else:
+            messages_to_count = self.messages[-200:]
+        
+        for msg_text, _ in messages_to_count:
+            if not msg_text:
+                continue
+            # Fast estimation without calling _wrap_text()
+            lines = (len(msg_text) + chars_per_line - 1) // chars_per_line
+            total_height += max(1, lines) * 18
+        
+        return total_height
+
+    def draw(self, surface):
+        """draw the serial monitor"""
+        # Always update enabled state from toggle button
+        if self.toggle_button:
+            self.enabled = self.toggle_button.is_enabled()
+        
+        if not self.enabled:
+            return
+        
+        x, y = self._x, self._y
+        w, h = self.width, self.height
+        
+        # Draw main background
+        pygame.draw.rect(surface, self._color, (x, y, w, h), border_radius=10)
+        pygame.draw.rect(surface, (200, 200, 200), (x, y, w, h), 2, border_radius=10)
+        
+        # Draw header
+        pygame.draw.line(surface, (200, 200, 200), (x, y + 45), (x + w, y + 45), 1)
+        
+        # Draw control buttons
+        self.btn_connect.draw(surface)
+        self.btn_disconnect.draw(surface)
+        self.btn_clear.draw(surface)
+        
+        # Draw messages area
+        messages_y = y + 90
+        messages_height = h - 150
+        messages_width = w - 40
+        
+        pygame.draw.rect(surface, (240, 240, 240), (x + 10, messages_y, w - 20, messages_height), border_radius=5)
+        pygame.draw.rect(surface, (150, 150, 150), (x + 10, messages_y, w - 20, messages_height), 1, border_radius=5)
+        
+        # Draw connection status
+        status_color = (0, 200, 0) if self.connected else (200, 0, 0)
+        pygame.draw.circle(surface, status_color, (x + w - 15, y + 12), 6)
+        pygame.draw.circle(surface, (0, 0, 0), (x + w - 15, y + 12), 6, 1)
+        
+        # Calculate total height of messages
+        total_height = self._calculate_total_message_height()
+        
+        # Clamp scroll offset to valid range
+        max_scroll = max(0, total_height - messages_height)
+        self.scroll_offset = max(0, min(self.scroll_offset, max_scroll))
+        
+        # Draw messages with wrapping and scrolling
+        current_y = messages_y + 5  # Start from top
+        
+        # Get messages based on limit checkbox
+        if self.checkbox_limit_messages.checked:
+            # Dynamically show only messages that fit in the available space
+            num_fit = self._get_messages_that_fit()
+            display_messages = self.messages[-num_fit:] if num_fit > 0 else []
+        else:
+            # Show all messages (but still limit to last 200 for performance)
+            display_messages = self.messages[-200:]
+        
+        # Renderizar mensagens
+        for idx, (msg_text, msg_color) in enumerate(display_messages):
+            if not msg_text:
+                continue
+            
+            # Use cache key based on message index
+            cache_key = len(self.messages) - len(display_messages) + idx
+            if cache_key not in self.messages_wrapped_cache:
+                self.messages_wrapped_cache[cache_key] = self.text_input._wrap_text(msg_text, messages_width)
+            
+            wrapped = self.messages_wrapped_cache[cache_key]
+            
+            for line in wrapped:
+                if not line:
+                    continue
+                
+                # Apply scroll offset
+                draw_y = current_y - self.scroll_offset
+                
+                # Only draw if visible
+                if messages_y <= draw_y < messages_y + messages_height:
+                    try:
+                        text_surf = self.font_small.render(line, True, msg_color)
+                        surface.blit(text_surf, (x + 15, draw_y))
+                    except:
+                        pass
+                
+                current_y += 18
+        
+        # Draw scrollbar
+        if total_height > messages_height:
+            scroll_h = max(10, int((messages_height / total_height) * messages_height))
+            # Position scrollbar based on scroll_offset
+            ratio = self.scroll_offset / (total_height - messages_height) if (total_height - messages_height) > 0 else 0
+            scroll_y = messages_y + int(ratio * (messages_height - scroll_h))
+            scroll_y = max(messages_y, min(scroll_y, messages_y + messages_height - scroll_h))
+            pygame.draw.rect(surface, (180, 180, 180), (x + w - 15, scroll_y, 5, scroll_h))
+        
+        # Draw limit messages checkbox (update position and draw)
+        checkbox_x = x + self.width - 35
+        checkbox_y = messages_y + 2
+        self.checkbox_limit_messages.set_coordinates((checkbox_x, checkbox_y))
+        self.checkbox_limit_messages.draw(surface)
+        
+        # Draw separator
+        pygame.draw.line(surface, (200, 200, 200), (x + 10, y + h - 59), (x + w - 10, y + h - 59), 1)
+        
+        # Draw input area
+        self.text_input.draw(surface)
+        
+        # Draw send button (gray if disconnected)
+        if not self.connected:
+            # Save original color and set to gray
+            original_color = self.btn_send.bg_color
+            self.btn_send.bg_color = (120, 120, 120)
+            self.btn_send.draw(surface)
+            self.btn_send.bg_color = original_color
+        else:
+            self.btn_send.draw(surface)
+        
+        self.port_dropdown.draw(surface)
 
 class Simulator:
     """
