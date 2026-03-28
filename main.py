@@ -6,7 +6,7 @@ def main(sim) -> None:
     # Main control loop
     # ------------------------------------------------------------------
 
-    v1 = v2 = 0.0
+    v1 = v2 = -10.0
     while True:
         data = sim.step(v1, v2)
         if data is None:

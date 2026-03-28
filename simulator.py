@@ -199,7 +199,7 @@ class GameSimulation:
         self.simulator.add(self.track)
         self.simulator.add(self.car_draw)
         self.simulator.add(self.line_sensor)
-        #self.simulator.add(self.minimap)
+        self.simulator.add(self.minimap)
         self.simulator.add(self.fps_display)
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)

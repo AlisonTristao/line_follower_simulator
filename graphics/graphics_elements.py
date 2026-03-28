@@ -21,6 +21,11 @@ class Shape:
         """
         self._x = coo[0]
         self._y = coo[1]
+        self._min_x = None
+        self._max_x = None
+        self._min_y = None
+        self._max_y = None
+
         self._angle = angle
         self._color = color
         self._size = size
@@ -98,6 +103,9 @@ class Shape:
         self._x += dx
         self._y += dy
 
+        # checks the limits before moving
+        self.check_limits()
+
     def rotate_around_origin(self, theta):
         # rotates the shape around the origin by theta radians
         x_new = self._x * math.cos(theta) - self._y * math.sin(theta)
@@ -126,6 +134,19 @@ class Shape:
     
     def update(self):
         pass
+
+    def check_limits(self):
+        if self._min_x is not None or self._max_x is not None or self._min_y is not None or self._max_y is not None:
+            print(self._x/250, self._y/250)
+            print(self._min_x/250, self._max_x/250, self._min_y/250, self._max_y/250)
+            if self._x < self._min_x:
+                self._x = self._min_x
+            if self._x > self._max_x:
+                self._x = self._max_x
+            if self._y < self._min_y:
+                self._y = self._min_y
+            if self._y > self._max_y:
+                self._y = self._max_y
 
 class Car(Shape):
     """
@@ -360,12 +381,12 @@ class MiniMap(Shape):
         rect_width = self._width
         rect_height = self._height
 
-        #border_color = (100, 100, 100)
+        border_color = (100, 100, 100)
         border_width = 1
 
         # draw border
-        #pygame.draw.rect(surface, border_color,
-        #                 (rect_x, rect_y, rect_width, rect_height), border_width)
+        pygame.draw.rect(surface, border_color,
+                         (rect_x, rect_y, rect_width, rect_height), border_width)
 
         # draw background
         pygame.draw.rect(surface, self._color,
@@ -410,6 +431,12 @@ class Track(Shape):
         self.wall = Wall()
         self.default = Default()
         self.matrix = self._create_matrix(size)
+
+        print(size)
+        self._max_x = 50*250
+        self._max_y = 50*250
+        self._min_x = -100*250
+        self._min_y = -100*250
 
     def _create_matrix(self, size):
         # creates the initial matrix of track objects
