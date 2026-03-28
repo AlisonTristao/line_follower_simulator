@@ -9,6 +9,8 @@ from serial_com import SerialCom
 com = None
 serial_connected = False
 serial_lock = threading.Lock()
+read_thread = None
+sim_obj = None
 
 def simulate_robot_data():
     """
@@ -42,13 +44,15 @@ def read_serial_thread():
     global com, serial_connected, sim_obj
     
     while serial_connected:
-        if com and com.is_connected():
-            msg = com.read_message()
-            if msg:
-                with serial_lock:
-                    if sim_obj and hasattr(sim_obj, 'serial_monitor') and sim_obj.serial_monitor:
-                        sim_obj.serial_monitor.add_message(f"[RX] {msg}", (0, 180, 255))
-        else:
+        try:
+            if com and com.is_connected():
+                msg = com.read_message()
+                if msg:
+                    with serial_lock:
+                        if sim_obj and hasattr(sim_obj, 'serial_monitor') and sim_obj.serial_monitor:
+                            sim_obj.serial_monitor.add_message(f"[RX] {msg}", (0, 180, 255))
+            time.sleep(0.01)  # Small delay to prevent busy waiting
+        except Exception as e:
             time.sleep(0.1)
 
 def serial_connect(port: str):
@@ -70,6 +74,7 @@ def serial_disconnect():
     global com, serial_connected
     
     serial_connected = False
+    time.sleep(0.1)  # Give thread time to exit
     if com:
         com.disconnect()
 
@@ -86,10 +91,6 @@ def main(sim) -> None:
     global com, serial_connected, sim_obj
     
     sim_obj = sim
-    
-    # ------------------------------------------------------------------
-    # Main control loop - Serial Backend + Pygame Simulator
-    # ------------------------------------------------------------------
     
     # Setup serial monitor
     if sim.serial_monitor:
@@ -151,6 +152,9 @@ def main(sim) -> None:
         # ---------------------------------------------------------------
 
         line, future_pts = data
+        
+        # Small delay to prevent CPU hogging and let other threads run
+        time.sleep(0.001)
     
     # Disconnect before exiting
     serial_disconnect()
