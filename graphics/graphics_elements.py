@@ -1254,24 +1254,11 @@ class SerialMonitor(Shape):
             elif event.button == 5:  # Scroll down
                 self.scroll_offset += 6
         
-        # Handle buttons
-        if self.btn_connect.handle_event(event):
-            self.connected = True
-            self.add_message("[SISTEMA] Conectado à porta " + self.port_dropdown.get_selected(), (0, 150, 0))
-        
-        if self.btn_disconnect.handle_event(event):
-            self.connected = False
-            self.add_message("[SISTEMA] Desconectado", (150, 0, 0))
-        
-        if self.btn_clear.handle_event(event):
-            self.clear_messages()
-        
-        if self.btn_send.handle_event(event):
-            text = self.text_input.get_text()
-            if text and self.connected:
-                self.add_message(">>> " + text, self.message_colors[self.current_color_index])
-                self.text_input.clear()
-                self.current_color_index = (self.current_color_index + 1) % len(self.message_colors)
+        # Handle buttons (callbacks will be called from main.py)
+        self.btn_connect.handle_event(event)
+        self.btn_disconnect.handle_event(event)
+        self.btn_clear.handle_event(event)
+        self.btn_send.handle_event(event)
         
         # Handle other UI elements
         self.port_dropdown.handle_event(event)
@@ -1281,10 +1268,8 @@ class SerialMonitor(Shape):
         # Handle text input submit (Enter key)
         if self.text_input.submit_pressed:
             text = self.text_input.get_text()
-            if text and self.connected:
-                self.add_message(">>> " + text, self.message_colors[self.current_color_index])
-                self.text_input.clear()
-                self.current_color_index = (self.current_color_index + 1) % len(self.message_colors)
+            if text and self.btn_send.callback:
+                self.btn_send.callback()
             self.text_input.submit_pressed = False
 
     def update(self):
