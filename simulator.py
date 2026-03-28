@@ -363,6 +363,10 @@ class GameSimulation:
         # Apply the delta movement received from real robot
         self.track.step(delta_x * self.SCALE, delta_y * self.SCALE, 0)
 
+        # Update cluster master position (car's current position) for tracking coverage
+        car_pos = self.track.get_center()
+        Cluster.set_master(car_pos, self.SCALE)
+
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
         self.coordinates_display.set_text(
             f"x: {round(self.track.get_center()[0]/self.SCALE, 2):.2f} y: {round(self.track.get_center()[1]/self.SCALE, 2):.2f}"
