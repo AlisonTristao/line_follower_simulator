@@ -6,7 +6,6 @@ from dataclasses import dataclass
 
 from graphics.graphics_elements import *
 from graphics.track_generator import *
-from car_modeling.car_dynamics import *
 import numpy as np
 
 @dataclass
@@ -42,7 +41,6 @@ class GameSimulation:
 
         self.time_simulation = 0
         self.timer = time.time()
-        self.perturbation = 0.0
 
         self._init_simulation_objects()
         self._setup_simulator()
@@ -65,60 +63,6 @@ class GameSimulation:
         self.win = None
 
         self.future_points_count = 10
-        #self.future_space = 30
-        #self.future_omega = [0] * 10
-        #self.future_v = [0] * 10
-        #self.free_response_omega = [0] * 10
-        #self.free_response_v = [0] * 10
-        #self.future_control_left = [0] * 10
-        #self.future_control_right = [0] * 10
-        self.perturbation_left = [0] * 10
-        self.perturbation_right = [0] * 10
-        #self.error_omega = [0] * 10
-        #self.error_v = [0] * 10
-
-    def setup_car_dynamics(
-        self,
-        wheels_radius=0.04,
-        wheels_distance=0.1,
-        wheels_RPM=3000,
-        ke_l=1,
-        ke_r=1,
-        kq=1,
-        accommodation_time_l=1.0,
-        accommodation_time_r=1.0,
-        sensor_distance=0.1,
-        sensor_count=8,
-    ):
-        z = 1 / self.FPS
-        self.car = car_dynamics(
-            z,
-            wheels_radius,
-            wheels_distance,
-            wheels_RPM,
-            ke_l,
-            ke_r,
-            kq,
-            accommodation_time_l,
-            accommodation_time_r,
-        )
-        self.car_draw.set_size(self.car.get_size() * self.SCALE)
-        self.line_sensor.set_coordinates(
-            (self.car_draw.get_center()[0], self.car_draw.get_center()[1] - sensor_distance * self.SCALE)
-        )
-        self.line_sensor.set_size(sensor_count * self.SCALE * self.array_sensor_dist)  # 0.05 meter between sensors
-
-    def set_encoders_count(self, count):
-        self.car.encoders.set_pulses(count)
-
-    def set_optical_flow_distance(self, distance):
-        self.car.optical_flow.set_distance(distance)
-
-    def set_future_points(self, count, space):
-        self.future_points_count = count
-        self.future_space = space
-        Cluster.set_master(self.car_draw.get_center(), self.car_draw.get_size())  # set the master point
-        Cluster.set_future_count(self.future_points_count, self.future_space)     # set the future points count
 
     # divide the track in clusters for rendering
     def configurate_cluster(self):
@@ -256,10 +200,6 @@ class GameSimulation:
         self.display.add_line_to_graph("control", "left", color=self.get_rand_color())
         self.display.add_line_to_graph("control", "right", color=self.get_rand_color())
 
-        self.display.add_graph("perturbation")
-        self.display.add_line_to_graph("perturbation", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("perturbation", "right", color=self.get_rand_color())
-
         '''self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "d", color=self.get_rand_color())
         self.display.add_line_to_graph("free_response", "θ", color=self.get_rand_color())
@@ -277,15 +217,9 @@ class GameSimulation:
         self.display.add_line_to_graph("error", "θ", color=self.get_rand_color())'''
 
     def _update_graphs(self):
-        """Update all graphs with the current simulation values."""
-        self.display.update_graph_data("wheels", "left", self.car.get_wheels_norm()[0])
-        self.display.update_graph_data("wheels", "right", self.car.get_wheels_norm()[1])
-        self.display.update_graph_data("car", "vm", self.car.speed_norm())
-        self.display.update_graph_data("car", "ω", self.car.omega_norm())
-        self.display.update_graph_data("control", "left", self.car.v1)
-        self.display.update_graph_data("control", "right", self.car.v2)
-        self.display.update_graph_data("perturbation", "left", self.car.q1)
-        self.display.update_graph_data("perturbation", "right", self.car.q2)
+        """Update all graphs with real robot data (to be received from serial)."""
+        # TODO: Update with real robot data once serial communication is implemented
+        pass
         '''self.display.set_graph_data("future_control", "left", self.future_control_left)
         self.display.set_graph_data("future_control", "right", self.future_control_right)
         self.display.set_graph_data("reference", "d", self.future_v)
@@ -311,6 +245,11 @@ class GameSimulation:
         """Update the points display with the given value."""
         self.points.set_text(f"score: {points}")
 
+    def set_future_points(self, count, space):
+        """Initialize future points visualization."""
+        from graphics.graphics_elements import Cluster
+        Cluster.set_future_count(future_count=count, future_space=space)
+
     # ------------------------------------------------------------------
     # Simulation main loop helpers
     # ------------------------------------------------------------------
@@ -326,27 +265,16 @@ class GameSimulation:
                     pygame.quit()
                     print("Simulation stopped using ESC")
                     return False
-                # Only process P if text input is not active
-                if event.key == pygame.K_p and not self.serial_monitor.text_input.active:
-                    result = input("Enter perturbation value (default is 0.0): ")
-                    self.perturbation = float(result)
-                    print(f"Perturbation set to {self.perturbation}")
+
             self.display.verify_checkbox(event)
             self.serial_monitor_toggle.handle_event(event)
             self.serial_monitor.handle_event(event)
         return True
 
-    def _step_physics(self, v1, v2, q1=0, q2=0):
-        """Simulate physics and render the scene."""
-        self.car.step(v1, v2, q1, q2)
-        self._update_graphs()
-
-        self.car.calculate_out_data()
-        dx, dy, angle = self.car.get_delta_space()
-        dx *= -self.SCALE
-        dy *= -self.SCALE
-        angle *= -1
-        self.track.step(dx, dy, angle)
+    def _step_physics(self, delta_x, delta_y):
+        """Apply robot movement to the track without simulating car dynamics."""
+        # Apply the delta movement received from real robot
+        self.track.step(delta_x * self.SCALE, delta_y * self.SCALE, 0)
 
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
         self.coordinates_display.set_text(
@@ -390,18 +318,17 @@ class GameSimulation:
 
         return (
             1 - final_line / 255,
-            future_point,
-            self.car
+            future_point
         )
 
-    def step(self, v1, v2):
+    def step(self, delta_x, delta_y):
         """Public method used by external modules to advance the simulation."""
         if not self._handle_events():
             return None
         
         self.serial_monitor.update()
 
-        data = self._step_physics(v1, v2, self.perturbation, -self.perturbation)
+        data = self._step_physics(delta_x, delta_y)
         if data is None:
             pygame.quit()
             return None
