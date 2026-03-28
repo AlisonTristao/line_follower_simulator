@@ -30,9 +30,12 @@ class Shape:
         self._world_width = None
         self._world_height = None
 
+        self._update_rotation_matrix()
+
+    def _update_rotation_matrix(self):
+        """Updates rotation matrix based on current angle"""
         cos_theta = math.cos(self._angle)
         sin_theta = math.sin(self._angle)
-
         # Matriz de rotação 2D
         self._rotation_matrix = [
             [cos_theta, -sin_theta],
@@ -50,15 +53,7 @@ class Shape:
     def set_angle(self, angle):
         # sets a new angle for the shape
         self._angle = angle
-
-        cos_theta = math.cos(self._angle)
-        sin_theta = math.sin(self._angle)
-
-        # Matriz de rotação 2D
-        self._rotation_matrix = [
-            [cos_theta, -sin_theta],
-            [sin_theta, cos_theta]
-        ]
+        self._update_rotation_matrix()
 
     def set_coordinates(self, coo):
         # sets new coordinates for the shape
@@ -328,28 +323,45 @@ class Cluster(Shape):
         return [(float(x), float(y)) for x, y in list(cls._arr_next_points)]
 
     def update(self):
+        """
+        Optimized: Pre-calculate future indices in set for O(1) lookup instead of O(n²) loops
+        """
+        # Build future indices set once
+        future_indices = set(
+            self._next_point + j 
+            for j in range(self._future_space, 
+                          self._future_space * self._future_count + self._future_space, 
+                          self._future_space)
+        )
+        
+        # Check which points have indices in future_indices (O(n) with O(1) lookups)
         for i in range(len(self.__points_arr)):
-            point_ = self._rotate_point(self.__points_arr[i])
-            x = point_[0] + self._x
-            y = point_[1] + self._y
-
-            for j in range(self._future_space, self._future_space * self._future_count + self._future_space, self._future_space):
-                if self.__global_index[i] == self._next_point + j:
-                    self.add_next_point((x, y), (self.__global_index[i] - self._next_point)//self._future_space - 1)
+            if self.__global_index[i] in future_indices:
+                point_ = self._rotate_point(self.__points_arr[i])
+                x = point_[0] + self._x
+                y = point_[1] + self._y
+                offset = (self.__global_index[i] - self._next_point) // self._future_space - 1
+                self.add_next_point((x, y), offset)
 
     def draw(self, surface):
         """
-        Draws the cluster on the given surface
+        Draws the cluster on the given surface (optimized)
+        Pre-calculate geometry checks to avoid repeated expensive operations
         """
-
+        # Get master point parameters
+        x0, y0 = self._master
+        d = self._master_distance
+        
         for i in range(len(self.__points_arr)):
             point_ = self._rotate_point(self.__points_arr[i])
             x = point_[0] + self._x
             y = point_[1] + self._y
 
-            if self._points_in_square(x, y) and self.__global_index[i] == self._next_point:
-                self.__colors_arr[i] = (100, 100, 100)  # Modify the color of the point
-                self.update_next_point()
+            # Check if point is in square (geometry check)
+            if (x0 - d < x < x0 + d) and (y0 < y < y0 + d):
+                if self.__global_index[i] == self._next_point:
+                    self.__colors_arr[i] = (100, 100, 100)
+                    self.update_next_point()
 
             pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
     
@@ -364,6 +376,8 @@ class MiniMap(Shape):
     """
     Represents a minimap object on the simulator
     """
+    MAX_TRAIL_POINTS = 250  # Maximum number of trail points to store
+    
     def __init__(self, coo, size, color=(255, 255, 255)):
         """
         Initializes the minimap object.
@@ -374,11 +388,36 @@ class MiniMap(Shape):
         """
         super().__init__(coo, color, size)
         self._width, self._height = size
-        self._points = []  # Lista de pontos no formato [(x, y)]
+        self._points = []  # Lista de pontos do track no formato [(x, y)]
+        self._trail = []   # Array para armazenar histórico de posições do carrinho (trilha azul)
+        self._left_sensor_points = []   # Marcadores amarelos (sensor esquerdo)
+        self._right_sensor_points = []  # Marcadores roxos (sensor direito)
         self._player = (0, 0)
 
     def add_point(self, point):
+        """Add a track point to the minimap"""
         self._points.append(point)
+    
+    def add_trail_point(self, player_x, player_y):
+        """Add current player position to the trail history"""
+        self._trail.append((player_x, player_y))
+        # Remove oldest point if exceeding maximum to prevent performance degradation
+        if len(self._trail) > self.MAX_TRAIL_POINTS:
+            self._trail.pop(0)
+    
+    def add_left_sensor_point(self, sensor_x, sensor_y):
+        """Add left sensor activation point (yellow marker)"""
+        self._left_sensor_points.append((sensor_x, sensor_y))
+    
+    def add_right_sensor_point(self, sensor_x, sensor_y):
+        """Add right sensor activation point (purple marker)"""
+        self._right_sensor_points.append((sensor_x, sensor_y))
+    
+    def clear_trail(self):
+        """Clear the trail history"""
+        self._trail = []
+        self._left_sensor_points = []
+        self._right_sensor_points = []
 
     def set_player_position(self, player):
         self._player = player
@@ -393,27 +432,51 @@ class MiniMap(Shape):
         #border_color = (100, 100, 100)
         border_width = 1
 
-        # draw border
-        #pygame.draw.rect(surface, border_color,
-        #                 (rect_x, rect_y, rect_width, rect_height), border_width)
-
         # draw background
         pygame.draw.rect(surface, self._color,
                          (rect_x + border_width, rect_y + border_width,
                           rect_width - 2 * border_width, rect_height - 2 * border_width))
 
-        # draw track
+        # Pre-calculate scale factors to avoid recalculation in loops
+        scale_x = self._width // 2
+        scale_y = self._height // 2
+
+        # draw track (black points)
         point_color = (0, 0, 0)
         for px, py in self._points:
             # normalize the point coordinates
-            x = int(self._x + px * (self._width // 2))
-            y = int(self._y + py * (self._height // 2))
+            x = int(self._x + px * scale_x)
+            y = int(self._y + py * scale_y)
             pygame.draw.circle(surface, point_color, (x, y), 1)
+        
+        # draw trail (blue line showing where the robot has been)
+        if len(self._trail) >= 2:
+            trail_color = (0, 100, 255)  # Blue
+            for i in range(len(self._trail) - 1):
+                x1 = int(self._x + self._trail[i][0] * scale_x)
+                y1 = int(self._y - self._trail[i][1] * scale_y)
+                x2 = int(self._x + self._trail[i + 1][0] * scale_x)
+                y2 = int(self._y - self._trail[i + 1][1] * scale_y)
+                pygame.draw.line(surface, trail_color, (x1, y1), (x2, y2), 2)
+        
+        # draw left sensor activation points (yellow circles)
+        left_sensor_color = (255, 255, 0)  # Yellow
+        for sx, sy in self._left_sensor_points:
+            x = int(self._x + sx * scale_x)
+            y = int(self._y - sy * scale_y)
+            pygame.draw.circle(surface, left_sensor_color, (x, y), 3)
+        
+        # draw right sensor activation points (purple circles)
+        right_sensor_color = (200, 0, 255)  # Purple
+        for sx, sy in self._right_sensor_points:
+            x = int(self._x + sx * scale_x)
+            y = int(self._y - sy * scale_y)
+            pygame.draw.circle(surface, right_sensor_color, (x, y), 3)
 
-        # draw player position
+        # draw player position (red circle)
         player_color = (200, 0, 0)
-        x = int(self._x + self._player[0] * (self._width // 2))
-        y = int(self._y - self._player[1] * (self._height // 2))
+        x = int(self._x + self._player[0] * scale_x)
+        y = int(self._y - self._player[1] * scale_y)
 
         pygame.draw.circle(surface, player_color, (x, y), 5)
 
@@ -437,8 +500,8 @@ class Track(Shape):
         self._center = (0, 0) #(self.screen_size[0] // 1.5, self.screen_size[1] // 2)
         
         # Set world boundaries based on track size
-        # World size = size (in cells) * point_spacing (pixels per cell)
-        self.set_world_bounds(size[0] * point_spacing, size[1] * point_spacing)
+        # World size = (size - 1) (in cells) * point_spacing (pixels per cell) to limit to 0-99 and 0-49
+        self.set_world_bounds((size[0] - 1) * point_spacing, (size[1] - 1) * point_spacing)
 
         # initializes the matrix of points and walls
         self.wall = Wall()
@@ -1597,6 +1660,4 @@ class Simulator:
         self.screen.fill((255, 255, 255))  # background color
         for obj in self.__objects:
             obj.draw(self.screen)
-
-        pygame.display.flip()
-        #self.__clock.tick(self.__FPS)
+        # Note: pygame.display.flip() is called by the caller after additional draws

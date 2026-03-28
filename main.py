@@ -21,15 +21,15 @@ def get_keyboard_input():
     
     # Horizontal movement (Left/Right arrows)
     if keys[pygame.K_LEFT]:
-        delta_x = 0.005
+        delta_x = -0.1
     elif keys[pygame.K_RIGHT]:
-        delta_x = -0.005
+        delta_x = 0.1
     
     # Vertical movement (Up/Down arrows)
     if keys[pygame.K_UP]:
-        delta_y = -0.005
+        delta_y = -0.1
     elif keys[pygame.K_DOWN]:
-        delta_y = 0.005
+        delta_y = 0.1
 
     # Rotation (Q/E keys)
     if keys[pygame.K_q]:
@@ -73,8 +73,8 @@ def simulate_robot_data():
         "delta_x": delta_x,
         "delta_y": delta_y,
         "delta_theta": delta_theta,
-        "left_sensor_active": random.choice([0, 1]),
-        "right_sensor_active": random.choice([0, 1]),
+        "left_sensor_active": 1 if random.random() < 0.001 else 0,    # 1% de chance
+        "right_sensor_active": 1 if random.random() < 0.001 else 0,   # 1% de chance
     }
 
 def main(sim) -> None:

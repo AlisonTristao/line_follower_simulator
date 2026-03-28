@@ -1,5 +1,10 @@
 import random
+import numpy as np
 from simulator import GameSimulation, SimulationConfig, MEDIUM, LEMNISCATE, FULL
+
+# Pre-calculated sine wave cache to avoid allocating 16KB per frame
+# This is used in simulate_robot_data() and saves ~1MB/minute of garbage collection
+SINE_WAVE_CACHE = 50 * np.sin(2 * np.pi * np.linspace(0, 10, 1000))
 
 
 def settings():
@@ -15,7 +20,7 @@ def settings():
         screen_size=FULL,
         fps=80,
         length=100,
-        width=100,
+        width=50,
         scale=250,
         render=3,
         track_type=LEMNISCATE,

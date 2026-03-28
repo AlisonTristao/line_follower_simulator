@@ -92,6 +92,8 @@ class GameSimulation:
         self.serial_monitor = None
         self.serial_monitor_toggle = None
         self.win = None
+        self.clear_trail_button = None
+        self.last_trail_update_time = time.time()  # Track last time trail point was added
 
         self.future_points_count = 10
 
@@ -135,7 +137,7 @@ class GameSimulation:
 
         # generate trajectory
         self.x_track, self.y_track = generate_track(
-            self.track_type, noise_level=0.225, checkpoints=36, resolution=500, track_rad=30
+            self.track_type, noise_level=0.225, checkpoints=36, resolution=500, track_rad=32
         )
         self.win = len(self.x_track) - 1
 
@@ -167,11 +169,28 @@ class GameSimulation:
         # create future points
         self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length * 0.5 * self.SCALE)
 
-        # create minimap
-        minimap_position = (0.9 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1])
-        self.minimap = MiniMap(minimap_position, (200, 150))
+        # create display with reduced size
+        display_height = int(0.7 * self.simulator.get_window_size()[1])
+        display_size = (self.simulator.get_window_size()[0], display_height)
+        display_center = (self.simulator.get_center()[0], display_height // 2)
+        self.display = Display(display_center, display_size)
+        self._setup_display_graphs()
+
+        # create minimap below the graphs
+        minimap_size = (500, 250)
+        minimap_center_x = minimap_size[0] // 2 + 40  # Position on the left with some padding
+        minimap_y = int(display_height + 140) - 40  # Position below the graphs
+        minimap_position = (minimap_center_x, minimap_y)
+        self.minimap = MiniMap(minimap_position, minimap_size)
         for k in range(0, len(self.x_track), self.SCALE // 10):
             self.minimap.add_point((2 * self.x_track[k] / self.LENGTH, 2 * self.y_track[k] / self.WIDTH))
+        
+        # create clear trail button (positioned at top-left corner of minimap)
+        button_x = int(minimap_position[0] - minimap_size[0] // 2 + 10)
+        button_y = int(minimap_position[1] - minimap_size[1] // 2 + 10)
+        self.clear_trail_button = Button(button_x, button_y, 100, 30, text="Clear Trail", font_size=12, 
+                                        bg_color=(200, 50, 50), text_color=(255, 255, 255))
+        self.clear_trail_button.callback = lambda: self.minimap.clear_trail()
 
         # set track properties
         self.track.set_coordinates(
@@ -179,10 +198,6 @@ class GameSimulation:
         )
         self.track.set_center(self.car_draw.get_center())
         self.track.set_pivot(self.car_draw.get_center())
-
-        # create display
-        self.display = Display(self.simulator.get_center(), self.simulator.get_window_size())
-        self._setup_display_graphs()
 
         # create coordinates display
         coordinates_position = (1.85 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1])
@@ -263,35 +278,21 @@ class GameSimulation:
 
     def _setup_display_graphs(self):
         """Setup all graphs to display real robot data."""
-        # Encoder data (wheel velocities)
-        self.display.add_graph("Encoder")
-        self.display.add_line_to_graph("Encoder", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("Encoder", "right", color=self.get_rand_color())
-
-        # IMU acceleration
-        self.display.add_graph("IMU")
-        self.display.add_line_to_graph("IMU", "ax", color=self.get_rand_color())
-        self.display.add_line_to_graph("IMU", "ay", color=self.get_rand_color())
-        self.display.add_line_to_graph("IMU", "az", color=self.get_rand_color())
-
-        # Motor current
-        self.display.add_graph("Current")
-        self.display.add_line_to_graph("Current", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("Current", "right", color=self.get_rand_color())
-
-        # PWM applied
-        self.display.add_graph("PWM")
-        self.display.add_line_to_graph("PWM", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("PWM", "right", color=self.get_rand_color())
-
-        # Front sensor reading
-        self.display.add_graph("Array_Sensor")
-        self.display.add_line_to_graph("Array_Sensor", "value", color=self.get_rand_color())
-
-        # Filtered velocity and omega (to be implemented with filtering)
-        self.display.add_graph("speed")
-        self.display.add_line_to_graph("speed", "vm", color=self.get_rand_color())
-        self.display.add_line_to_graph("speed", "ω", color=self.get_rand_color())
+        # Define graphs structure: {graph_name: [list of line_names]}
+        graphs_structure = {
+            "Encoder": ["left", "right"],
+            "IMU": ["ax", "ay", "az"],
+            "Current": ["left", "right"],
+            "PWM": ["left", "right"],
+            "Array_Sensor": ["value"],
+            "speed": ["vm", "ω"],
+        }
+        
+        # Create graphs using structure
+        for graph_name, line_names in graphs_structure.items():
+            self.display.add_graph(graph_name)
+            for line_name in line_names:
+                self.display.add_line_to_graph(graph_name, line_name, color=self.get_rand_color())
 
         '''self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "d", color=self.get_rand_color())
@@ -327,29 +328,25 @@ class GameSimulation:
 
     def update_graphs_from_robot_data(self):
         """Update all graphs with current robot data."""
-        # Encoder data
-        self.display.update_graph_data("Encoder", "left", self.robot_data["encoder_left"])
-        self.display.update_graph_data("Encoder", "right", self.robot_data["encoder_right"])
-
-        # IMU acceleration
-        self.display.update_graph_data("IMU", "ax", self.robot_data["imu_ax"])
-        self.display.update_graph_data("IMU", "ay", self.robot_data["imu_ay"])
-        self.display.update_graph_data("IMU", "az", self.robot_data["imu_az"])
-
-        # Motor current
-        self.display.update_graph_data("Current", "left", self.robot_data["Current_left"])
-        self.display.update_graph_data("Current", "right", self.robot_data["Current_right"])
-
-        # PWM applied
-        self.display.update_graph_data("PWM", "left", self.robot_data["PWM_left"])
-        self.display.update_graph_data("PWM", "right", self.robot_data["PWM_right"])
-
-        # Front sensor reading
-        self.display.update_graph_data("Array_Sensor", "value", self.robot_data["Array_Sensor"])
-
-        # Filtered velocity and omega
-        self.display.update_graph_data("speed", "vm", self.robot_data["speed"])
-        self.display.update_graph_data("speed", "ω", self.robot_data["omega_filtered"])
+        # Define mapping: (graph_name, line_name) -> robot_data_key
+        graph_updates = [
+            ("Encoder", "left", "encoder_left"),
+            ("Encoder", "right", "encoder_right"),
+            ("IMU", "ax", "imu_ax"),
+            ("IMU", "ay", "imu_ay"),
+            ("IMU", "az", "imu_az"),
+            ("Current", "left", "Current_left"),
+            ("Current", "right", "Current_right"),
+            ("PWM", "left", "PWM_left"),
+            ("PWM", "right", "PWM_right"),
+            ("Array_Sensor", "value", "Array_Sensor"),
+            ("speed", "vm", "speed"),
+            ("speed", "ω", "omega_filtered"),
+        ]
+        
+        # Update all graphs in single loop
+        for graph_name, line_name, data_key in graph_updates:
+            self.display.update_graph_data(graph_name, line_name, self.robot_data[data_key])
 
     def get_robot_data(self):
         """Return a copy of the current robot data dictionary."""
@@ -415,6 +412,7 @@ class GameSimulation:
             self.display.verify_checkbox(event)
             self.serial_monitor_toggle.handle_event(event)
             self.serial_monitor.handle_event(event)
+            self.clear_trail_button.handle_event(event)
         return True
 
     def _step_physics(self, delta_x, delta_y, delta_theta=0.0):
@@ -432,20 +430,41 @@ class GameSimulation:
             f"x: {round(self.track.get_center()[0]/self.SCALE, 2):.2f} y: {round(self.track.get_center()[1]/self.SCALE, 2):.2f}"
         )
 
-        self.minimap.set_player_position(
-            (2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1,
-             -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1)
-        )
+        minimap_x = 2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1
+        minimap_y = -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1
+        
+        self.minimap.set_player_position((minimap_x, minimap_y))
+        
+        # Add current position to minimap trail (only every 0.5 seconds to reduce memory usage)
+        current_time = time.time()
+        if current_time - self.last_trail_update_time >= 0.1:
+            self.minimap.add_trail_point(minimap_x, minimap_y)
+            self.last_trail_update_time = current_time
+
+        # Update all clusters BEFORE drawing to recalculate future points
+        # This ensures FuturePoints are synchronized with current position
+        for i in range(len(self.track.matrix)):
+            for j in range(len(self.track.matrix[i])):
+                if hasattr(self.track.matrix[i][j], 'update'):
+                    self.track.matrix[i][j].update()
+        
+        # Now get the updated future points for FuturePoints object
+        future_point = Cluster.get_next_point()
+        self.future_points.set_points(future_point)
 
         self.simulator.draw()
+        
+        # Draw clear button on top
+        self.clear_trail_button.draw(self.simulator.screen)
+        
+        # Single display update after all draws
+        pygame.display.flip()
 
         if Cluster._next_point == self.win:
             print("Congratulations!")
             print("You win the game, you score is {:.2f}".format(100 * 100 / self.time_simulation))
             return None
 
-        future_point = Cluster.get_next_point()
-        self.future_points.set_points(future_point)
         future_point = [
             ((x - self.car_draw.get_center()[0]) / self.SCALE,
              (-y + self.car_draw.get_center()[1]) / self.SCALE)
@@ -534,7 +553,18 @@ class GameSimulation:
         self.set_right_sensor(right_sensor_active)
         
         # Advance simulation with physics and drawing
-        return self.step(delta_x, delta_y, delta_theta)
+        result = self.step(delta_x, delta_y, delta_theta)
+        
+        # Track sensor activations on minimap (after step calculates positions)
+        if result is not None:  # step() returns tuple
+            minimap_x = 2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1
+            minimap_y = -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1
+            if left_sensor_active:
+                self.minimap.add_left_sensor_point(minimap_x, minimap_y)
+            if right_sensor_active:
+                self.minimap.add_right_sensor_point(minimap_x, minimap_y)
+        
+        return result
 
     # ========================================================================
     # Serial Communication Methods
