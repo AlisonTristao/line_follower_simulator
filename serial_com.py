@@ -30,7 +30,6 @@ class SerialCom:
         ports = []
         for port, desc, hwid in serial.tools.list_ports.comports():
             ports.append(port)
-            print(f"  {port:12} - {desc}")
         return ports
     
     def select_port(self) -> Optional[str]:
@@ -77,7 +76,6 @@ class SerialCom:
             self.port = port
         
         if not self.port:
-            print("Nenhuma porta selecionada!")
             return False
         
         try:
@@ -87,10 +85,8 @@ class SerialCom:
                 timeout=0.1
             )
             self.connected = True
-            print(f"✓ Conectado em {self.port} ({self.BAUDRATE} baud)")
             return True
         except serial.SerialException as e:
-            print(f"✗ Erro ao conectar: {e}")
             self.connected = False
             return False
     
@@ -105,10 +101,8 @@ class SerialCom:
             try:
                 self.serial.close()
                 self.connected = False
-                print("✓ Desconectado")
                 return True
             except serial.SerialException as e:
-                print(f"✗ Erro ao desconectar: {e}")
                 return False
         return False
     
@@ -125,7 +119,6 @@ class SerialCom:
             True se enviou, False caso contrário
         """
         if not self.connected or not self.serial:
-            print("Não conectado!")
             return False
         
         try:
@@ -136,7 +129,6 @@ class SerialCom:
             self.serial.write(message.encode())
             return True
         except serial.SerialException as e:
-            print(f"✗ Erro ao enviar: {e}")
             return False
     
     def read_message(self) -> Optional[str]:
@@ -159,7 +151,6 @@ class SerialCom:
                     return message
             return None
         except serial.SerialException as e:
-            print(f"✗ Erro ao ler: {e}")
             return None
     
     def is_connected(self) -> bool:

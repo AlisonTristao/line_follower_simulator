@@ -90,10 +90,6 @@ def main(sim) -> None:
     # ------------------------------------------------------------------
     # Main control loop - Serial Backend + Pygame Simulator
     # ------------------------------------------------------------------
-
-    print("\n" + "="*60)
-    print("LINHA FOLLOWER - SERIAL BACKEND + SIMULATOR")
-    print("="*60 + "\n")
     
     # Setup serial monitor
     if sim.serial_monitor:
@@ -158,7 +154,6 @@ def main(sim) -> None:
     
     # Disconnect before exiting
     serial_disconnect()
-    print("\n✓ Desconectado.")
 
 if __name__ == "__main__":
     sim = settings()
