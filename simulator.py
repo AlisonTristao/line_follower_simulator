@@ -177,7 +177,7 @@ class GameSimulation:
         # create serial monitor on the right side
         serial_monitor_width = 380
         serial_monitor_height = 450
-        serial_monitor_x = self.simulator.get_window_size()[0] - serial_monitor_width - 10
+        serial_monitor_x = self.simulator.get_window_size()[0] - serial_monitor_width - 5
         serial_monitor_y = 40
         self.serial_monitor = SerialMonitor(
             (serial_monitor_x, serial_monitor_y),
