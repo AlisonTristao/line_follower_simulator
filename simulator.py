@@ -2,10 +2,12 @@ import pygame
 import random
 import time
 import math
+import threading
 from dataclasses import dataclass
 
 from graphics.graphics_elements import *
 from graphics.track_generator import *
+from serial_com import SerialCom
 import numpy as np
 
 @dataclass
@@ -74,6 +76,12 @@ class GameSimulation:
         self.win = None
 
         self.future_points_count = 10
+
+        # Serial communication
+        self.com = None
+        self.serial_connected = False
+        self.serial_lock = threading.Lock()
+        self.read_thread = None
 
         # Real robot data storage
         self.robot_data = {
@@ -177,7 +185,7 @@ class GameSimulation:
         # create serial monitor on the right side
         serial_monitor_width = 380
         serial_monitor_height = 450
-        serial_monitor_x = self.simulator.get_window_size()[0] - serial_monitor_width - 5
+        serial_monitor_x = self.simulator.get_window_size()[0] - serial_monitor_width + 2
         serial_monitor_y = 40
         self.serial_monitor = SerialMonitor(
             (serial_monitor_x, serial_monitor_y),
@@ -424,6 +432,92 @@ class GameSimulation:
         self.timer = time.time()
 
         return data
+
+    # ========================================================================
+    # Serial Communication Methods
+    # ========================================================================
+
+    def _read_serial_thread(self):
+        """Thread para ler mensagens do robô continuamente"""
+        while self.serial_connected:
+            try:
+                if self.com and self.com.is_connected():
+                    msg = self.com.read_message()
+                    if msg:
+                        with self.serial_lock:
+                            if self.serial_monitor:
+                                self.serial_monitor.add_message(f"[RX] {msg}", (0, 180, 255))
+                time.sleep(0.01)
+            except Exception as e:
+                time.sleep(0.1)
+
+    def serial_connect(self, port: str):
+        """Connect to serial port and start read thread"""
+        if not self.com:
+            self.com = SerialCom()
+        
+        if self.com.connect(port):
+            self.serial_connected = True
+            self.read_thread = threading.Thread(target=self._read_serial_thread, daemon=True)
+            self.read_thread.start()
+            return True
+        return False
+
+    def serial_disconnect(self):
+        """Disconnect from serial port"""
+        self.serial_connected = False
+        time.sleep(0.1)
+        if self.com:
+            self.com.disconnect()
+
+    def serial_send(self, message: str):
+        """Send message via serial"""
+        if self.com and self.com.is_connected():
+            self.com.send_message(message)
+            return True
+        return False
+
+    def serial_setup_ui(self):
+        """Setup serial monitor UI callbacks"""
+        if not self.serial_monitor:
+            return
+        
+        # Get available ports
+        available_ports = self.com.list_ports() if self.com else []
+        if available_ports:
+            self.serial_monitor.port_dropdown.set_options(available_ports)
+        else:
+            self.serial_monitor.port_dropdown.set_options(["Nenhuma porta"])
+        
+        # Create and connect callbacks
+        def on_connect_click():
+            port = self.serial_monitor.port_dropdown.get_selected()
+            if self.serial_connect(port):
+                self.serial_monitor.connected = True
+                self.serial_monitor.add_message(f"[SISTEMA] Conectado em {port}", (0, 200, 0))
+            else:
+                self.serial_monitor.connected = False
+                self.serial_monitor.add_message(f"[SISTEMA] Falha ao conectar em {port}", (200, 0, 0))
+        
+        def on_disconnect_click():
+            self.serial_disconnect()
+            self.serial_monitor.connected = False
+            self.serial_monitor.add_message("[SISTEMA] Desconectado", (200, 100, 0))
+        
+        def on_send_click():
+            text = self.serial_monitor.text_input.get_text()
+            if text:
+                if self.serial_send(text):
+                    self.serial_monitor.add_message(f"[TX] {text}", (200, 200, 0))
+                else:
+                    self.serial_monitor.add_message("[SISTEMA] Não conectado", (200, 0, 0))
+                self.serial_monitor.text_input.clear()
+        
+        self.serial_monitor.btn_connect.callback = on_connect_click
+        self.serial_monitor.btn_disconnect.callback = on_disconnect_click
+        self.serial_monitor.btn_send.callback = on_send_click
+        
+        self.serial_monitor.add_message("[SISTEMA] Inicializado", (100, 200, 100))
 
 _simulation: GameSimulation | None = None
 
