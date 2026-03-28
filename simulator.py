@@ -22,6 +22,17 @@ class SimulationConfig:
     track_length: float = 0.02
     sensor_spacing: float = 0.001
 
+
+# Graph scale limits (min and max percentages for real robot data)
+GRAPH_LIMITS = {
+    "encoder": {"min": -100, "max": 100},           # RPM or velocity percentage
+    "imu_accel": {"min": -100, "max": 100},         # m/s² or g
+    "motor_current": {"min": -100, "max": 100},     # mA or percentage
+    "pwm": {"min": -100, "max": 100},               # -100% to 100%
+    "sensor_front": {"min": 0, "max": 100},         # 0-100% (line presence)
+    "vel_filtered": {"min": -100, "max": 100},      # velocity and omega
+}
+
 class GameSimulation:
     """High level controller responsible for running the simulation."""
 
@@ -63,6 +74,22 @@ class GameSimulation:
         self.win = None
 
         self.future_points_count = 10
+
+        # Real robot data storage
+        self.robot_data = {
+            "encoder_left": 0.0,
+            "encoder_right": 0.0,
+            "imu_ax": 0.0,
+            "imu_ay": 0.0,
+            "imu_az": 0.0,
+            "motor_current_left": 0.0,
+            "motor_current_right": 0.0,
+            "pwm_left": 0.0,
+            "pwm_right": 0.0,
+            "sensor_front": 0.0,
+            "vel_filtered": 0.0,
+            "omega_filtered": 0.0,
+        }
 
     # divide the track in clusters for rendering
     def configurate_cluster(self):
@@ -188,17 +215,36 @@ class GameSimulation:
         return tuple(random.randint(0, 255) for _ in range(3))
 
     def _setup_display_graphs(self):
-        self.display.add_graph("wheels")
-        self.display.add_line_to_graph("wheels", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("wheels", "right", color=self.get_rand_color())
+        """Setup all graphs to display real robot data."""
+        # Encoder data (wheel velocities)
+        self.display.add_graph("encoder")
+        self.display.add_line_to_graph("encoder", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("encoder", "right", color=self.get_rand_color())
 
-        self.display.add_graph("car")
-        self.display.add_line_to_graph("car", "vm", color=self.get_rand_color())
-        self.display.add_line_to_graph("car", "ω", color=self.get_rand_color())
+        # IMU acceleration
+        self.display.add_graph("imu_accel")
+        self.display.add_line_to_graph("imu_accel", "ax", color=self.get_rand_color())
+        self.display.add_line_to_graph("imu_accel", "ay", color=self.get_rand_color())
+        self.display.add_line_to_graph("imu_accel", "az", color=self.get_rand_color())
 
-        self.display.add_graph("control")
-        self.display.add_line_to_graph("control", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("control", "right", color=self.get_rand_color())
+        # Motor current
+        self.display.add_graph("motor_current")
+        self.display.add_line_to_graph("motor_current", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("motor_current", "right", color=self.get_rand_color())
+
+        # PWM applied
+        self.display.add_graph("pwm")
+        self.display.add_line_to_graph("pwm", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("pwm", "right", color=self.get_rand_color())
+
+        # Front sensor reading
+        self.display.add_graph("sensor_front")
+        self.display.add_line_to_graph("sensor_front", "value", color=self.get_rand_color())
+
+        # Filtered velocity and omega (to be implemented with filtering)
+        self.display.add_graph("vel_filtered")
+        self.display.add_line_to_graph("vel_filtered", "vm", color=self.get_rand_color())
+        self.display.add_line_to_graph("vel_filtered", "ω", color=self.get_rand_color())
 
         '''self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "d", color=self.get_rand_color())
@@ -220,14 +266,47 @@ class GameSimulation:
         """Update all graphs with real robot data (to be received from serial)."""
         # TODO: Update with real robot data once serial communication is implemented
         pass
-        '''self.display.set_graph_data("future_control", "left", self.future_control_left)
-        self.display.set_graph_data("future_control", "right", self.future_control_right)
-        self.display.set_graph_data("reference", "d", self.future_v)
-        self.display.set_graph_data("reference", "θ", self.future_omega)
-        self.display.set_graph_data("free_response", "d", self.free_response_v)
-        self.display.set_graph_data("free_response", "θ", self.free_response_omega)
-        self.display.set_graph_data("error", "d", self.error_v)
-        self.display.set_graph_data("error", "θ", self.error_omega)'''
+
+    def update_robot_data(self, data_dict):
+        """
+        Update robot data from serial communication.
+        
+        Args:
+            data_dict: Dictionary with keys like 'encoder_left', 'encoder_right', etc.
+        """
+        for key, value in data_dict.items():
+            if key in self.robot_data:
+                self.robot_data[key] = float(value)
+
+    def update_graphs_from_robot_data(self):
+        """Update all graphs with current robot data."""
+        # Encoder data
+        self.display.update_graph_data("encoder", "left", self.robot_data["encoder_left"])
+        self.display.update_graph_data("encoder", "right", self.robot_data["encoder_right"])
+
+        # IMU acceleration
+        self.display.update_graph_data("imu_accel", "ax", self.robot_data["imu_ax"])
+        self.display.update_graph_data("imu_accel", "ay", self.robot_data["imu_ay"])
+        self.display.update_graph_data("imu_accel", "az", self.robot_data["imu_az"])
+
+        # Motor current
+        self.display.update_graph_data("motor_current", "left", self.robot_data["motor_current_left"])
+        self.display.update_graph_data("motor_current", "right", self.robot_data["motor_current_right"])
+
+        # PWM applied
+        self.display.update_graph_data("pwm", "left", self.robot_data["pwm_left"])
+        self.display.update_graph_data("pwm", "right", self.robot_data["pwm_right"])
+
+        # Front sensor reading
+        self.display.update_graph_data("sensor_front", "value", self.robot_data["sensor_front"])
+
+        # Filtered velocity and omega
+        self.display.update_graph_data("vel_filtered", "vm", self.robot_data["vel_filtered"])
+        self.display.update_graph_data("vel_filtered", "ω", self.robot_data["omega_filtered"])
+
+    def get_robot_data(self):
+        """Return a copy of the current robot data dictionary."""
+        return self.robot_data.copy()
 
     def update_FPS(self, fps):
         """
