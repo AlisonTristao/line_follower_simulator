@@ -106,12 +106,15 @@ def main(sim) -> None:
         def on_connect_click():
             port = sim.serial_monitor.port_dropdown.get_selected()
             if serial_connect(port):
+                sim.serial_monitor.connected = True
                 sim.serial_monitor.add_message(f"[SISTEMA] Conectado em {port}", (0, 200, 0))
             else:
+                sim.serial_monitor.connected = False
                 sim.serial_monitor.add_message(f"[SISTEMA] Falha ao conectar em {port}", (200, 0, 0))
         
         def on_disconnect_click():
             serial_disconnect()
+            sim.serial_monitor.connected = False
             sim.serial_monitor.add_message("[SISTEMA] Desconectado", (200, 100, 0))
         
         def on_send_click():
