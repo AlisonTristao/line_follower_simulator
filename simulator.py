@@ -119,7 +119,7 @@ class GameSimulation:
         self.x_track, self.y_track = generate_track(
             self.track_type, noise_level=0.225, checkpoints=36, resolution=500, track_rad=30
         )
-        self.win = len(self.x_track - 1)
+        self.win = len(self.x_track) - 1
 
         # create car
         self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.8))
@@ -365,7 +365,12 @@ class GameSimulation:
 
         # Update cluster master position (car's current position) for tracking coverage
         car_pos = self.track.get_center()
-        Cluster.set_master(car_pos, self.car_draw.get_size())
+        car_size = self.car_draw.get_size()
+        Cluster.set_master(car_pos, car_size)
+        
+        # DEBUG
+        if self.time_simulation < 0.5:  # Only print first few frames
+            print(f"[DEBUG] car_pos={car_pos}, car_size={car_size}, next_point={Cluster._next_point}")
 
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
         self.coordinates_display.set_text(
