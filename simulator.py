@@ -128,7 +128,7 @@ class GameSimulation:
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
 
         # create line sensor
-        self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1]))
+        self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - 30))
 
         # create future points
         self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length * 0.5 * self.SCALE)
@@ -183,9 +183,9 @@ class GameSimulation:
         self.serial_monitor_toggle = SerialMonitorToggle((toggle_x, toggle_y))
 
         # create serial monitor on the right side
-        serial_monitor_width = 380
-        serial_monitor_height = 450
-        serial_monitor_x = self.simulator.get_window_size()[0] - serial_monitor_width + 2
+        serial_monitor_width = 450
+        serial_monitor_height = 250
+        serial_monitor_x = self.simulator.get_window_size()[0] - serial_monitor_width + 30
         serial_monitor_y = 40
         self.serial_monitor = SerialMonitor(
             (serial_monitor_x, serial_monitor_y),
