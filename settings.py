@@ -1,5 +1,5 @@
 import random
-from simulator import GameSimulation, SimulationConfig, MEDIUM, LEMNISCATE
+from simulator import GameSimulation, SimulationConfig, MEDIUM, LEMNISCATE, FULL
 
 
 def settings():
@@ -12,7 +12,7 @@ def settings():
     print("seed =", seed)
 
     sim_config = SimulationConfig(
-        screen_size=MEDIUM,
+        screen_size=FULL,
         fps=80,
         length=100,
         width=100,
