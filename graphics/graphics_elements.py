@@ -25,6 +25,10 @@ class Shape:
         self._color = color
         self._size = size
         self._pivot = (0, 0)
+        
+        # World boundary limits (default to None - disabled)
+        self._world_width = None
+        self._world_height = None
 
         cos_theta = math.cos(self._angle)
         sin_theta = math.sin(self._angle)
@@ -80,6 +84,23 @@ class Shape:
         # returns the size of the shape
         return self._size
 
+    def set_world_bounds(self, width, height):
+        """
+        sets the world boundary limits for this shape
+        args:
+            width (float): maximum x coordinate (width of world)
+            height (float): maximum y coordinate (height of world)
+        """
+        self._world_width = width
+        self._world_height = height
+
+    def _clamp_position(self):
+        """clamps the shape position within world boundaries"""
+        if self._world_width is not None:
+            self._x = max(0, min(self._x, self._world_width))
+        if self._world_height is not None:
+            self._y = max(0, min(self._y, self._world_height))
+
     def step(self, dx, dy, angle):
         # moves and rotates the shape
         self._rotate(angle)
@@ -97,6 +118,7 @@ class Shape:
         dx = s
         self._x += dx
         self._y += dy
+        self._clamp_position()
 
     def rotate_around_origin(self, theta):
         # rotates the shape around the origin by theta radians
@@ -413,6 +435,10 @@ class Track(Shape):
         self.__visible = visible
         self.__point_spacing = point_spacing
         self._center = (0, 0) #(self.screen_size[0] // 1.5, self.screen_size[1] // 2)
+        
+        # Set world boundaries based on track size
+        # World size = size (in cells) * point_spacing (pixels per cell)
+        self.set_world_bounds(size[0] * point_spacing, size[1] * point_spacing)
 
         # initializes the matrix of points and walls
         self.wall = Wall()

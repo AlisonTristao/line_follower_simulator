@@ -22,10 +22,10 @@ def settings():
         track_length=0.02,
         sensor_spacing=0.008,
         # Robot dimensions in METERS
-        car_size=0.15,                   # Car width in meters
+        car_size=0.10,                   # Car width in meters
         front_sensor_distance=0.12,      # Distance from car center to front sensor in meters
-        front_sensor_size=0.08,          # Front sensor length in meters
-        side_sensor_distance_x=0.08,     # Horizontal distance from car center to side sensors in meters (left/right)
+        front_sensor_size=0.10,          # Front sensor length in meters
+        side_sensor_distance_x=0.10,     # Horizontal distance from car center to side sensors in meters (left/right)
         side_sensor_distance_y=0.10,     # Vertical distance from car center to side sensors in meters (forward/backward)
         side_sensor_size=0.03,           # Side sensor diameter in meters
     )

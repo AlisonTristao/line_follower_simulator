@@ -1,20 +1,61 @@
 import numpy as np
 import random
+import pygame
 from settings import *
+
+def get_keyboard_input():
+    """
+    Read arrow keys and return delta_x, delta_y, and delta_theta.
+    - Left/Right arrows: control delta_x (horizontal movement)
+    - Up/Down arrows: control delta_y (vertical movement)
+    - Q/E keys: control delta_theta (rotation)
+    
+    Returns:
+        tuple: (delta_x, delta_y, delta_theta) based on pressed keys
+    """
+    keys = pygame.key.get_pressed()
+    
+    delta_x = 0.0
+    delta_y = 0.0
+    delta_theta = 0.0
+    
+    # Horizontal movement (Left/Right arrows)
+    if keys[pygame.K_LEFT]:
+        delta_x = 0.005
+    elif keys[pygame.K_RIGHT]:
+        delta_x = -0.005
+    
+    # Vertical movement (Up/Down arrows)
+    if keys[pygame.K_UP]:
+        delta_y = -0.005
+    elif keys[pygame.K_DOWN]:
+        delta_y = 0.005
+
+    # Rotation (Q/E keys)
+    if keys[pygame.K_q]:
+        delta_theta = 0.05  # Rotate counter-clockwise
+    elif keys[pygame.K_e]:
+        delta_theta = -0.05  # Rotate clockwise
+    
+    return delta_x, delta_y, delta_theta
 
 def simulate_robot_data():
     """
-    Simulate robot data for testing.
-    This will be replaced with actual serial communication data.
+    Simulate all robot data and control inputs for testing.
+    Returns a single dictionary with everything needed for one simulation step.
     """
     import random
     import math
+    
+    # Get movement from keyboard
+    delta_x, delta_y, delta_theta = get_keyboard_input()
     
     # Simulate some varying data for visualization
     timestamp = np.linspace(0, 10, 1000)
     sine_wave = 50 * np.sin(2 * np.pi * timestamp)
     
     return {
+        # Robot sensor data
         "encoder_left": sine_wave[random.randint(-100, 100)],
         "encoder_right": sine_wave[random.randint(-100, 100)],
         "imu_ax": random.uniform(-10, 10),
@@ -27,49 +68,43 @@ def simulate_robot_data():
         "Array_Sensor": random.uniform(0, 100),
         "speed": sine_wave[int(timestamp[0] * 100) % 1000] / 2,
         "omega_filtered": random.uniform(-50, 50),
+        
+        # Control inputs from keyboard
+        "delta_x": delta_x,
+        "delta_y": delta_y,
+        "delta_theta": delta_theta,
+        "left_sensor_active": random.choice([0, 1]),
+        "right_sensor_active": random.choice([0, 1]),
     }
 
 def main(sim) -> None:
     # ------------------------------------------------------------------
     # Main control loop - Serial Backend + Pygame Simulator
     # ------------------------------------------------------------------
+    # Controls:
+    # - Up Arrow: move forward (+Y)
+    # - Down Arrow: move backward (-Y)
+    # - Left Arrow: move left (-X)
+    # - Right Arrow: move right (+X)
+    # - Q: rotate counter-clockwise
+    # - E: rotate clockwise
+    # - ESC: quit
     
     # Setup serial monitor UI
     sim.serial_setup_ui()
     
-    frame_count = 0
-    
-    # TEST: Pass delta_x and delta_y manually
-    # Uncomment and modify these values to test with fixed movements
-    # TEST_MODE = True
-    # TEST_DELTA_X = 0.001
-    # TEST_DELTA_Y = 0.0
-    
     while True:
-        frame_count += 1
+        # Get all data for this step in a single dictionary
+        step_data = simulate_robot_data()
         
-        # Uncomment to use manual test values:
-        delta_x = 0.0
-        delta_y = -0.01
+        # Single call with one argument
+        data = sim.update_step(step_data)
         
-        # Use simulated data for graphs (or will come from parser later)
-        robot_data = simulate_robot_data()
-        sim.update_robot_data(robot_data)
-        sim.update_graphs_from_robot_data()
-
-        data = sim.step(delta_x, delta_y)
         if data is None:
             break
-
-        # ---------------------------------------------------------------
-        # Receive visualization data from simulator
-        # ---------------------------------------------------------------
-
-        line, future_pts = data
         
-        # TEST: Random sensor activation
-        sim.set_left_sensor(random.choice([0, 1]))
-        sim.set_right_sensor(random.choice([0, 1]))
+        # Receive visualization data from simulator
+        line_sensor, future_points = data
     
     # Disconnect before exiting
     sim.serial_disconnect()

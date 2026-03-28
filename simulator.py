@@ -417,10 +417,10 @@ class GameSimulation:
             self.serial_monitor.handle_event(event)
         return True
 
-    def _step_physics(self, delta_x, delta_y):
+    def _step_physics(self, delta_x, delta_y, delta_theta=0.0):
         """Apply robot movement to the track without simulating car dynamics."""
         # Apply the delta movement received from real robot
-        self.track.step(delta_x * self.SCALE, delta_y * self.SCALE, 0)
+        self.track.step(delta_x * self.SCALE, delta_y * self.SCALE, delta_theta)
 
         # Update cluster master position (car's current position) for tracking coverage
         car_pos = self.car_draw.get_center()
@@ -472,14 +472,14 @@ class GameSimulation:
             future_point
         )
 
-    def step(self, delta_x, delta_y):
+    def step(self, delta_x, delta_y, delta_theta=0.0):
         """Public method used by external modules to advance the simulation."""
         if not self._handle_events():
             return None
         
         self.serial_monitor.update()
 
-        data = self._step_physics(delta_x, delta_y)
+        data = self._step_physics(delta_x, delta_y, delta_theta)
         if data is None:
             pygame.quit()
             return None
@@ -496,6 +496,45 @@ class GameSimulation:
         self.timer = time.time()
 
         return data
+
+    def update_step(self, step_data):
+        """
+        Consolidated method for a single loop iteration.
+        All data (robot data, movement, sensors) passed in a single dictionary.
+        
+        Args:
+            step_data (dict): Dictionary containing:
+                - "delta_x" (float): movement in x direction (in meters)
+                - "delta_y" (float): movement in y direction (in meters)
+                - "delta_theta" (float): rotation angle (in radians)
+                - "left_sensor_active" (bool): activate left side sensor
+                - "right_sensor_active" (bool): activate right side sensor
+                - All other robot sensor data to plot
+                
+        Returns:
+            tuple: (line_sensor_data, future_points) or None if simulation ended
+        """
+        # Extract movement and sensor data
+        delta_x = step_data.get("delta_x", 0.0)
+        delta_y = step_data.get("delta_y", 0.0)
+        delta_theta = step_data.get("delta_theta", 0.0)
+        left_sensor_active = step_data.get("left_sensor_active", False)
+        right_sensor_active = step_data.get("right_sensor_active", False)
+        
+        # Extract robot data (everything except movement/sensors)
+        robot_data = {k: v for k, v in step_data.items() 
+                      if k not in ["delta_x", "delta_y", "delta_theta", "left_sensor_active", "right_sensor_active"]}
+        
+        # Update robot data and graphs
+        self.update_robot_data(robot_data)
+        self.update_graphs_from_robot_data()
+        
+        # Update sensor states
+        self.set_left_sensor(left_sensor_active)
+        self.set_right_sensor(right_sensor_active)
+        
+        # Advance simulation with physics and drawing
+        return self.step(delta_x, delta_y, delta_theta)
 
     # ========================================================================
     # Serial Communication Methods
