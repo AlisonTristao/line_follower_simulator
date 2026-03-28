@@ -23,6 +23,13 @@ class SimulationConfig:
     track_type: int = 0
     track_length: float = 0.02
     sensor_spacing: float = 0.001
+    
+    # Robot dimensions (in meters)
+    car_size: float = 0.15              # Car width/size in meters
+    front_sensor_distance: float = 0.12 # Distance from car center to front sensor in meters
+    front_sensor_size: float = 0.08     # Front sensor length in meters
+    side_sensor_distance: float = 0.08  # Distance from car center to side sensors in meters
+    side_sensor_size: float = 0.03      # Side sensor diameter in meters
 
 
 # Graph scale limits (min and max percentages for real robot data)
@@ -31,7 +38,7 @@ GRAPH_LIMITS = {
     "IMU": {"min": -100, "max": 100},         # m/s² or g
     "Current": {"min": -100, "max": 100},     # mA or percentage
     "PWM": {"min": -100, "max": 100},               # -100% to 100%
-    "Array Sensor": {"min": 0, "max": 100},         # 0-100% (line presence)
+    "Array_Sensor": {"min": 0, "max": 100},         # 0-100% (line presence)
     "speed": {"min": -100, "max": 100},      # velocity and omega
 }
 
@@ -51,6 +58,13 @@ class GameSimulation:
         self.track_type = config.track_type
         self.track_length = config.track_length
         self.array_sensor_dist = config.sensor_spacing
+        
+        # Robot dimensions (in meters) - converted to pixels via SCALE
+        self.car_size_meters = config.car_size
+        self.front_sensor_distance_meters = config.front_sensor_distance
+        self.front_sensor_size_meters = config.front_sensor_size
+        self.side_sensor_distance_meters = config.side_sensor_distance
+        self.side_sensor_size_meters = config.side_sensor_size
 
         self.time_simulation = 0
         self.timer = time.time()
@@ -96,7 +110,7 @@ class GameSimulation:
             "Current_right": 0.0,
             "PWM_left": 0.0,
             "PWM_right": 0.0,
-            "Array Sensor": 0.0,
+            "Array_Sensor": 0.0,
             "speed": 0.0,
             "omega_filtered": 0.0,
         }
@@ -123,20 +137,28 @@ class GameSimulation:
         )
         self.win = len(self.x_track) - 1
 
-        # create car
-        self.car_draw = Car(self.simulator.get_center(), center=(1.36, 1.8))
+        # create car with configured size (convert meters to pixels)
+        car_size_pixels = int(self.car_size_meters * self.SCALE)
+        self.car_draw = Car(self.simulator.get_center(), size=car_size_pixels, center=(1.36, 1.8))
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
 
-        # create line sensor
-        self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - 30))
+        # create line sensor (front sensor - convert meters to pixels)
+        front_sensor_distance_pixels = int(self.front_sensor_distance_meters * self.SCALE)
+        front_sensor_size_pixels = int(self.front_sensor_size_meters * self.SCALE)
+        self.line_sensor = LineSensor(
+            (self.car_draw.get_center()[0], self.car_draw.get_center()[1] - front_sensor_distance_pixels),
+            size=front_sensor_size_pixels
+        )
 
-        # create side sensors (left and right)
+        # create side sensors (left and right - convert meters to pixels)
+        side_sensor_distance_pixels = int(self.side_sensor_distance_meters * self.SCALE)
+        side_sensor_size_pixels = int(self.side_sensor_size_meters * self.SCALE)
         car_x = self.car_draw.get_center()[0]
         car_y = self.car_draw.get_center()[1]
-        self.left_sensor = SideSensor((car_x - 20, car_y))
-        self.right_sensor = SideSensor((car_x + 20, car_y))
+        self.left_sensor = SideSensor((car_x - side_sensor_distance_pixels, car_y), size=side_sensor_size_pixels)
+        self.right_sensor = SideSensor((car_x + side_sensor_distance_pixels, car_y), size=side_sensor_size_pixels)
 
         # create future points
         self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length * 0.5 * self.SCALE)
@@ -256,8 +278,8 @@ class GameSimulation:
         self.display.add_line_to_graph("PWM", "right", color=self.get_rand_color())
 
         # Front sensor reading
-        self.display.add_graph("Array Sensor")
-        self.display.add_line_to_graph("Array Sensor", "value", color=self.get_rand_color())
+        self.display.add_graph("Array_Sensor")
+        self.display.add_line_to_graph("Array_Sensor", "value", color=self.get_rand_color())
 
         # Filtered velocity and omega (to be implemented with filtering)
         self.display.add_graph("speed")
@@ -299,8 +321,8 @@ class GameSimulation:
     def update_graphs_from_robot_data(self):
         """Update all graphs with current robot data."""
         # Encoder data
-        self.display.update_graph_data("encoder", "left", self.robot_data["encoder_left"])
-        self.display.update_graph_data("encoder", "right", self.robot_data["encoder_right"])
+        self.display.update_graph_data("Encoder", "left", self.robot_data["encoder_left"])
+        self.display.update_graph_data("Encoder", "right", self.robot_data["encoder_right"])
 
         # IMU acceleration
         self.display.update_graph_data("IMU", "ax", self.robot_data["imu_ax"])
@@ -316,7 +338,7 @@ class GameSimulation:
         self.display.update_graph_data("PWM", "right", self.robot_data["PWM_right"])
 
         # Front sensor reading
-        self.display.update_graph_data("Array Sensor", "value", self.robot_data["Array Sensor"])
+        self.display.update_graph_data("Array_Sensor", "value", self.robot_data["Array_Sensor"])
 
         # Filtered velocity and omega
         self.display.update_graph_data("speed", "vm", self.robot_data["speed"])

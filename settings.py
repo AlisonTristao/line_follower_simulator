@@ -21,6 +21,12 @@ def settings():
         track_type=LEMNISCATE,
         track_length=0.02,
         sensor_spacing=0.008,
+        # Robot dimensions in METERS
+        car_size=0.15,                   # Car width in meters
+        front_sensor_distance=0.12,      # Distance from car center to front sensor in meters
+        front_sensor_size=0.08,          # Front sensor length in meters
+        side_sensor_distance=0.08,       # Distance from car center to side sensors in meters
+        side_sensor_size=0.03,           # Side sensor diameter in meters
     )
     sim = GameSimulation(sim_config)
 
