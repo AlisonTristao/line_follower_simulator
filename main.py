@@ -20,12 +20,12 @@ def simulate_robot_data():
         "imu_ax": random.uniform(-10, 10),
         "imu_ay": random.uniform(-10, 10),
         "imu_az": random.uniform(0, 50),
-        "motor_current_left": random.uniform(-100, 100),
-        "motor_current_right": random.uniform(-100, 100),
-        "pwm_left": random.uniform(-100, 100),
-        "pwm_right": random.uniform(-100, 100),
-        "sensor_front": random.uniform(0, 100),
-        "vel_filtered": sine_wave[int(timestamp[0] * 100) % 1000] / 2,
+        "Current_left": random.uniform(-100, 100),
+        "Current_right": random.uniform(-100, 100),
+        "PWM_left": random.uniform(-100, 100),
+        "PWM_right": random.uniform(-100, 100),
+        "Array_Sensor": random.uniform(0, 100),
+        "speed": sine_wave[int(timestamp[0] * 100) % 1000] / 2,
         "omega_filtered": random.uniform(-50, 50),
     }
 
@@ -66,6 +66,10 @@ def main(sim) -> None:
         # ---------------------------------------------------------------
 
         line, future_pts = data
+        
+        # TEST: Random sensor activation
+        sim.set_left_sensor(random.choice([0, 1]))
+        sim.set_right_sensor(random.choice([0, 1]))
     
     # Disconnect before exiting
     sim.serial_disconnect()
