@@ -1,5 +1,7 @@
 import numpy as np
+import random
 from settings import *
+from serial_com import SerialCom
 
 def simulate_robot_data():
     """
@@ -14,8 +16,8 @@ def simulate_robot_data():
     sine_wave = 50 * np.sin(2 * np.pi * timestamp)
     
     return {
-        "encoder_left": sine_wave[int(timestamp[0] * 100) % 1000],
-        "encoder_right": sine_wave[int(timestamp[0] * 100 + 50) % 1000],
+        "encoder_left": sine_wave[random.randint(-100, 100)],
+        "encoder_right": sine_wave[random.randint(-100, 100)],
         "imu_ax": random.uniform(-10, 10),
         "imu_ay": random.uniform(-10, 10),
         "imu_az": random.uniform(0, 50),
@@ -30,18 +32,55 @@ def simulate_robot_data():
 
 def main(sim) -> None:
     # ------------------------------------------------------------------
-    # Main control loop - receives data from real robot via serial
+    # Main control loop - communicates with real robot via serial
     # ------------------------------------------------------------------
 
+    # Initialize serial communication
+    com = SerialCom()
+    
+    print("\n" + "="*50)
+    print("SELEÇÃO DE PORTA SERIAL")
+    print("="*50)
+    
+    # List and select port
+    port = com.select_port()
+    if not port:
+        print("Nenhuma porta selecionada. Usando dados simulados.")
+        use_serial = False
+    else:
+        # Try to connect
+        if com.connect(port):
+            use_serial = True
+            print("\n✓ Conexão estabelecida com o robô!")
+        else:
+            print("\n✗ Falha ao conectar. Usando dados simulados.")
+            use_serial = False
+
+    print("\nSimulador iniciando...\n")
+    
     frame_count = 0
     while True:
         frame_count += 1
         
-        # TODO: Receive delta_x, delta_y, sensor_data from real robot via serial
-        delta_x = 0.0  # Will come from encoder or odometry
-        delta_y = 0.0  # Will come from encoder or odometry
+        # Default movement
+        delta_x = random.uniform(-1e-3, 1e-3)
+        delta_y = random.uniform(-1e-3, 1e-3)
         
-        # TODO: Receive robot data from serial (replace with actual serial reading)
+        # Try to receive data from robot
+        if use_serial and com.is_connected():
+            msg = com.read_message()
+            
+            if msg:
+                # TODO: Parse message and extract robot data
+                # For now, just print it
+                print(f"Frame {frame_count}: {msg}")
+                
+                # Example (when parser is ready):
+                # robot_data = parse_message(msg)
+                # sim.update_robot_data(robot_data)
+                # sim.update_graphs_from_robot_data()
+        
+        # Use simulated data for now
         robot_data = simulate_robot_data()
         sim.update_robot_data(robot_data)
         sim.update_graphs_from_robot_data()
@@ -55,6 +94,10 @@ def main(sim) -> None:
         # ---------------------------------------------------------------
 
         line, future_pts = data
+    
+    # Disconnect before exiting
+    if use_serial:
+        com.disconnect()
         
 if __name__ == "__main__":
     sim = settings()
