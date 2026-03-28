@@ -28,11 +28,11 @@ class SimulationConfig:
 # Graph scale limits (min and max percentages for real robot data)
 GRAPH_LIMITS = {
     "encoder": {"min": -100, "max": 100},           # RPM or velocity percentage
-    "imu_accel": {"min": -100, "max": 100},         # m/s² or g
-    "motor_current": {"min": -100, "max": 100},     # mA or percentage
-    "pwm": {"min": -100, "max": 100},               # -100% to 100%
-    "sensor_front": {"min": 0, "max": 100},         # 0-100% (line presence)
-    "vel_filtered": {"min": -100, "max": 100},      # velocity and omega
+    "IMU": {"min": -100, "max": 100},         # m/s² or g
+    "Current": {"min": -100, "max": 100},     # mA or percentage
+    "PWM": {"min": -100, "max": 100},               # -100% to 100%
+    "Array Sensor": {"min": 0, "max": 100},         # 0-100% (line presence)
+    "speed": {"min": -100, "max": 100},      # velocity and omega
 }
 
 class GameSimulation:
@@ -68,6 +68,8 @@ class GameSimulation:
         self.coordinates_display = None
         self.compass = None
         self.line_sensor = None
+        self.left_sensor = None
+        self.right_sensor = None
         self.future_points = None
         self.track_percentage = None
         self.points = None
@@ -90,12 +92,12 @@ class GameSimulation:
             "imu_ax": 0.0,
             "imu_ay": 0.0,
             "imu_az": 0.0,
-            "motor_current_left": 0.0,
-            "motor_current_right": 0.0,
-            "pwm_left": 0.0,
-            "pwm_right": 0.0,
-            "sensor_front": 0.0,
-            "vel_filtered": 0.0,
+            "Current_left": 0.0,
+            "Current_right": 0.0,
+            "PWM_left": 0.0,
+            "PWM_right": 0.0,
+            "Array Sensor": 0.0,
+            "speed": 0.0,
             "omega_filtered": 0.0,
         }
 
@@ -129,6 +131,12 @@ class GameSimulation:
 
         # create line sensor
         self.line_sensor = LineSensor((self.car_draw.get_center()[0], self.car_draw.get_center()[1] - 30))
+
+        # create side sensors (left and right)
+        car_x = self.car_draw.get_center()[0]
+        car_y = self.car_draw.get_center()[1]
+        self.left_sensor = SideSensor((car_x - 20, car_y))
+        self.right_sensor = SideSensor((car_x + 20, car_y))
 
         # create future points
         self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length * 0.5 * self.SCALE)
@@ -199,7 +207,9 @@ class GameSimulation:
         self.simulator.add(self.track)
         self.simulator.add(self.car_draw)
         self.simulator.add(self.line_sensor)
-        #self.simulator.add(self.minimap)
+        self.simulator.add(self.left_sensor)
+        self.simulator.add(self.right_sensor)
+        self.simulator.add(self.minimap)
         self.simulator.add(self.fps_display)
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
@@ -225,34 +235,34 @@ class GameSimulation:
     def _setup_display_graphs(self):
         """Setup all graphs to display real robot data."""
         # Encoder data (wheel velocities)
-        self.display.add_graph("encoder")
-        self.display.add_line_to_graph("encoder", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("encoder", "right", color=self.get_rand_color())
+        self.display.add_graph("Encoder")
+        self.display.add_line_to_graph("Encoder", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("Encoder", "right", color=self.get_rand_color())
 
         # IMU acceleration
-        self.display.add_graph("imu_accel")
-        self.display.add_line_to_graph("imu_accel", "ax", color=self.get_rand_color())
-        self.display.add_line_to_graph("imu_accel", "ay", color=self.get_rand_color())
-        self.display.add_line_to_graph("imu_accel", "az", color=self.get_rand_color())
+        self.display.add_graph("IMU")
+        self.display.add_line_to_graph("IMU", "ax", color=self.get_rand_color())
+        self.display.add_line_to_graph("IMU", "ay", color=self.get_rand_color())
+        self.display.add_line_to_graph("IMU", "az", color=self.get_rand_color())
 
         # Motor current
-        self.display.add_graph("motor_current")
-        self.display.add_line_to_graph("motor_current", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("motor_current", "right", color=self.get_rand_color())
+        self.display.add_graph("Current")
+        self.display.add_line_to_graph("Current", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("Current", "right", color=self.get_rand_color())
 
         # PWM applied
-        self.display.add_graph("pwm")
-        self.display.add_line_to_graph("pwm", "left", color=self.get_rand_color())
-        self.display.add_line_to_graph("pwm", "right", color=self.get_rand_color())
+        self.display.add_graph("PWM")
+        self.display.add_line_to_graph("PWM", "left", color=self.get_rand_color())
+        self.display.add_line_to_graph("PWM", "right", color=self.get_rand_color())
 
         # Front sensor reading
-        self.display.add_graph("sensor_front")
-        self.display.add_line_to_graph("sensor_front", "value", color=self.get_rand_color())
+        self.display.add_graph("Array Sensor")
+        self.display.add_line_to_graph("Array Sensor", "value", color=self.get_rand_color())
 
         # Filtered velocity and omega (to be implemented with filtering)
-        self.display.add_graph("vel_filtered")
-        self.display.add_line_to_graph("vel_filtered", "vm", color=self.get_rand_color())
-        self.display.add_line_to_graph("vel_filtered", "ω", color=self.get_rand_color())
+        self.display.add_graph("speed")
+        self.display.add_line_to_graph("speed", "vm", color=self.get_rand_color())
+        self.display.add_line_to_graph("speed", "ω", color=self.get_rand_color())
 
         '''self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "d", color=self.get_rand_color())
@@ -293,24 +303,24 @@ class GameSimulation:
         self.display.update_graph_data("encoder", "right", self.robot_data["encoder_right"])
 
         # IMU acceleration
-        self.display.update_graph_data("imu_accel", "ax", self.robot_data["imu_ax"])
-        self.display.update_graph_data("imu_accel", "ay", self.robot_data["imu_ay"])
-        self.display.update_graph_data("imu_accel", "az", self.robot_data["imu_az"])
+        self.display.update_graph_data("IMU", "ax", self.robot_data["imu_ax"])
+        self.display.update_graph_data("IMU", "ay", self.robot_data["imu_ay"])
+        self.display.update_graph_data("IMU", "az", self.robot_data["imu_az"])
 
         # Motor current
-        self.display.update_graph_data("motor_current", "left", self.robot_data["motor_current_left"])
-        self.display.update_graph_data("motor_current", "right", self.robot_data["motor_current_right"])
+        self.display.update_graph_data("Current", "left", self.robot_data["Current_left"])
+        self.display.update_graph_data("Current", "right", self.robot_data["Current_right"])
 
         # PWM applied
-        self.display.update_graph_data("pwm", "left", self.robot_data["pwm_left"])
-        self.display.update_graph_data("pwm", "right", self.robot_data["pwm_right"])
+        self.display.update_graph_data("PWM", "left", self.robot_data["PWM_left"])
+        self.display.update_graph_data("PWM", "right", self.robot_data["PWM_right"])
 
         # Front sensor reading
-        self.display.update_graph_data("sensor_front", "value", self.robot_data["sensor_front"])
+        self.display.update_graph_data("Array Sensor", "value", self.robot_data["Array Sensor"])
 
         # Filtered velocity and omega
-        self.display.update_graph_data("vel_filtered", "vm", self.robot_data["vel_filtered"])
-        self.display.update_graph_data("vel_filtered", "ω", self.robot_data["omega_filtered"])
+        self.display.update_graph_data("speed", "vm", self.robot_data["speed"])
+        self.display.update_graph_data("speed", "ω", self.robot_data["omega_filtered"])
 
     def get_robot_data(self):
         """Return a copy of the current robot data dictionary."""
@@ -336,6 +346,26 @@ class GameSimulation:
         """Initialize future points visualization."""
         from graphics.graphics_elements import Cluster
         Cluster.set_future_count(future_count=count, future_space=space)
+
+    def set_left_sensor(self, active: bool):
+        """
+        Set left side sensor color (green if active, gray if inactive).
+        
+        Args:
+            active (bool): True to activate (green), False to deactivate (gray)
+        """
+        if self.left_sensor:
+            self.left_sensor.set_active(active)
+
+    def set_right_sensor(self, active: bool):
+        """
+        Set right side sensor color (green if active, gray if inactive).
+        
+        Args:
+            active (bool): True to activate (green), False to deactivate (gray)
+        """
+        if self.right_sensor:
+            self.right_sensor.set_active(active)
 
     # ------------------------------------------------------------------
     # Simulation main loop helpers
@@ -367,10 +397,6 @@ class GameSimulation:
         car_pos = self.car_draw.get_center()
         car_size = self.car_draw.get_size()
         Cluster.set_master(car_pos, car_size)
-        
-        # DEBUG
-        if self.time_simulation < 0.5:  # Only print first few frames
-            print(f"[DEBUG] car_pos={car_pos}, car_size={car_size}, next_point={Cluster._next_point}")
 
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
         self.coordinates_display.set_text(
@@ -525,9 +551,14 @@ class GameSimulation:
                     self.serial_monitor.add_message("[SISTEMA] Não conectado", (200, 0, 0))
                 self.serial_monitor.text_input.clear()
         
+        def on_clear_click():
+            self.serial_monitor.clear_messages()
+            self.serial_monitor.add_message("[SISTEMA] Histórico limpo", (100, 200, 100))
+        
         self.serial_monitor.btn_connect.callback = on_connect_click
         self.serial_monitor.btn_disconnect.callback = on_disconnect_click
         self.serial_monitor.btn_send.callback = on_send_click
+        self.serial_monitor.btn_clear.callback = on_clear_click
         
         self.serial_monitor.add_message("[SISTEMA] Inicializado", (100, 200, 100))
 

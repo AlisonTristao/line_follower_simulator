@@ -847,6 +847,40 @@ class LineSensor(Shape):
         # returns the size of the line sensor
         return self._size
 
+class SideSensor(Shape):
+    """
+    Represents a side sensor (left or right) on the simulator
+    Draws as a circle that can change color
+    """
+    def __init__(self, coo, color=(100, 100, 100), size=8, angle=0):
+        """
+        Initialize the side sensor object
+        args:
+            coo (tuple): coordinates of the sensor
+            color (tuple): color of the sensor in rgb format
+            size (int): radius of the sensor circle
+            angle (float): initial angle (unused for circular sensor)
+        """
+        super().__init__(coo, color, size, angle)
+        self.active_color = (0, 255, 0)  # Green when active
+        self.inactive_color = (100, 100, 100)  # Gray when inactive
+        self.is_active = False
+
+    def draw(self, surface):
+        """Draw the sensor as a circle"""
+        current_color = self.active_color if self.is_active else self.inactive_color
+        pygame.draw.circle(surface, current_color, (int(self._x), int(self._y)), self._size)
+
+    def set_active(self, active: bool):
+        """Set sensor active state (green if True, gray if False)"""
+        self.is_active = active
+
+    def get_x(self):
+        return self._x
+    
+    def get_y(self):
+        return self._y
+
 class SerialMonitorToggle(Shape):
     """
     represents a toggle button (checkbox) for the serial monitor
