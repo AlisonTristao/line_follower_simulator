@@ -141,7 +141,8 @@ class GameSimulation:
 
         # create car with configured size (convert meters to pixels)
         car_size_pixels = int(self.car_size_meters * self.SCALE)
-        self.car_draw = Car(self.simulator.get_center(), size=car_size_pixels, center=(1.36, 1.8))
+        # onde o carrinho vai ficar 1,36 e 1,8 // original 
+        self.car_draw = Car(self.simulator.get_center(), size=car_size_pixels, center=(1.4, 1.4))
 
         # create the track
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
@@ -247,6 +248,9 @@ class GameSimulation:
 
         # configurate the cluster
         self.configurate_cluster()
+
+        # Set maximum point limit - stops incrementing when reaching end of track
+        Cluster.set_max_point(self.win)
 
         # print the initialization message
         print("Simulator initialized")

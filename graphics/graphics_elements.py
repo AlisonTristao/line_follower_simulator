@@ -142,7 +142,7 @@ class Car(Shape):
             center (tuple): center position multiplier for car positioning
         """
         super().__init__(coo, color, size, angle)
-        self._x = center[0] * coo[0] + math.cos(math.radians(angle))
+        self._x = center[0] * coo[0] #+ math.cos(math.radians(angle))
         self._y = center[1] * coo[1]
         self._vertices = []
         self._calculate_vertices()
@@ -256,6 +256,7 @@ class Cluster(Shape):
     _master             = (0, 0)   
     _master_distance    = 0         
     _next_point         = 0        
+    _max_point          = None       # Limit for _next_point (stops incrementing when reached)
     _arr_next_points    = []        
     _future_count       = 10       
     _future_space       = 30        
@@ -287,7 +288,14 @@ class Cluster(Shape):
 
     @classmethod
     def update_next_point(cls):
-        cls._next_point += 1
+        # Only increment if we haven't reached the max point limit
+        if cls._max_point is None or cls._next_point < cls._max_point:
+            cls._next_point += 1
+
+    @classmethod
+    def set_max_point(cls, max_point):
+        """Set the maximum point limit (stops incrementing when _next_point reaches this)"""
+        cls._max_point = max_point
 
     @classmethod
     def add_next_point(cls, point, index):
