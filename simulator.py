@@ -365,7 +365,7 @@ class GameSimulation:
 
         # Update cluster master position (car's current position) for tracking coverage
         car_pos = self.track.get_center()
-        Cluster.set_master(car_pos, self.SCALE)
+        Cluster.set_master(car_pos, self.car_draw.get_size())
 
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
         self.coordinates_display.set_text(
