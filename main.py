@@ -39,12 +39,18 @@ def main(sim) -> None:
     
     frame_count = 0
     
+    # TEST: Pass delta_x and delta_y manually
+    # Uncomment and modify these values to test with fixed movements
+    # TEST_MODE = True
+    # TEST_DELTA_X = 0.001
+    # TEST_DELTA_Y = 0.0
+    
     while True:
         frame_count += 1
         
-        # Default movement (will be replaced with serial data)
-        delta_x = random.uniform(-1e-3, 1e-3)
-        delta_y = random.uniform(-1e-3, 1e-3)
+        # Uncomment to use manual test values:
+        delta_x = 0.0
+        delta_y = -0.01
         
         # Use simulated data for graphs (or will come from parser later)
         robot_data = simulate_robot_data()

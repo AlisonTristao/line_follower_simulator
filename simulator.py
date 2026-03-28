@@ -364,7 +364,7 @@ class GameSimulation:
         self.track.step(delta_x * self.SCALE, delta_y * self.SCALE, 0)
 
         # Update cluster master position (car's current position) for tracking coverage
-        car_pos = self.track.get_center()
+        car_pos = self.car_draw.get_center()
         car_size = self.car_draw.get_size()
         Cluster.set_master(car_pos, car_size)
         
