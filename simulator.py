@@ -482,8 +482,11 @@ class GameSimulation:
         if not self.serial_monitor:
             return
         
-        # Get available ports
-        available_ports = self.com.list_ports() if self.com else []
+        # Get available ports - create SerialCom if needed
+        if not self.com:
+            self.com = SerialCom()
+        
+        available_ports = self.com.list_ports()
         if available_ports:
             self.serial_monitor.port_dropdown.set_options(available_ports)
         else:
