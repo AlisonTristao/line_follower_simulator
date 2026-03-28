@@ -1,104 +1,77 @@
-import numpy as np
-import random
-from settings import *
 from serial_com import SerialCom
+import threading
 
-def simulate_robot_data():
-    """
-    Simulate robot data for testing.
-    This will be replaced with actual serial communication data.
-    """
-    import random
-    import math
-    
-    # Simulate some varying data for visualization
-    timestamp = np.linspace(0, 10, 1000)
-    sine_wave = 50 * np.sin(2 * np.pi * timestamp)
-    
-    return {
-        "encoder_left": sine_wave[random.randint(-100, 100)],
-        "encoder_right": sine_wave[random.randint(-100, 100)],
-        "imu_ax": random.uniform(-10, 10),
-        "imu_ay": random.uniform(-10, 10),
-        "imu_az": random.uniform(0, 50),
-        "motor_current_left": random.uniform(-100, 100),
-        "motor_current_right": random.uniform(-100, 100),
-        "pwm_left": random.uniform(-100, 100),
-        "pwm_right": random.uniform(-100, 100),
-        "sensor_front": random.uniform(0, 100),
-        "vel_filtered": sine_wave[int(timestamp[0] * 100) % 1000] / 2,
-        "omega_filtered": random.uniform(-50, 50),
-    }
-
-def main(sim) -> None:
+def main() -> None:
     # ------------------------------------------------------------------
-    # Main control loop - communicates with real robot via serial
+    # Serial Communication Interface
     # ------------------------------------------------------------------
 
     # Initialize serial communication
     com = SerialCom()
     
-    print("\n" + "="*50)
-    print("SELEÇÃO DE PORTA SERIAL")
-    print("="*50)
+    print("\n" + "="*60)
+    print("LINHA FOLLOWER - SERIAL COMMUNICATION TEST")
+    print("="*60)
     
     # List and select port
     port = com.select_port()
     if not port:
-        print("Nenhuma porta selecionada. Usando dados simulados.")
-        use_serial = False
-    else:
-        # Try to connect
-        if com.connect(port):
-            use_serial = True
-            print("\n✓ Conexão estabelecida com o robô!")
-        else:
-            print("\n✗ Falha ao conectar. Usando dados simulados.")
-            use_serial = False
-
-    print("\nSimulador iniciando...\n")
+        print("\n✗ Nenhuma porta selecionada. Encerrando.")
+        return
+    
+    # Try to connect
+    if not com.connect(port):
+        print("\n✗ Falha ao conectar. Encerrando.")
+        return
+    
+    print("\n✓ Conexão estabelecida com o robô!")
+    print("\nComandos:")
+    print("  - Digite mensagens para enviar")
+    print("  - Digite 'sair' para desconectar")
+    print("  - Digite 'limpar' para limpar tela")
+    print("\n" + "="*60)
     
     frame_count = 0
-    while True:
-        frame_count += 1
-        
-        # Default movement
-        delta_x = random.uniform(-1e-3, 1e-3)
-        delta_y = random.uniform(-1e-3, 1e-3)
-        
-        # Try to receive data from robot
-        if use_serial and com.is_connected():
-            msg = com.read_message()
-            
-            if msg:
-                # TODO: Parse message and extract robot data
-                # For now, just print it
-                print(f"Frame {frame_count}: {msg}")
-                
-                # Example (when parser is ready):
-                # robot_data = parse_message(msg)
-                # sim.update_robot_data(robot_data)
-                # sim.update_graphs_from_robot_data()
-        
-        # Use simulated data for now
-        robot_data = simulate_robot_data()
-        sim.update_robot_data(robot_data)
-        sim.update_graphs_from_robot_data()
-
-        data = sim.step(delta_x, delta_y)
-        if data is None:
-            break
-
-        # ---------------------------------------------------------------
-        # Receive visualization data from simulator
-        # ---------------------------------------------------------------
-
-        line, future_pts = data
     
-    # Disconnect before exiting
-    if use_serial:
+    def read_messages():
+        """Thread para ler mensagens do robô continuamente"""
+        nonlocal frame_count
+        while com.is_connected():
+            msg = com.read_message()
+            if msg:
+                frame_count += 1
+                print(f"\n[RX {frame_count}]: {msg}")
+                print("> ", end="", flush=True)
+    
+    # Start read thread
+    read_thread = threading.Thread(target=read_messages, daemon=True)
+    read_thread.start()
+    
+    # Input loop
+    try:
+        while com.is_connected():
+            try:
+                msg = input("> ").strip()
+                
+                if msg.lower() == "sair":
+                    print("\nDesconectando...")
+                    break
+                
+                if msg.lower() == "limpar":
+                    print("\n" * 50)
+                    continue
+                
+                if msg:
+                    com.send_message(msg)
+                    print(f"[TX]: {msg}")
+            
+            except KeyboardInterrupt:
+                print("\n\nDesconectando...")
+                break
+    
+    finally:
         com.disconnect()
-        
+        print("✓ Desconectado.")
+
 if __name__ == "__main__":
-    sim = settings()
-    main(sim)
+    main()
