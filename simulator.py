@@ -28,7 +28,8 @@ class SimulationConfig:
     car_size: float = 0.15              # Car width/size in meters
     front_sensor_distance: float = 0.12 # Distance from car center to front sensor in meters
     front_sensor_size: float = 0.08     # Front sensor length in meters
-    side_sensor_distance: float = 0.08  # Distance from car center to side sensors in meters
+    side_sensor_distance_x: float = 0.08  # Horizontal distance from car center to side sensors in meters
+    side_sensor_distance_y: float = 0.10  # Vertical distance from car center to side sensors in meters
     side_sensor_size: float = 0.03      # Side sensor diameter in meters
 
 
@@ -63,7 +64,8 @@ class GameSimulation:
         self.car_size_meters = config.car_size
         self.front_sensor_distance_meters = config.front_sensor_distance
         self.front_sensor_size_meters = config.front_sensor_size
-        self.side_sensor_distance_meters = config.side_sensor_distance
+        self.side_sensor_distance_x_meters = config.side_sensor_distance_x
+        self.side_sensor_distance_y_meters = config.side_sensor_distance_y
         self.side_sensor_size_meters = config.side_sensor_size
 
         self.time_simulation = 0
@@ -153,12 +155,13 @@ class GameSimulation:
         )
 
         # create side sensors (left and right - convert meters to pixels)
-        side_sensor_distance_pixels = int(self.side_sensor_distance_meters * self.SCALE)
+        side_sensor_distance_x_pixels = int(self.side_sensor_distance_x_meters * self.SCALE)
+        side_sensor_distance_y_pixels = int(self.side_sensor_distance_y_meters * self.SCALE)
         side_sensor_size_pixels = int(self.side_sensor_size_meters * self.SCALE)
         car_x = self.car_draw.get_center()[0]
         car_y = self.car_draw.get_center()[1]
-        self.left_sensor = SideSensor((car_x - side_sensor_distance_pixels, car_y), size=side_sensor_size_pixels)
-        self.right_sensor = SideSensor((car_x + side_sensor_distance_pixels, car_y), size=side_sensor_size_pixels)
+        self.left_sensor = SideSensor((car_x - side_sensor_distance_x_pixels, car_y - side_sensor_distance_y_pixels), size=side_sensor_size_pixels)
+        self.right_sensor = SideSensor((car_x + side_sensor_distance_x_pixels, car_y - side_sensor_distance_y_pixels), size=side_sensor_size_pixels)
 
         # create future points
         self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length * 0.5 * self.SCALE)
