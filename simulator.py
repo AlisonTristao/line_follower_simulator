@@ -251,6 +251,7 @@ class GameSimulation:
         self.simulator.add(self.left_sensor)
         self.simulator.add(self.right_sensor)
         self.simulator.add(self.minimap)
+        self.simulator.add(self.clear_trail_button)  # Add before display layer
         self.simulator.add(self.fps_display)
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
@@ -453,9 +454,6 @@ class GameSimulation:
         self.future_points.set_points(future_point)
 
         self.simulator.draw()
-        
-        # Draw clear button on top
-        self.clear_trail_button.draw(self.simulator.screen)
         
         # Single display update after all draws
         pygame.display.flip()

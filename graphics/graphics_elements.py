@@ -1308,6 +1308,14 @@ class SerialMonitor(Shape):
         ]
         self.current_color_index = 0
         
+        # Drag and drop support (optimized)
+        self.is_dragging = False
+        self.drag_offset_x = 0
+        self.drag_offset_y = 0
+        self.header_height = 25  # Height of the draggable header
+        self.handle_radius = 5  # Radius of the grab handle
+        self.mouse_over_handle = False
+        
         self._update_ui_positions()
 
     def _update_ui_positions(self):
@@ -1367,6 +1375,12 @@ class SerialMonitor(Shape):
         
         return messages_count if messages_count > 0 else 1  # At least 1 message
 
+    def _is_mouse_over_handle(self, mouse_x, mouse_y):
+        """check if mouse is over the grab handle (optimized)"""
+        handle_x = self._x + self.width - 12
+        handle_y = self._y - 10
+        distance = ((mouse_x - handle_x) ** 2 + (mouse_y - handle_y) ** 2) ** 0.5
+        return distance <= self.handle_radius + 3  # 3px tolerance
 
     def handle_event(self, event):
         """handle UI events"""
@@ -1378,23 +1392,52 @@ class SerialMonitor(Shape):
         if not self.enabled:
             return
         
-        # Handle scroll with mouse wheel
+        # Handle drag and drop of header - only from handle
         if event.type == pygame.MOUSEBUTTONDOWN:
-            if event.button == 4:  # Scroll up
+            if event.button == 1:  # Left mouse button
+                mouse_x, mouse_y = event.pos
+                # Check if mouse is over grab handle (optimized)
+                if self._is_mouse_over_handle(mouse_x, mouse_y):
+                    self.is_dragging = True
+                    self.drag_offset_x = mouse_x - self._x
+                    self.drag_offset_y = mouse_y - self._y
+                    return  # Don't process other events when starting drag
+            elif event.button == 4:  # Scroll up
                 self.scroll_offset = max(0, self.scroll_offset - 6)
             elif event.button == 5:  # Scroll down
                 self.scroll_offset += 6
         
-        # Handle buttons (callbacks will be called from main.py)
-        self.btn_connect.handle_event(event)
-        self.btn_disconnect.handle_event(event)
-        self.btn_clear.handle_event(event)
-        self.btn_send.handle_event(event)
+        # Handle mouse move (drag only if already dragging)
+        elif event.type == pygame.MOUSEMOTION:
+            if self.is_dragging:
+                mouse_x, mouse_y = event.pos
+                new_x = mouse_x - self.drag_offset_x
+                new_y = mouse_y - self.drag_offset_y
+                self.set_coordinates((new_x, new_y))
+                return  # Don't process other events while dragging
+            else:
+                # Only check hover when not dragging (optimized)
+                mouse_x, mouse_y = event.pos
+                self.mouse_over_handle = self._is_mouse_over_handle(mouse_x, mouse_y)
         
-        # Handle other UI elements
-        self.port_dropdown.handle_event(event)
-        self.text_input.handle_event(event)
-        self.checkbox_limit_messages.handle_event(event)
+        # Handle mouse release
+        elif event.type == pygame.MOUSEBUTTONUP:
+            if event.button == 1:  # Left mouse button
+                self.is_dragging = False
+                return
+        
+        # Only process button events if not dragging (optimized)
+        if not self.is_dragging:
+            # Handle buttons (callbacks will be called from main.py)
+            self.btn_connect.handle_event(event)
+            self.btn_disconnect.handle_event(event)
+            self.btn_clear.handle_event(event)
+            self.btn_send.handle_event(event)
+            
+            # Handle other UI elements
+            self.port_dropdown.handle_event(event)
+            self.text_input.handle_event(event)
+            self.checkbox_limit_messages.handle_event(event)
         
         # Handle text input submit (Enter key)
         if self.text_input.submit_pressed:
@@ -1482,8 +1525,15 @@ class SerialMonitor(Shape):
         pygame.draw.rect(surface, self._color, (x, y, w, h), border_radius=10)
         pygame.draw.rect(surface, (200, 200, 200), (x, y, w, h), 2, border_radius=10)
         
-        # Draw header
-        pygame.draw.line(surface, (200, 200, 200), (x, y + 45), (x + w, y + 45), 1)
+        # Draw grab handle (small circle) in top-right corner
+        handle_x = x + w - 12
+        handle_y = y - 10
+        handle_color = (100, 200, 255) if self.mouse_over_handle else (150, 150, 150)
+        pygame.draw.circle(surface, handle_color, (handle_x, handle_y), self.handle_radius)
+        pygame.draw.circle(surface, (100, 100, 100), (handle_x, handle_y), self.handle_radius, 1)
+        
+        # Draw header line
+        pygame.draw.line(surface, (200, 200, 200), (x, y + 20), (x + w, y + 20), 1)
         
         # Draw control buttons
         self.btn_connect.draw(surface)
