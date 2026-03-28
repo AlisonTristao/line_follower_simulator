@@ -1,8 +1,14 @@
 import numpy as np
 import random
 import threading
+import time
 from settings import *
 from serial_com import SerialCom
+
+# Global serial communication object
+com = None
+serial_connected = False
+serial_lock = threading.Lock()
 
 def simulate_robot_data():
     """
@@ -31,50 +37,102 @@ def simulate_robot_data():
         "omega_filtered": random.uniform(-50, 50),
     }
 
+def read_serial_thread():
+    """Thread para ler mensagens do robô continuamente"""
+    global com, serial_connected, sim_obj
+    
+    while serial_connected:
+        if com and com.is_connected():
+            msg = com.read_message()
+            if msg:
+                with serial_lock:
+                    if sim_obj and hasattr(sim_obj, 'serial_monitor') and sim_obj.serial_monitor:
+                        sim_obj.serial_monitor.add_message(f"[RX] {msg}", (0, 180, 255))
+        else:
+            time.sleep(0.1)
+
+def serial_connect(port: str):
+    """Connect to serial port and start read thread"""
+    global com, serial_connected, read_thread
+    
+    if not com:
+        com = SerialCom()
+    
+    if com.connect(port):
+        serial_connected = True
+        read_thread = threading.Thread(target=read_serial_thread, daemon=True)
+        read_thread.start()
+        return True
+    return False
+
+def serial_disconnect():
+    """Disconnect from serial port"""
+    global com, serial_connected
+    
+    serial_connected = False
+    if com:
+        com.disconnect()
+
+def serial_send(message: str):
+    """Send message via serial"""
+    global com
+    
+    if com and com.is_connected():
+        com.send_message(message)
+        return True
+    return False
+
 def main(sim) -> None:
+    global com, serial_connected, sim_obj
+    
+    sim_obj = sim
+    
     # ------------------------------------------------------------------
     # Main control loop - Serial Backend + Pygame Simulator
     # ------------------------------------------------------------------
 
-    # Initialize serial communication
-    com = SerialCom()
-    
     print("\n" + "="*60)
     print("LINHA FOLLOWER - SERIAL BACKEND + SIMULATOR")
-    print("="*60)
+    print("="*60 + "\n")
     
-    # List and select port
-    port = com.select_port()
-    if not port:
-        print("\n✗ Nenhuma porta selecionada. Usando simulador standalone.")
-        use_serial = False
-    else:
-        # Try to connect
-        if com.connect(port):
-            use_serial = True
-            print("\n✓ Conexão estabelecida com o robô!")
+    # Setup serial monitor
+    if sim.serial_monitor:
+        # Get available ports
+        com_test = SerialCom()
+        available_ports = com_test.list_ports()
+        
+        if available_ports:
+            sim.serial_monitor.port_dropdown.set_options(available_ports)
         else:
-            print("\n✗ Falha ao conectar. Usando simulador standalone.")
-            use_serial = False
-
-    print("\nSimulador + Backend Serial inicializando...\n")
+            sim.serial_monitor.port_dropdown.set_options(["Nenhuma porta"])
+        
+        def on_connect_click():
+            port = sim.serial_monitor.port_dropdown.get_selected()
+            if serial_connect(port):
+                sim.serial_monitor.add_message(f"[SISTEMA] Conectado em {port}", (0, 200, 0))
+            else:
+                sim.serial_monitor.add_message(f"[SISTEMA] Falha ao conectar em {port}", (200, 0, 0))
+        
+        def on_disconnect_click():
+            serial_disconnect()
+            sim.serial_monitor.add_message("[SISTEMA] Desconectado", (200, 100, 0))
+        
+        def on_send_click():
+            text = sim.serial_monitor.text_input.get_text()
+            if text:
+                if serial_send(text):
+                    sim.serial_monitor.add_message(f"[TX] {text}", (200, 200, 0))
+                else:
+                    sim.serial_monitor.add_message("[SISTEMA] Não conectado", (200, 0, 0))
+                sim.serial_monitor.text_input.clear()
+        
+        sim.serial_monitor.btn_connect.callback = on_connect_click
+        sim.serial_monitor.btn_disconnect.callback = on_disconnect_click
+        sim.serial_monitor.btn_send.callback = on_send_click
+        
+        sim.serial_monitor.add_message("[SISTEMA] Inicializado", (100, 200, 100))
     
     frame_count = 0
-    last_message = None
-    
-    def read_messages():
-        """Thread para ler mensagens do robô continuamente"""
-        nonlocal last_message
-        while com.is_connected():
-            msg = com.read_message()
-            if msg:
-                last_message = msg
-                print(f"\n[RX]: {msg}")
-    
-    # Start read thread if connected
-    if use_serial:
-        read_thread = threading.Thread(target=read_messages, daemon=True)
-        read_thread.start()
     
     while True:
         frame_count += 1
@@ -82,11 +140,6 @@ def main(sim) -> None:
         # Default movement (will be replaced with serial data)
         delta_x = random.uniform(-1e-3, 1e-3)
         delta_y = random.uniform(-1e-3, 1e-3)
-        
-        # Print received message if any
-        if last_message:
-            print(f"Frame {frame_count}: {last_message}")
-            last_message = None
         
         # Use simulated data for graphs (or will come from parser later)
         robot_data = simulate_robot_data()
@@ -104,9 +157,8 @@ def main(sim) -> None:
         line, future_pts = data
     
     # Disconnect before exiting
-    if use_serial:
-        com.disconnect()
-        print("\n✓ Desconectado.")
+    serial_disconnect()
+    print("\n✓ Desconectado.")
 
 if __name__ == "__main__":
     sim = settings()

@@ -915,6 +915,7 @@ class Button:
         self.bg_color = bg_color
         self.text_color = text_color
         self.hovered = False
+        self.callback = None  # Optional callback function
 
     def draw(self, surface):
         # draw button background
@@ -932,6 +933,8 @@ class Button:
             self.hovered = self.rect.collidepoint(event.pos)
         elif event.type == pygame.MOUSEBUTTONDOWN:
             if self.rect.collidepoint(event.pos):
+                if self.callback:
+                    self.callback()
                 return True
         return False
 
