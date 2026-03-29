@@ -36,7 +36,4 @@ def settings():
     )
     sim = GameSimulation(sim_config)
 
-    # Initialize future points for visualization
-    sim.set_future_points(count=45, space=3)
-
     return sim

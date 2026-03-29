@@ -95,7 +95,7 @@ class GameSimulation:
         self.clear_trail_button = None
         self.last_trail_update_time = time.time()  # Track last time trail point was added
 
-        self.future_points_count = 10
+        self.cluster_future_count = 10
 
         # Serial communication
         self.com = None
@@ -167,7 +167,7 @@ class GameSimulation:
         self.right_sensor = SideSensor((car_x + side_sensor_distance_x_pixels, car_y - side_sensor_distance_y_pixels), size=side_sensor_size_pixels)
 
         # create future points
-        self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length * 0.5 * self.SCALE)
+        #self.future_points = FuturePoints(self.car_draw.get_center(), size=self.track_length * 0.5 * self.SCALE)
 
         # create display with reduced size
         display_height = int(0.7 * self.simulator.get_window_size()[1])
@@ -255,7 +255,7 @@ class GameSimulation:
         self.simulator.add(self.fps_display)
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
-        self.simulator.add(self.future_points)
+        #self.simulator.add(self.future_points)
         self.simulator.add(self.track_percentage)
         self.simulator.add(self.points)
         self.simulator.add(self.display)
@@ -264,6 +264,9 @@ class GameSimulation:
 
         # configurate the cluster
         self.configurate_cluster()
+
+        # Setup Cluster's future points tracking with count=10, space=30
+        self.setup_cluster_future_points(count=self.cluster_future_count, space=30)
 
         # Set maximum point limit - stops incrementing when reaching end of track
         Cluster.set_max_point(self.win)
@@ -369,8 +372,8 @@ class GameSimulation:
         """Update the points display with the given value."""
         self.points.set_text(f"score: {points}")
 
-    def set_future_points(self, count, space):
-        """Initialize future points visualization."""
+    def setup_cluster_future_points(self, count, space):
+        """Setup Cluster's future points tracking."""
         from graphics.graphics_elements import Cluster
         Cluster.set_future_count(future_count=count, future_space=space)
 
@@ -451,7 +454,7 @@ class GameSimulation:
         
         # Now get the updated future points for FuturePoints object
         future_point = Cluster.get_next_point()
-        self.future_points.set_points(future_point)
+        #self.future_points.set_points(future_point)
 
         self.simulator.draw()
         
@@ -729,11 +732,11 @@ def set_car_dynamics(
         sensor_count,
     )
 
-def set_future_points(count, space):
+'''def set_future_points(count, space):
     sim = _require_simulation()
     if sim is None:
         return
-    sim.set_future_points(count, space)
+    sim.set_future_points(count, space)'''
 
 '''def set_graph_future_control(left, right):
     sim = _require_simulation()
