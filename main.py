@@ -21,21 +21,21 @@ def get_keyboard_input():
     
     # Horizontal movement (Left/Right arrows)
     if keys[pygame.K_LEFT]:
-        delta_x = -0.1
+        delta_x = -0.01
     elif keys[pygame.K_RIGHT]:
-        delta_x = 0.1
+        delta_x = 0.01
     
     # Vertical movement (Up/Down arrows)
     if keys[pygame.K_UP]:
-        delta_y = -0.1
+        delta_y = -0.01
     elif keys[pygame.K_DOWN]:
-        delta_y = 0.1
+        delta_y = 0.01
 
     # Rotation (Q/E keys)
     if keys[pygame.K_q]:
-        delta_theta = 0.05  # Rotate counter-clockwise
+        delta_theta = 0.01  # Rotate counter-clockwise
     elif keys[pygame.K_e]:
-        delta_theta = -0.05  # Rotate clockwise
+        delta_theta = -0.01  # Rotate clockwise
     
     return delta_x, delta_y, delta_theta
 
