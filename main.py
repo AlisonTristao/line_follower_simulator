@@ -56,8 +56,8 @@ def simulate_robot_data():
     
     return {
         # Robot sensor data
-        "encoder_left": sine_wave[random.randint(-100, 100)],
-        "encoder_right": sine_wave[random.randint(-100, 100)],
+        "encoder_left": random.randint(-100, 100),
+        "encoder_right": random.randint(-100, 100),
         "imu_ax": random.uniform(-10, 10),
         "imu_ay": random.uniform(-10, 10),
         "imu_az": random.uniform(0, 50),
@@ -104,7 +104,7 @@ def main(sim) -> None:
             break
         
         # Receive visualization data from simulator
-        line_sensor, future_points = data
+        #line_sensor, future_points = data
     
     # Disconnect before exiting
     sim.serial_disconnect()

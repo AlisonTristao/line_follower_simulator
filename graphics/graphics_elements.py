@@ -25,6 +25,7 @@ class Shape:
         self._color = color
         self._size = size
         self._pivot = (0, 0)
+        self.visible = True  # Visibility flag for toggling display
         
         # World boundary limits (default to None - disabled)
         self._world_width = None
@@ -278,7 +279,7 @@ class Cluster(Shape):
     _future_count       = 10       
     _future_space       = 30        
 
-    def __init__(self, coo=(0, 0), color=(0, 0, 0), size=5, angle=0):
+    def __init__(self, coo=(0, 0), color=(0, 0, 0), size=3, angle=0):
         """
         Initializes the cluster object
         """
@@ -376,7 +377,7 @@ class MiniMap(Shape):
     """
     Represents a minimap object on the simulator
     """
-    MAX_TRAIL_POINTS = 250  # Maximum number of trail points to store
+    MAX_TRAIL_POINTS = 50  # Maximum number of trail points to store
     
     def __init__(self, coo, size, color=(255, 255, 255)):
         """
@@ -493,7 +494,7 @@ class Track(Shape):
             visible (int): radius of visibility for the track points
             screen_size (tuple): dimensions of the screen
         """
-        super().__init__(coo=(size[0] * point_spacing // 1.1, size[1] * point_spacing // 2), size=size, angle=0)
+        super().__init__(coo=(size[0] * point_spacing, size[1] * point_spacing // 2), size=size, angle=0)
         self.screen_size = screen_size
         self.__visible = visible
         self.__point_spacing = point_spacing
@@ -634,6 +635,12 @@ class Display(Shape):
         self.__graph_colors = {}
 
         self.__checbox_arr = {}
+        
+        # Checkboxes for compass and coordinates visibility
+        self.checkbox_compass = Checkbox(0, 0, 30, "Compass")
+        self.checkbox_compass.checked = True
+        self.checkbox_coordinates = Checkbox(0, 0, 30, "Coordinates")
+        self.checkbox_coordinates.checked = True
 
     # define time of the x axis
     def set_time(self, fps):
@@ -642,6 +649,9 @@ class Display(Shape):
     def verify_checkbox(self, event):
         for graph_name, checkbox in self.__checbox_arr.items():
             checkbox.handle_event(event)
+        # Handle compass and coordinates checkboxes
+        self.checkbox_compass.handle_event(event)
+        self.checkbox_coordinates.handle_event(event)
 
     # adds a new graph with a specific line name
     def add_graph(self, graph_name):
@@ -680,12 +690,15 @@ class Display(Shape):
 
     # draws the display as a rectangle with rounded corners, including graphs and text
     def draw(self, surface):
-        # draw the display rectangle with rounded corners
-        rect = pygame.Rect(self._x, self._y, self._size[0], self._size[1])
-        pygame.draw.rect(surface, self._color, rect, border_radius=15)
-
         # calculate the height of each graph useing the number of selected graphs
         selected = sum(1 for checkbox in self.__checbox_arr.values() if checkbox.checked)
+        
+        # Only draw background if any graph is selected (FPS optimization)
+        if selected > 0:
+            # draw the display rectangle with rounded corners
+            rect = pygame.Rect(self._x, self._y, self._size[0], self._size[1])
+            pygame.draw.rect(surface, self._color, rect, border_radius=15)
+        
         graph_height = (self._size[1] - 30) // selected if selected > 0 else 0
 
         # draw each graph
@@ -701,6 +714,17 @@ class Display(Shape):
 
             if checkbox.checked:
                 selected.append(graph_name)
+
+        # Draw compass and coordinates checkboxes below graph checkboxes
+        num_graphs = len(self.__graph_data)
+        compass_y = self._y + num_graphs * 20
+        coordinates_y = self._y + (num_graphs + 1) * 20
+        
+        self.checkbox_compass.set_coordinates((self._x + self._size[0] + 5, compass_y))
+        self.checkbox_compass.draw(surface)
+        
+        self.checkbox_coordinates.set_coordinates((self._x + self._size[0] + 5, coordinates_y))
+        self.checkbox_coordinates.draw(surface)
 
         for i in range(len(selected)):
             graph_name = selected[i]
@@ -862,6 +886,8 @@ class Statistics(Shape):
         args:
             surface (pygame.Surface): the surface to draw on
         """
+        if not self.visible:
+            return
         text_surface = self._font.render(self.text, True, self._color)
         x = self._x - text_surface.get_width() // self._offset
         surface.blit(text_surface, (x, self._y))
@@ -883,6 +909,10 @@ class Compass(Shape):
         super().__init__(coo, color, size, angle)
 
     def draw(self, surface):
+        # Check if visible before drawing
+        if not self.visible:
+            return
+            
         # Draw the outer circle
         pygame.draw.circle(surface, self._color, (self._x, self._y), self._size, 2)
 
@@ -1344,6 +1374,10 @@ class SerialMonitor(Shape):
         self.btn_disconnect.set_position(x + 105, y + 50)
         self.btn_clear.set_position(x + 200, y + 50)
         
+        # Limit messages checkbox (top right of messages area)
+        # Messages area starts at y + 90, so checkbox goes there
+        self.checkbox_limit_messages.set_coordinates((x + self.width - 40, y + 100))
+        
         # Message input area with fixed height
         self.text_input.set_position(x + 10, y + self.height - 55)
         self.btn_send.set_position(x + self.width - 80, y + self.height - 55)
@@ -1624,10 +1658,7 @@ class SerialMonitor(Shape):
             scroll_y = max(messages_y, min(scroll_y, messages_y + messages_height - scroll_h))
             pygame.draw.rect(surface, (180, 180, 180), (x + w - 15, scroll_y, 5, scroll_h))
         
-        # Draw limit messages checkbox (update position and draw)
-        checkbox_x = x + self.width - 35
-        checkbox_y = messages_y + 2
-        self.checkbox_limit_messages.set_coordinates((checkbox_x, checkbox_y))
+        # Draw limit messages checkbox only (top right corner)
         self.checkbox_limit_messages.draw(surface)
         
         # Draw separator

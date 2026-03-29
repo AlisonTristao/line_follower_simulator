@@ -113,7 +113,7 @@ def generate_cluster(length, width, scale, x_arr, y_arr):
     for i in range(-length//2, length//2):
         for j in range(-width//2, width//2):
             # verify if has in the square
-            index_arr = points_in_square(i, j, (length + width)/scale, x_arr, y_arr)
+            index_arr = points_in_square(i, j, 0.5, x_arr, y_arr)
             if len(index_arr) > 0:
                 cluster_array = []
                 # create the cluster

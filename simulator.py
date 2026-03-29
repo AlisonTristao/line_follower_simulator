@@ -20,9 +20,9 @@ class SimulationConfig:
     width: int
     scale: int
     render: int
-    track_type: int = 0
-    track_length: float = 0.02
+    meter_per_scale: int
     sensor_spacing: float = 0.001
+    tail_time: float = 0.1
     
     # Robot dimensions (in meters)
     car_size: float = 0.15              # Car width/size in meters
@@ -32,6 +32,11 @@ class SimulationConfig:
     side_sensor_distance_y: float = 0.10  # Vertical distance from car center to side sensors in meters
     side_sensor_size: float = 0.03      # Side sensor diameter in meters
 
+    # track configuration 
+    track_type: int = 0
+    track_length: float = 0.02
+    track_noise: float = 0.12
+    track_radius: float = 30
 
 # Graph scale limits (min and max percentages for real robot data)
 GRAPH_LIMITS = {
@@ -73,6 +78,10 @@ class GameSimulation:
 
         self._init_simulation_objects()
         self._setup_simulator()
+
+        # frames per secod 
+        self.frames_per_secod = 0
+        self.last_FPS_update = 0
 
     def _init_simulation_objects(self):
         self.simulator = Simulator(self.screen_size, self.FPS)
@@ -126,7 +135,7 @@ class GameSimulation:
 
         # create the cluster
         for i in range(len(cluster_matrix)):
-            cluster = Cluster(size=self.track_length * self.SCALE)
+            cluster = Cluster(size=self.track_length * self.SCALE//2)
             for k in cluster_matrix[i]:
                 cluster.add_point(k)
             self.track.set_obj(position[i][0], position[i][1], cluster)
@@ -136,13 +145,14 @@ class GameSimulation:
         print("Initializing simulator...")
 
         # generate trajectory
+        resolution = int((self.config.length + self.config.width)*3.0)
         self.x_track, self.y_track = generate_track(
-            self.track_type, noise_level=0.225, checkpoints=36, resolution=500, track_rad=32
+            self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=resolution, track_rad=self.config.track_radius
         )
         self.win = len(self.x_track) - 1
 
         # create car with configured size (convert meters to pixels)
-        car_size_pixels = int(self.car_size_meters * self.SCALE)
+        car_size_pixels = int(self.car_size_meters * self.SCALE)//2
         # onde o carrinho vai ficar 1,36 e 1,8 // original 
         self.car_draw = Car(self.simulator.get_center(), size=car_size_pixels, center=(1.4, 1.4))
 
@@ -150,12 +160,12 @@ class GameSimulation:
         self.track = Track((self.LENGTH, self.WIDTH), self.SCALE, self.RENDER)
 
         # create line sensor (front sensor - convert meters to pixels)
-        front_sensor_distance_pixels = int(self.front_sensor_distance_meters * self.SCALE)
-        front_sensor_size_pixels = int(self.front_sensor_size_meters * self.SCALE)
-        self.line_sensor = LineSensor(
-            (self.car_draw.get_center()[0], self.car_draw.get_center()[1] - front_sensor_distance_pixels),
-            size=front_sensor_size_pixels
-        )
+        #front_sensor_distance_pixels = int(self.front_sensor_distance_meters * self.SCALE)
+        #front_sensor_size_pixels = int(self.front_sensor_size_meters * self.SCALE)
+        #self.line_sensor = LineSensor(
+        #    (self.car_draw.get_center()[0], self.car_draw.get_center()[1] - front_sensor_distance_pixels),
+        #    size=front_sensor_size_pixels
+        #)
 
         # create side sensors (left and right - convert meters to pixels)
         side_sensor_distance_x_pixels = int(self.side_sensor_distance_x_meters * self.SCALE)
@@ -182,7 +192,7 @@ class GameSimulation:
         minimap_y = int(display_height + 140) - 40  # Position below the graphs
         minimap_position = (minimap_center_x, minimap_y)
         self.minimap = MiniMap(minimap_position, minimap_size)
-        for k in range(0, len(self.x_track), self.SCALE // 10):
+        for k in range(0, len(self.x_track), resolution//10):
             self.minimap.add_point((2 * self.x_track[k] / self.LENGTH, 2 * self.y_track[k] / self.WIDTH))
         
         # create clear trail button (positioned at top-left corner of minimap)
@@ -215,12 +225,6 @@ class GameSimulation:
         # create statistics displays
         self.fps_display = Statistics((1.99 * self.simulator.get_center()[0], 0.01 * self.simulator.get_center()[1]))
 
-        # create display points
-        self.track_percentage = Statistics((1.0 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1]))
-
-        # pontuation of the track
-        self.points = Statistics((0.25 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1]))
-
         # create compass
         self.compass = Compass((1.85 * self.simulator.get_center()[0], 1.75 * self.simulator.get_center()[1]))
 
@@ -247,7 +251,7 @@ class GameSimulation:
         # the order of the objects is the layer order
         self.simulator.add(self.track)
         self.simulator.add(self.car_draw)
-        self.simulator.add(self.line_sensor)
+        #self.simulator.add(self.line_sensor)
         self.simulator.add(self.left_sensor)
         self.simulator.add(self.right_sensor)
         self.simulator.add(self.minimap)
@@ -256,8 +260,6 @@ class GameSimulation:
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
         #self.simulator.add(self.future_points)
-        self.simulator.add(self.track_percentage)
-        self.simulator.add(self.points)
         self.simulator.add(self.display)
         self.simulator.add(self.serial_monitor)
         self.simulator.add(self.serial_monitor_toggle)  # Add toggle AFTER monitor so it renders on top
@@ -362,16 +364,6 @@ class GameSimulation:
         """
         self.fps_display.set_text(f"fps: {fps}")
 
-    def update_coverage(self, coverage):
-        """
-        update the coverage display with the given value.
-        """
-        self.track_percentage.set_text(f"covered: {coverage}")
-
-    def update_points(self, points):
-        """Update the points display with the given value."""
-        self.points.set_text(f"score: {points}")
-
     def setup_cluster_future_points(self, count, space):
         """Setup Cluster's future points tracking."""
         from graphics.graphics_elements import Cluster
@@ -441,7 +433,7 @@ class GameSimulation:
         
         # Add current position to minimap trail (only every 0.5 seconds to reduce memory usage)
         current_time = time.time()
-        if current_time - self.last_trail_update_time >= 0.1:
+        if current_time - self.last_trail_update_time >= self.config.tail_time:
             self.minimap.add_trail_point(minimap_x, minimap_y)
             self.last_trail_update_time = current_time
 
@@ -465,8 +457,10 @@ class GameSimulation:
             print("Congratulations!")
             print("You win the game, you score is {:.2f}".format(100 * 100 / self.time_simulation))
             return None
+        
+        return True
 
-        future_point = [
+        '''future_point = [
             ((x - self.car_draw.get_center()[0]) / self.SCALE,
              (-y + self.car_draw.get_center()[1]) / self.SCALE)
             for x, y in future_point
@@ -490,7 +484,7 @@ class GameSimulation:
         return (
             1 - final_line / 255,
             future_point
-        )
+        )'''
 
     def step(self, delta_x, delta_y, delta_theta=0.0):
         """Public method used by external modules to advance the simulation."""
@@ -498,6 +492,10 @@ class GameSimulation:
             return None
         
         self.serial_monitor.update()
+        
+        # Update visibility of compass and coordinates based on checkboxes
+        self.compass.visible = self.display.checkbox_compass.checked
+        self.coordinates_display.visible = self.display.checkbox_coordinates.checked
 
         data = self._step_physics(delta_x, delta_y, delta_theta)
         if data is None:
@@ -505,14 +503,14 @@ class GameSimulation:
             return None
 
         self.time_simulation += 1 / self.FPS
-        coverage = Cluster._next_point / self.win * 100
-        self.update_coverage("{:.2f}%".format(coverage))
-        self.update_points("{:.2f}".format(100 * coverage / self.time_simulation))
+        #while (time.time() - self.timer) < 1 / self.FPS:
+        #    pass
 
-        while (time.time() - self.timer) < 1 / self.FPS:
-            pass
-
-        self.update_FPS("{:.1f}".format(1 / (time.time() - self.timer)))
+        self.frames_per_secod += 1
+        if time.time() - self.last_FPS_update >= 1.0:
+            self.update_FPS("{:.1f}".format(self.frames_per_secod))
+            self.frames_per_secod = 0
+            self.last_FPS_update = time.time()
         self.timer = time.time()
 
         return data
