@@ -241,21 +241,21 @@ class Wall(Shape):
     """
     represents a wall on the track
     """
-    def __init__(self, coo=(0, 0, 0), color=(100, 100, 100), size=70):
+    def __init__(self, coo=(0, 0, 0), color=(100, 100, 100), size=(70, 70)):
         """
         initializes a wall object
         args:
             coo (tuple): coordinates of the wall
             color (tuple): color of the wall in rgb format
-            size (int): size of the wall
+            size (tuple): width and height of the wall
         """
         super().__init__(coo, color, size)
 
     def draw(self, surface):
         # draws the wall as a rotated rectangle on the given surface
-        temp_surface = pygame.Surface((self._size, self._size), pygame.SRCALPHA)
+        temp_surface = pygame.Surface(self._size, pygame.SRCALPHA)
         temp_surface.fill(self._color)
-        rotated_surface = pygame.transform.rotate(temp_surface, math.degrees(self._angle))
+        rotated_surface = pygame.transform.rotate(temp_surface, math.degrees(-self._angle))
         rotated_rect = rotated_surface.get_rect(center=(int(self._x), int(self._y)))
         surface.blit(rotated_surface, rotated_rect)
 
@@ -503,8 +503,14 @@ class Track(Shape):
         # World size = (size - 1) (in cells) * point_spacing (pixels per cell) to limit to 0-99 and 0-49
         self.set_world_bounds((size[0] - 1) * point_spacing, (size[1] - 1) * point_spacing)
 
+        # lenght and width of the space between the chunks of the track
+        len_chunk = point_spacing//5
+        size_wall = point_spacing//2
+
         # initializes the matrix of points and walls
-        self.wall = Wall()
+        self.wall_hor = Wall(size=(len_chunk, size_wall))
+        self.wall_ver = Wall(size=(size_wall, len_chunk))
+        self.wall_lim = Wall(size=(len_chunk, len_chunk))
         self.default = Default()
         self.matrix = self._create_matrix(size)
 
@@ -514,7 +520,15 @@ class Track(Shape):
         for i in range(size[0]):
             row = []
             for j in range(size[1]):
-                row.append(self.wall if i in (0, size[0] - 1) or j in (0, size[1] - 1) else self.default)
+                # math case if x = 0 or x = size[0] - 1 or y = 0 or y = size[1] - 1, then it's a wall, otherwise it's a default point
+                if (i == 0 or i == size[0] - 1) and not (j == 0 or j == size[1] - 1):
+                    row.append(self.wall_hor)
+                elif (j == 0 or j == size[1] - 1) and not (i == 0 or i == size[0] - 1):
+                    row.append(self.wall_ver)
+                elif (i == 0 or i == size[0] - 1) and (j == 0 or j == size[1] - 1):
+                    row.append(self.wall_lim)
+                else:
+                    row.append(self.default)
             matrix.append(row)
         return matrix
 
