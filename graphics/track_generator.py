@@ -1,49 +1,96 @@
 import math
 import random
+import csv
 import numpy as np
 from scipy.interpolate import splprep, splev
 
 LEMNISCATE = 0
 CIRCLE = 1
+CSV_TRACK = 2
+
 
 def circle_checkpoints(ckeckpoints_number, track_radius, noise):
     checkpoints = []
     for c in range(ckeckpoints_number):
-        # Angle steps
         t = 2 * math.pi * c / ckeckpoints_number
 
-        # Point coordinates
         x = track_radius * math.cos(t)
         y = track_radius * math.sin(t)
 
-        # Add noise to points
-        x += random.uniform(noise/2, noise)
-        y += random.uniform(noise/2, noise)
+        x += random.uniform(noise / 2, noise)
+        y += random.uniform(noise / 2, noise)
 
         checkpoints.append((x, y))
-    
+
     return checkpoints
+
 
 def lemniscate_checkpoints(ckeckpoints_number, track_radius, noise):
     checkpoints = []
     for c in range(ckeckpoints_number):
-        # Angle steps
         t = 2 * math.pi * c / ckeckpoints_number
 
-        # Point coordinates
         x = track_radius * math.cos(t)
-        y = track_radius * math.sin(t) * math.cos(t)  
+        y = track_radius * math.sin(t) * math.cos(t)
 
-        # Add noise to points
-        x += random.uniform(noise/3, noise)
-        y += random.uniform(noise/3, noise)
+        x += random.uniform(noise / 3, noise)
+        y += random.uniform(noise / 3, noise)
 
         checkpoints.append((x, y))
 
     return checkpoints
 
-def generate_track(type=LEMNISCATE, checkpoints=24, track_rad=40, noise_level=0.12, resolution=250):
-    # Seed random generator
+def load_track_from_csv(csv_path, track_id=0):
+    """
+    Lê CSV e retorna x_arr, y_arr DIRETO (sem spline)
+    """
+    rows = []
+
+    with open(csv_path, "r", encoding="utf-8") as f:
+        reader = csv.DictReader(f)
+
+        for row in reader:
+            if int(row["track_id"]) == track_id:
+                rows.append((
+                    int(row["point_id"]),
+                    float(row["x"])/100,
+                    float(row["y"])/100
+                ))
+
+    if not rows:
+        raise ValueError(f"Nenhum ponto encontrado para track_id={track_id}")
+
+    # Ordena pela sequência correta
+    rows.sort(key=lambda item: item[0])
+
+    x_arr = np.array([row[1] for row in rows], dtype=float)
+    y_arr = np.array([row[2] for row in rows], dtype=float)
+
+    return x_arr, y_arr
+
+
+def generate_track(
+    type=LEMNISCATE,
+    checkpoints=24,
+    track_rad=40,
+    noise_level=0.12,
+    resolution=250,
+    csv_path=None,
+    track_id=0
+):
+    """
+    Agora:
+    - CSV_TRACK retorna direto os pontos do CSV
+    - SEM spline
+    """
+
+    # 🔥 CSV = retorno direto
+    if type == CSV_TRACK:
+        if csv_path is None:
+            raise ValueError("csv_path precisa ser definido para CSV_TRACK")
+        return load_track_from_csv(csv_path, track_id)
+
+    # resto igual ao seu original
     SEED = None
     if SEED is None:
         SEED = random.randint(0, 2**32 - 1)
@@ -53,7 +100,6 @@ def generate_track(type=LEMNISCATE, checkpoints=24, track_rad=40, noise_level=0.
     TRACK_RADIUS = track_rad
     NOISE_LEVEL = noise_level * track_rad
 
-    # Generate checkpoints 
     if type == CIRCLE:
         checkpoints = circle_checkpoints(CHECKPOINTS, TRACK_RADIUS, NOISE_LEVEL)
     elif type == LEMNISCATE:
@@ -61,73 +107,45 @@ def generate_track(type=LEMNISCATE, checkpoints=24, track_rad=40, noise_level=0.
     else:
         raise ValueError("Invalid track type")
 
-    # Smooth the track using spline interpolation
     checkpoints = np.array(checkpoints)
     tck, u = splprep([checkpoints[:, 0], checkpoints[:, 1]], s=0, per=True)
-    u_new = np.linspace(0, 1, len(checkpoints) * resolution)  # More points for smoothing
+    u_new = np.linspace(0, 1, len(checkpoints) * resolution)
     smooth_x, smooth_y = splev(u_new, tck)
 
     return smooth_x[::-1], smooth_y[::-1]
 
-def points_in_square(x0, y0, size, x_arr, y_arr):
-    """
-    Returns the indices of points inside a square centered at (x0, y0) with a side length of 2 * size.
-    
-    Args:
-        x0 (float): x-coordinate of the square's center.
-        y0 (float): y-coordinate of the square's center.
-        size (float): Half the side length of the square.
-        x_arr (np.ndarray): Array of x-coordinates of the points.
-        y_arr (np.ndarray): Array of y-coordinates of the points.
 
-    Returns:
-        list: Indices of points inside the square.
-    """
+def points_in_square(x0, y0, size, x_arr, y_arr):
     x_arr = np.array(x_arr)
     y_arr = np.array(y_arr)
-    
+
     inside_x = (x_arr > x0 - size) & (x_arr < x0 + size)
     inside_y = (y_arr > y0 - size) & (y_arr < y0 + size)
     inside_square = inside_x & inside_y
 
     return np.where(inside_square)[0].tolist()
 
+
 def generate_cluster(length, width, scale, x_arr, y_arr):
-    """
-    Generates a cluster of points in a square area.
-    
-    Args:
-        length (float): Length of the square.
-        width (float): Width of the square.
-
-    Returns:
-        array of arrays: Array of points in the cluster.
-    """
-
-    # matriz of 3 dimensions
     cluster_matrix = []
     position = []
 
-    # save the points useds
     processed_points = set()
-    for i in range(-length//2, length//2):
-        for j in range(-width//2, width//2):
-            # verify if has in the square
+    for i in range(-length // 2, length // 2):
+        for j in range(-width // 2, width // 2):
             index_arr = points_in_square(i, j, 0.5, x_arr, y_arr)
+
             if len(index_arr) > 0:
                 cluster_array = []
-                # create the cluster
+
                 for index in index_arr:
-                    # verify if the point is already used
                     if index not in processed_points:
                         x = (x_arr[index] - i) * scale
                         y = (y_arr[index] - j) * scale
                         cluster_array.append((x, y, index))
                         processed_points.add(index)
-            
-                # add the cluster to the matrix
-                cluster_matrix.append([])
-                cluster_matrix[-1] = cluster_array
+
+                cluster_matrix.append(cluster_array)
                 position.append((i + length // 2, j + width // 2))
 
     return cluster_matrix, position

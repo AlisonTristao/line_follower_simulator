@@ -34,6 +34,7 @@ class SimulationConfig:
 
     # track configuration 
     track_type: int = 0
+    track_path: str = "pista.csv"
     track_length: float = 0.02
     track_noise: float = 0.12
     track_radius: float = 30
@@ -147,7 +148,7 @@ class GameSimulation:
         # generate trajectory
         resolution = int((self.config.length + self.config.width)*3.0)
         self.x_track, self.y_track = generate_track(
-            self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=resolution, track_rad=self.config.track_radius
+            self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=resolution, track_rad=self.config.track_radius,  csv_path=self.config.track_path
         )
         self.win = len(self.x_track) - 1
 

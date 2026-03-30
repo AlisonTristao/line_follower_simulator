@@ -1,6 +1,6 @@
 import random
 import numpy as np
-from simulator import GameSimulation, SimulationConfig, LEMNISCATE, FULL
+from simulator import GameSimulation, SimulationConfig, FULL, CSV_TRACK
 
 METER_PER_SCALE = 3.0
 
@@ -16,11 +16,11 @@ def settings():
     sim_config = SimulationConfig(
         screen_size=FULL,
         fps=300,
-        length=14,                      # track length in meters
+        length=7,                      # track length in meters
         width=7,                        # track width in meters
         scale=500, # pixels per unity
         meter_per_scale = METER_PER_SCALE,
-        render=3,                        # number of chuncks render
+        render=2,                        # number of chuncks render
         tail_time=0.01,
         # Robot dimensions in METERS
         car_size=0.10,                   # Car width in meters
@@ -30,9 +30,10 @@ def settings():
         side_sensor_distance_y=0.10,     # Vertical distance from car center to side sensors in meters (forward/backward)
         side_sensor_size=0.03,           # Side sensor diameter in meters
         # track generation configuration
-        track_type=LEMNISCATE,          # type of format
-        track_noise=0.225,              # noise level as a percentage of track radius
-        track_radius=3                 # track radius in meters (for circular tracks) or size of the figure (for lemniscate)
+        track_type=CSV_TRACK,          # type of format
+        track_path="pista.csv"
+        #track_noise=0.225,              # noise level as a percentage of track radius
+        #track_radius=3                 # track radius in meters (for circular tracks) or size of the figure (for lemniscate)
 
     )
     sim = GameSimulation(sim_config)
