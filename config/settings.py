@@ -20,7 +20,7 @@ def settings():
         width=70,                        # track width in meters
         scale=500, # pixels per unity
         meter_per_scale = METER_PER_SCALE,
-        render=3,                        # number of chuncks render
+        render=2,                        # number of chuncks render
         tail_time=0.01,
         # Robot dimensions in METERS
         car_size=0.10,                   # Car width in meters
