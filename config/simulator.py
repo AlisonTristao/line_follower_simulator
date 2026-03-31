@@ -1,4 +1,4 @@
-import pygame
+﻿import pygame
 import random
 import time
 import math
@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from graphics.graphics_elements import *
 from graphics.track_generator import *
-from serial_com import SerialCom
+from .serial_com import SerialCom
 import numpy as np
 
 @dataclass
@@ -34,7 +34,6 @@ class SimulationConfig:
 
     # track configuration 
     track_type: int = 0
-    track_path: str = "pista.csv"
     track_length: float = 0.02
     track_noise: float = 0.12
     track_radius: float = 30
@@ -42,7 +41,7 @@ class SimulationConfig:
 # Graph scale limits (min and max percentages for real robot data)
 GRAPH_LIMITS = {
     "encoder": {"min": -100, "max": 100},           # RPM or velocity percentage
-    "IMU": {"min": -100, "max": 100},         # m/s² or g
+    "IMU": {"min": -100, "max": 100},         # m/s┬▓ or g
     "Current": {"min": -100, "max": 100},     # mA or percentage
     "PWM": {"min": -100, "max": 100},               # -100% to 100%
     "Array_Sensor": {"min": 0, "max": 100},         # 0-100% (line presence)
@@ -148,7 +147,7 @@ class GameSimulation:
         # generate trajectory
         resolution = int((self.config.length + self.config.width)*3.0)
         self.x_track, self.y_track = generate_track(
-            self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=resolution, track_rad=self.config.track_radius,  csv_path=self.config.track_path
+            self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=resolution, track_rad=self.config.track_radius
         )
         self.win = len(self.x_track) - 1
 
@@ -292,7 +291,7 @@ class GameSimulation:
             "Current": ["left", "right"],
             "PWM": ["left", "right"],
             "Array_Sensor": ["value"],
-            "speed": ["vm", "ω"],
+            "speed": ["vm", "¤ë"],
         }
         
         # Create graphs using structure
@@ -303,7 +302,7 @@ class GameSimulation:
 
         '''self.display.add_graph("free_response")
         self.display.add_line_to_graph("free_response", "d", color=self.get_rand_color())
-        self.display.add_line_to_graph("free_response", "θ", color=self.get_rand_color())
+        self.display.add_line_to_graph("free_response", "╬©", color=self.get_rand_color())
 
         self.display.add_graph("future_control")
         self.display.add_line_to_graph("future_control", "left", color=self.get_rand_color())
@@ -311,11 +310,11 @@ class GameSimulation:
 
         self.display.add_graph("reference")
         self.display.add_line_to_graph("reference", "d", color=self.get_rand_color())
-        self.display.add_line_to_graph("reference", "θ", color=self.get_rand_color())
+        self.display.add_line_to_graph("reference", "╬©", color=self.get_rand_color())
 
         self.display.add_graph("error")
         self.display.add_line_to_graph("error", "d", color=self.get_rand_color())
-        self.display.add_line_to_graph("error", "θ", color=self.get_rand_color())'''
+        self.display.add_line_to_graph("error", "╬©", color=self.get_rand_color())'''
 
     def _update_graphs(self):
         """Update all graphs with real robot data (to be received from serial)."""
@@ -348,7 +347,7 @@ class GameSimulation:
             ("PWM", "right", "PWM_right"),
             ("Array_Sensor", "value", "Array_Sensor"),
             ("speed", "vm", "speed"),
-            ("speed", "ω", "omega_filtered"),
+            ("speed", "¤ë", "omega_filtered"),
         ]
         
         # Update all graphs in single loop
@@ -571,7 +570,7 @@ class GameSimulation:
     # ========================================================================
 
     def _read_serial_thread(self):
-        """Thread para ler mensagens do robô continuamente"""
+        """Thread para ler mensagens do rob├┤ continuamente"""
         while self.serial_connected:
             try:
                 if self.com and self.com.is_connected():
@@ -646,12 +645,12 @@ class GameSimulation:
                 if self.serial_send(text):
                     self.serial_monitor.add_message(f"[TX] {text}", (200, 200, 0))
                 else:
-                    self.serial_monitor.add_message("[SISTEMA] Não conectado", (200, 0, 0))
+                    self.serial_monitor.add_message("[SISTEMA] N├úo conectado", (200, 0, 0))
                 self.serial_monitor.text_input.clear()
         
         def on_clear_click():
             self.serial_monitor.clear_messages()
-            self.serial_monitor.add_message("[SISTEMA] Histórico limpo", (100, 200, 100))
+            self.serial_monitor.add_message("[SISTEMA] Hist├│rico limpo", (100, 200, 100))
         
         self.serial_monitor.btn_connect.callback = on_connect_click
         self.serial_monitor.btn_disconnect.callback = on_disconnect_click

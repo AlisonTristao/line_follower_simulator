@@ -1,7 +1,7 @@
 import numpy as np
 import random
 import pygame
-from settings import *
+from config.settings import *
 
 def get_keyboard_input():
     """
