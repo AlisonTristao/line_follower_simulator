@@ -54,6 +54,7 @@ class ImportadorTrajeto:
                             distancia=float(item.get("distancia", 0.0)),
                             x=float(item.get("x", 0.0)),
                             y=float(item.get("y", 0.0)),
+                            angulo_eixo_x=float(item.get("angulo_eixo_x", 0.0)),
                         )
                     )
 
@@ -93,6 +94,43 @@ class ImportadorTrajeto:
             
             # Carrega usando o método carregar_json
             segmentos, config, marcacoes = ImportadorTrajeto.carregar_json(caminho_json)
+            
+            # Obtém o fator de conversão para converter de volta para metros
+            fator_unidade = config.get("fator_personalizado", 1.0)
+            if fator_unidade is None:
+                fator_unidade = 1.0
+            fator_inverso = 1.0 / float(fator_unidade)  # Converte de volta para metros
+            
+            # Tenta carregar marcações do CSV se existir
+            nome_base = os.path.splitext(arquivos_json[0])[0].replace("_segmentos", "")
+            caminho_marcacoes_csv = os.path.join(tmpdir, f"{nome_base}_marcacoes.csv")
+            
+            if os.path.exists(caminho_marcacoes_csv):
+                import csv
+                import math
+                marcacoes = []
+                with open(caminho_marcacoes_csv, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    for row in reader:
+                        if row:
+                            angulo_graus = float(row.get("angulo_eixo_x_graus", 0.0))
+                            angulo_rad = math.radians(angulo_graus)
+                            
+                            # Lê os valores (em unidades do CSV) e converte de volta para metros
+                            distancia = float(row.get("distancia", 0.0)) * fator_inverso
+                            x = float(row.get("x", 0.0)) * fator_inverso
+                            y = float(row.get("y", 0.0)) * fator_inverso
+                            
+                            marcacoes.append(
+                                Marcacao(
+                                    ordem=int(row.get("idx", 0)),
+                                    lado=str(row.get("lado", "esquerda")),
+                                    distancia=distancia,
+                                    x=x,
+                                    y=y,
+                                    angulo_eixo_x=angulo_rad,
+                                )
+                            )
             
             return segmentos, config, marcacoes
         

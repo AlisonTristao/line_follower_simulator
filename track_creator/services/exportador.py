@@ -79,15 +79,17 @@ class ExportadorTrajeto:
     def exportar_csv_e_json(caminho_csv, trajeto, qtd_pontos, unidade, fator_personalizado, origem_x, origem_y, modo_resolucao_auto=True, pontos_por_metro="10"):
         pontos = GeometriaTrajeto.amostrar_por_quantidade(trajeto, qtd_pontos)
 
-        # CSV da pista com apenas idx, x, y (em metros)
+        # CSV da pista com unit conversion
+        fator, unidade_saida = ExportadorTrajeto.obter_fator_unidade(unidade, fator_personalizado)
         with open(caminho_csv, "w", newline="", encoding="utf-8") as f:
             writer = csv.writer(f)
             writer.writerow(["idx", "x", "y"])
             for i, (x, y) in enumerate(pontos):
-                writer.writerow([i, x, y])
+                x_convertido = x * fator
+                y_convertido = y * fator
+                writer.writerow([i, f"{x_convertido:.6f}", f"{y_convertido:.6f}"])
 
         # JSON com metadata e config
-        fator, unidade_saida = ExportadorTrajeto.obter_fator_unidade(unidade, fator_personalizado)
         caminho_json = caminho_csv.rsplit(".", 1)[0] + "_segmentos.json"
         ExportadorTrajeto.salvar_json_projeto(
             caminho_json=caminho_json,
@@ -101,14 +103,19 @@ class ExportadorTrajeto:
             pontos_por_metro=pontos_por_metro,
         )
         
-        # CSV de marcações com idx, lado, x, y (em metros)
+        # CSV de marcações com unit conversion
         if trajeto.marcacoes:
+            import math
             caminho_marcacoes = caminho_csv.rsplit(".", 1)[0] + "_marcacoes.csv"
             with open(caminho_marcacoes, "w", newline="", encoding="utf-8") as f:
                 writer = csv.writer(f)
-                writer.writerow(["idx", "lado", "x", "y"])
+                writer.writerow(["idx", "lado", "distancia", "angulo_eixo_x_graus", "x", "y"])
                 for marcacao in trajeto.marcacoes:
-                    writer.writerow([marcacao.ordem, marcacao.lado, marcacao.x, marcacao.y])
+                    angulo_graus = math.degrees(marcacao.angulo_eixo_x)
+                    distancia_convertida = marcacao.distancia * fator
+                    x_convertido = marcacao.x * fator
+                    y_convertido = marcacao.y * fator
+                    writer.writerow([marcacao.ordem, marcacao.lado, f"{distancia_convertida:.2f}", f"{angulo_graus:.2f}", f"{x_convertido:.6f}", f"{y_convertido:.6f}"])
         
         return caminho_json
 

@@ -52,6 +52,13 @@ class GeradorTrajetoApp:
         # Variáveis para marcações
         self.var_marcacao_distancia = tk.StringVar(value="0.5")
         self.var_marcacao_lado = tk.StringVar(value="esquerda")
+        # Variáveis para labels dinâmicos de unidade
+        self.var_label_comprimento = tk.StringVar(value="Comprimento (m)")
+        self.var_label_raio = tk.StringVar(value="Raio (m)")
+        self.var_label_distancia_marcacao = tk.StringVar(value="Distância (m)")
+        self.var_label_grade_espaco = tk.StringVar(value="Espaço da grade (m)")
+        self.var_label_origem_x = tk.StringVar(value="Origem X (m)")
+        self.var_label_origem_y = tk.StringVar(value="Origem Y (m)")
 
     def _configurar_menu(self):
         menubar = tk.Menu(self.root)
@@ -104,7 +111,7 @@ class GeradorTrajetoApp:
     def _montar_painel_esquerdo(self, parent):
         frame_reta = ttk.LabelFrame(parent, text="Reta", padding=10)
         frame_reta.pack(fill="x", pady=(0, 10))
-        ttk.Label(frame_reta, text="Comprimento (m)").grid(row=0, column=0, sticky="w")
+        ttk.Label(frame_reta, textvariable=self.var_label_comprimento).grid(row=0, column=0, sticky="w")
         ttk.Entry(frame_reta, textvariable=self.var_reta_comprimento, width=18).grid(row=0, column=1, padx=6, pady=4)
         ttk.Label(frame_reta, text="Ângulo absoluto (graus)").grid(row=1, column=0, sticky="w")
         ttk.Entry(frame_reta, textvariable=self.var_reta_angulo, width=18).grid(row=1, column=1, padx=6, pady=4)
@@ -120,7 +127,7 @@ class GeradorTrajetoApp:
 
         frame_curva = ttk.LabelFrame(parent, text="Curva", padding=10)
         frame_curva.pack(fill="x", pady=(0, 10))
-        ttk.Label(frame_curva, text="Raio (m)").grid(row=0, column=0, sticky="w")
+        ttk.Label(frame_curva, textvariable=self.var_label_raio).grid(row=0, column=0, sticky="w")
         ttk.Entry(frame_curva, textvariable=self.var_curva_raio, width=18).grid(row=0, column=1, padx=6, pady=4)
         ttk.Label(frame_curva, text="Lado").grid(row=1, column=0, sticky="w")
         ttk.Combobox(
@@ -152,11 +159,9 @@ class GeradorTrajetoApp:
             width=15,
             state="readonly",
         ).grid(row=0, column=1, padx=6, pady=4)
-        self.var_marcacao_lado.trace("w", lambda *args: self._ao_alterar_marcacao())
         
-        ttk.Label(frame_marcacao, text="Distância (m)").grid(row=1, column=0, sticky="w")
+        ttk.Label(frame_marcacao, textvariable=self.var_label_distancia_marcacao).grid(row=1, column=0, sticky="w")
         ttk.Entry(frame_marcacao, textvariable=self.var_marcacao_distancia, width=18).grid(row=1, column=1, padx=6, pady=4)
-        self.var_marcacao_distancia.trace("w", lambda *args: self._ao_alterar_marcacao())
 
     def _montar_canvas(self, parent):
         frame_canvas = ttk.LabelFrame(parent, text="Visualização", padding=8)
@@ -202,17 +207,17 @@ class GeradorTrajetoApp:
         frame_config = ttk.Frame(frame_visual)
         frame_config.pack(fill="x", pady=(0, 8))
         
-        ttk.Label(frame_config, text="Espaço da grade (m)").pack(side="left")
+        ttk.Label(frame_config, textvariable=self.var_label_grade_espaco).pack(side="left")
         ttk.Entry(frame_config, textvariable=self.var_grade_espaco, width=10).pack(side="right", padx=(4, 0))
         
         frame_origem_x = ttk.Frame(frame_visual)
         frame_origem_x.pack(fill="x", pady=(0, 4))
-        ttk.Label(frame_origem_x, text="Origem X (m)").pack(side="left")
+        ttk.Label(frame_origem_x, textvariable=self.var_label_origem_x).pack(side="left")
         ttk.Entry(frame_origem_x, textvariable=self.var_origem_x, width=10).pack(side="right", padx=(4, 0))
         
         frame_origem_y = ttk.Frame(frame_visual)
         frame_origem_y.pack(fill="x", pady=(0, 8))
-        ttk.Label(frame_origem_y, text="Origem Y (m)").pack(side="left")
+        ttk.Label(frame_origem_y, textvariable=self.var_label_origem_y).pack(side="left")
         ttk.Entry(frame_origem_y, textvariable=self.var_origem_y, width=10).pack(side="right", padx=(4, 0))
         
         # Frame para botões horizontais
@@ -356,6 +361,20 @@ class GeradorTrajetoApp:
     def _atualizar_estado_fator(self):
         estado = "normal" if self.var_unidade.get() == "personalizada" else "disabled"
         self.entry_fator_personalizado.configure(state=estado)
+        
+        # Atualizar labels com a unidade selecionada
+        unidade = self.var_unidade.get()
+        if unidade == "personalizada":
+            unidade_label = "unid."
+        else:
+            unidade_label = unidade
+        
+        self.var_label_comprimento.set(f"Comprimento ({unidade_label})")
+        self.var_label_raio.set(f"Raio ({unidade_label})")
+        self.var_label_distancia_marcacao.set(f"Distância ({unidade_label})")
+        self.var_label_grade_espaco.set(f"Espaço da grade ({unidade_label})")
+        self.var_label_origem_x.set(f"Origem X ({unidade_label})")
+        self.var_label_origem_y.set(f"Origem Y ({unidade_label})")
 
     def _atualizar_estado_resolucao(self):
         modo_auto = self.var_modo_resolucao_auto.get()
@@ -477,6 +496,7 @@ class GeradorTrajetoApp:
             messagebox.showerror("Valor inválido", str(e))
             return
         self.trajeto.atualizar_segmento(self.indice_selecionado, novo_segmento)
+        self._ao_alterar_marcacao()
         self._atualizar_estado()
 
     def adicionar_curva(self):
@@ -517,6 +537,7 @@ class GeradorTrajetoApp:
             messagebox.showerror("Valor inválido", str(e))
             return
         self.trajeto.atualizar_segmento(self.indice_selecionado, novo_segmento)
+        self._ao_alterar_marcacao()
         self._atualizar_estado()
 
     def _ao_alterar_marcacao(self):
@@ -550,14 +571,15 @@ class GeradorTrajetoApp:
         )
         
         if pos is not None:
-            novo_x, novo_y = pos
+            novo_x, novo_y, novo_angulo = pos
             # Registra a mudança no histórico
             self.trajeto.modificar_marcacao(
                 self.indice_selecionado,
                 novo_lado,
                 distancia,
                 novo_x,
-                novo_y
+                novo_y,
+                novo_angulo
             )
             self._redesenhar()
 
