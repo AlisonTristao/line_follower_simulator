@@ -6,6 +6,7 @@ import threading
 from dataclasses import dataclass
 
 from graphics.graphics_elements import *
+from graphics.track_generator import LEMNISCATE, CIRCLE, TFG
 from graphics.track_generator import *
 from .serial_com import SerialCom
 import numpy as np
@@ -37,6 +38,8 @@ class SimulationConfig:
     track_length: float = 0.02
     track_noise: float = 0.12
     track_radius: float = 30
+    track_file_path: str = None  # Path to .tfg file for TFG track type
+    resolution: int = None  # Resolution read from TFG JSON
 
 # Graph scale limits (min and max percentages for real robot data)
 GRAPH_LIMITS = {
@@ -102,6 +105,7 @@ class GameSimulation:
         self.serial_monitor_toggle = None
         self.win = None
         self.clear_trail_button = None
+        self.slider_trail_limit = None
         self.last_trail_update_time = time.time()  # Track last time trail point was added
 
         self.cluster_future_count = 10
@@ -145,10 +149,22 @@ class GameSimulation:
         print("Initializing simulator...")
 
         # generate trajectory
-        resolution = int((self.config.length + self.config.width)*3.0)
-        self.x_track, self.y_track = generate_track(
-            self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=resolution, track_rad=self.config.track_radius
-        )
+        if self.track_type == TFG:
+            # Load track from .tfg file
+            if self.config.track_file_path is None:
+                raise ValueError("track_file_path must be provided when using TFG track type")
+            self.x_track, self.y_track, resolution = load_track_from_tfg(self.config.track_file_path)
+            # Save resolution to config
+            if resolution is not None:
+                self.config.resolution = resolution
+            # Store for later use
+            self.resolution = resolution if resolution is not None else len(self.x_track)
+        else:
+            # Generate track from CIRCLE or LEMNISCATE
+            self.resolution = int((self.config.length + self.config.width)*3.0)
+            self.x_track, self.y_track = generate_track(
+                self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=self.resolution, track_rad=self.config.track_radius
+            )
         self.win = len(self.x_track) - 1
 
         # create car with configured size (convert meters to pixels)
@@ -192,7 +208,15 @@ class GameSimulation:
         minimap_y = int(display_height + 140) - 40  # Position below the graphs
         minimap_position = (minimap_center_x, minimap_y)
         self.minimap = MiniMap(minimap_position, minimap_size)
-        for k in range(0, len(self.x_track), resolution//10):
+        
+        # Calculate spacing proportional to real map size vs minimap size
+        # Each minimap pixel represents this many real pixels
+        pixels_per_minimap_pixel_x = (self.LENGTH * self.SCALE) / minimap_size[0]
+        pixels_per_minimap_pixel_y = (self.WIDTH * self.SCALE) / minimap_size[1]
+        max_ratio = max(pixels_per_minimap_pixel_x, pixels_per_minimap_pixel_y)
+        minimap_spacing = max(1, int(max_ratio / 3))  # Divide by 3 for denser points
+        
+        for k in range(0, len(self.x_track), minimap_spacing):
             self.minimap.add_point((2 * self.x_track[k] / self.LENGTH, 2 * self.y_track[k] / self.WIDTH))
         
         # create clear trail button (positioned at top-left corner of minimap)
@@ -201,6 +225,13 @@ class GameSimulation:
         self.clear_trail_button = Button(button_x, button_y, 100, 30, text="Clear Trail", font_size=12, 
                                         bg_color=(200, 50, 50), text_color=(255, 255, 255))
         self.clear_trail_button.callback = lambda: self.minimap.clear_trail()
+        
+        # create trail limit slider (positioned next to clear trail button)
+        slider_x = button_x + 110
+        slider_y = button_y - 5
+        self.slider_trail_limit = Slider(slider_x, slider_y, 200, 35, min_val=10, max_val=7500, 
+                                         initial_val=50, label="Max Trail")
+        self.slider_trail_limit.callback = lambda val: setattr(self.minimap, 'MAX_TRAIL_POINTS', val)
 
         # set track properties
         self.track.set_coordinates(
@@ -256,6 +287,7 @@ class GameSimulation:
         self.simulator.add(self.right_sensor)
         self.simulator.add(self.minimap)
         self.simulator.add(self.clear_trail_button)  # Add before display layer
+        self.simulator.add(self.slider_trail_limit)  # Add slider next to button
         self.simulator.add(self.fps_display)
         self.simulator.add(self.coordinates_display)
         self.simulator.add(self.compass)
@@ -409,6 +441,7 @@ class GameSimulation:
             self.serial_monitor_toggle.handle_event(event)
             self.serial_monitor.handle_event(event)
             self.clear_trail_button.handle_event(event)
+            self.slider_trail_limit.handle_event(event)
         return True
 
     def _step_physics(self, delta_x, delta_y, delta_theta=0.0):

@@ -1,10 +1,14 @@
 import math
 import random
 import numpy as np
+import csv
+import json
+import zipfile
 from scipy.interpolate import splprep, splev
 
 LEMNISCATE = 0
 CIRCLE = 1
+TFG = 2
 
 def circle_checkpoints(ckeckpoints_number, track_radius, noise):
     checkpoints = []
@@ -131,3 +135,75 @@ def generate_cluster(length, width, scale, x_arr, y_arr):
                 position.append((i + length // 2, j + width // 2))
 
     return cluster_matrix, position
+
+
+def load_track_from_tfg(tfg_file_path):
+    """
+    Load track points from a .tfg file (which is a ZIP archive).
+    
+    Args:
+        tfg_file_path (str): Path to the .tfg file
+        
+    Returns:
+        tuple: (x_array, y_array, resolution) - numpy arrays of x and y coordinates and the resolution value
+    """
+    x_points = []
+    y_points = []
+    resolution = None
+    
+    # Open the .tfg file (which is a ZIP archive)
+    with zipfile.ZipFile(tfg_file_path, 'r') as zip_file:
+        # List all files in the ZIP
+        file_list = zip_file.namelist()
+        
+        # Find the JSON file (ends with _segmentos.json or similar)
+        json_file = None
+        for file_name in file_list:
+            if file_name.endswith('.json') and '_segmentos' in file_name:
+                json_file = file_name
+                break
+        
+        # Read resolution from JSON if found
+        if json_file:
+            try:
+                with zip_file.open(json_file) as jf:
+                    json_data = json.loads(jf.read().decode('utf-8'))
+                    resolution = json_data.get('qtd_pontos_exportados')
+            except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+                pass
+        
+        # Find the track CSV file (ends with .csv and is not _marcacoes.csv)
+        track_csv = None
+        for file_name in file_list:
+            if file_name.endswith('.csv') and '_marcacoes' not in file_name:
+                track_csv = file_name
+                break
+        
+        if track_csv is None:
+            raise ValueError("No track CSV file found in the .tfg file")
+        
+        # Read the CSV file
+        with zip_file.open(track_csv) as csv_file:
+            # Decode bytes to string for csv reader
+            text_file = csv_file.read().decode('utf-8').splitlines()
+            reader = csv.reader(text_file)
+            
+            # Skip header row
+            next(reader)
+            
+            # Read x and y points
+            for row in reader:
+                if len(row) >= 3:  # idx, x, y
+                    try:
+                        x = float(row[1])
+                        y = float(row[2])
+                        x_points.append(x)
+                        y_points.append(y)
+                    except (ValueError, IndexError):
+                        continue
+    
+    # Convert to numpy arrays
+    x_array = np.array(x_points)
+    y_array = np.array(y_points)
+    
+    return x_array, y_array, resolution

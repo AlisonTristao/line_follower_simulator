@@ -1218,6 +1218,104 @@ class TextInput:
     def clear(self):
         self.text = ""
 
+class Slider:
+    """
+    represents a horizontal slider UI element for numeric value control
+    """
+    def __init__(self, x, y, width, height, min_val=0, max_val=100, initial_val=50, label=""):
+        """
+        initializes a slider
+        args:
+            x (int): x coordinate of the slider
+            y (int): y coordinate of the slider
+            width (int): width of the slider track
+            height (int): height of the slider
+            min_val (int/float): minimum value
+            max_val (int/float): maximum value
+            initial_val (int/float): initial value
+            label (str): label displayed above the slider
+        """
+        self.rect = pygame.Rect(x, y, width, height)
+        self.min_val = min_val
+        self.max_val = max_val
+        self.value = initial_val
+        self.label = label
+        self.font = pygame.font.SysFont(None, 14)
+        self.dragging = False
+        self.callback = None
+        self.track_height = 4
+        self.handle_radius = 8
+        
+    def _get_handle_x(self):
+        """calculate handle x position based on current value"""
+        ratio = (self.value - self.min_val) / (self.max_val - self.min_val)
+        return self.rect.x + int(ratio * self.rect.width)
+    
+    def _set_value_from_x(self, x):
+        """set value based on x coordinate"""
+        x_relative = max(0, min(x - self.rect.x, self.rect.width))
+        ratio = x_relative / self.rect.width
+        new_value = self.min_val + ratio * (self.max_val - self.min_val)
+        self.value = max(self.min_val, min(self.max_val, new_value))
+        if self.callback:
+            self.callback(int(self.value))
+    
+    def draw(self, surface):
+        """draw the slider"""
+        track_y = self.rect.centery
+        
+        # draw label
+        if self.label:
+            label_text = self.font.render(f"{self.label}: {int(self.value)}", True, (255, 255, 255))
+            # Draw background for text visibility
+            text_rect = label_text.get_rect(topleft=(self.rect.x, self.rect.y - 20))
+            text_rect.inflate_ip(4, 2)
+            pygame.draw.rect(surface, (50, 50, 50), text_rect)
+            surface.blit(label_text, (self.rect.x + 2, self.rect.y - 19))
+        
+        # draw track
+        pygame.draw.line(surface, (150, 150, 150), 
+                        (self.rect.x, track_y), 
+                        (self.rect.x + self.rect.width, track_y), 
+                        self.track_height)
+        
+        # draw handle
+        handle_x = self._get_handle_x()
+        handle_color = (100, 150, 255) if self.dragging else (100, 100, 100)
+        pygame.draw.circle(surface, handle_color, (handle_x, track_y), self.handle_radius)
+        pygame.draw.circle(surface, (0, 0, 0), (handle_x, track_y), self.handle_radius, 1)
+    
+    def handle_event(self, event):
+        """handle mouse events for slider interaction"""
+        if event.type == pygame.MOUSEBUTTONDOWN:
+            # check if clicked on or near the handle
+            handle_x = self._get_handle_x()
+            track_y = self.rect.centery
+            dist = ((event.pos[0] - handle_x)**2 + (event.pos[1] - track_y)**2)**0.5
+            if dist <= self.handle_radius + 5:
+                self.dragging = True
+                return True
+        elif event.type == pygame.MOUSEBUTTONUP:
+            self.dragging = False
+        elif event.type == pygame.MOUSEMOTION:
+            if self.dragging:
+                self._set_value_from_x(event.pos[0])
+                return True
+        return False
+    
+    def set_position(self, x, y):
+        """set slider position"""
+        self.rect.x = x
+        self.rect.y = y
+    
+    def get_value(self):
+        """get current slider value"""
+        return int(self.value)
+    
+    def set_value(self, value):
+        """set slider value"""
+        self.value = max(self.min_val, min(self.max_val, value))
+
 class Dropdown:
     """
     represents a dropdown/combobox UI element
