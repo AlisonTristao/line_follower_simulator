@@ -14,6 +14,17 @@ class ImportadorTrajeto:
         with open(caminho_json, "r", encoding="utf-8") as f:
             dados = json.load(f)
 
+        fator_unidade = dados.get("fator_multiplicador_da_unidade")
+        try:
+            fator_unidade = float(fator_unidade) if fator_unidade is not None else 1.0
+        except (TypeError, ValueError):
+            fator_unidade = 1.0
+        if fator_unidade <= 0:
+            fator_unidade = 1.0
+
+        dimensoes_convertidas = bool(dados.get("dimensoes_convertidas_para_unidade_saida", False))
+        fator_inverso = (1.0 / fator_unidade) if dimensoes_convertidas else 1.0
+
         segmentos_dados = dados.get("segmentos")
         if not isinstance(segmentos_dados, list):
             raise ValueError("JSON inválido: campo 'segmentos' ausente ou inválido.")
@@ -27,14 +38,14 @@ class ImportadorTrajeto:
             if tipo == "reta":
                 segmentos.append(
                     SegmentoReta(
-                        comprimento=float(item["comprimento"]),
+                        comprimento=float(item["comprimento"]) * fator_inverso,
                         angulo_graus=float(item["angulo_graus"]),
                     )
                 )
             elif tipo == "curva":
                 segmentos.append(
                     SegmentoCurva(
-                        raio=float(item["raio"]),
+                        raio=float(item["raio"]) * fator_inverso,
                         lado=str(item["lado"]),
                         angulo_central_graus=float(item["angulo_central_graus"]),
                     )
@@ -51,23 +62,24 @@ class ImportadorTrajeto:
                         Marcacao(
                             ordem=int(item.get("ordem", 0)),
                             lado=str(item.get("lado", "esquerda")),
-                            distancia=float(item.get("distancia", 0.0)),
-                            x=float(item.get("x", 0.0)),
-                            y=float(item.get("y", 0.0)),
+                            distancia=float(item.get("distancia", 0.0)) * fator_inverso,
+                            x=float(item.get("x", 0.0)) * fator_inverso,
+                            y=float(item.get("y", 0.0)) * fator_inverso,
                             angulo_eixo_x=float(item.get("angulo_eixo_x", 0.0)),
                         )
                     )
 
-        origem_visual = dados.get("origem_visual_exportacao_m", {}) or {}
+        origem_visual = dados.get("origem_visual_exportacao") if dimensoes_convertidas else None
+        if not isinstance(origem_visual, dict):
+            origem_visual = dados.get("origem_visual_exportacao_m", {}) or {}
         qtd_pontos = dados.get("qtd_pontos_exportados")
         unidade_saida = dados.get("unidade_saida")
-        fator_unidade = dados.get("fator_multiplicador_da_unidade")
         modo_resolucao_auto = dados.get("modo_resolucao_auto")
         pontos_por_metro = dados.get("pontos_por_metro")
 
         config = {
-            "origem_x": float(origem_visual.get("x", 0.0)),
-            "origem_y": float(origem_visual.get("y", 0.0)),
+            "origem_x": float(origem_visual.get("x", 0.0)) * fator_inverso,
+            "origem_y": float(origem_visual.get("y", 0.0)) * fator_inverso,
             "qtd_pontos": int(qtd_pontos) if qtd_pontos is not None else None,
             "unidade": unidade_saida,
             "fator_personalizado": float(fator_unidade) if fator_unidade is not None else None,

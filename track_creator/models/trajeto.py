@@ -242,7 +242,7 @@ class Trajeto:
             return None
         return self.marcacoes[indice]
 
-    def modificar_marcacao(self, indice, lado, distancia, x, y):
+    def modificar_marcacao(self, indice, lado, distancia, x, y, angulo_eixo_x):
         """Modifica uma marcação e registra a ação no histórico."""
         if indice < 0 or indice >= len(self.marcacoes):
             return False
@@ -255,6 +255,7 @@ class Trajeto:
         self.marcacoes[indice].distancia = distancia
         self.marcacoes[indice].x = x
         self.marcacoes[indice].y = y
+        self.marcacoes[indice].angulo_eixo_x = angulo_eixo_x
         
         # Cria ação no histórico
         acao = AcaoHistorico('modificar_marcacao', indice, None, 

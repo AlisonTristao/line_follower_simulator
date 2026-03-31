@@ -11,6 +11,26 @@ from services.geometria import GeometriaTrajeto
 
 class ExportadorTrajeto:
     @staticmethod
+    def _converter_segmento_para_unidade(item_segmento, fator):
+        item = dict(item_segmento)
+        if item.get("tipo") == "reta" and "comprimento" in item:
+            item["comprimento"] = float(item["comprimento"]) * fator
+        elif item.get("tipo") == "curva" and "raio" in item:
+            item["raio"] = float(item["raio"]) * fator
+        return item
+
+    @staticmethod
+    def _converter_marcacao_para_unidade(item_marcacao, fator):
+        item = dict(item_marcacao)
+        if "distancia" in item:
+            item["distancia"] = float(item["distancia"]) * fator
+        if "x" in item:
+            item["x"] = float(item["x"]) * fator
+        if "y" in item:
+            item["y"] = float(item["y"]) * fator
+        return item
+
+    @staticmethod
     def obter_fator_unidade(unidade, fator_personalizado):
         mapa = {
             "m": 1.0,
@@ -34,24 +54,31 @@ class ExportadorTrajeto:
             item = asdict(seg)
             item["ordem"] = i
             item["tipo"] = seg.tipo
-            dados_segmentos.append(item)
+            dados_segmentos.append(ExportadorTrajeto._converter_segmento_para_unidade(item, fator))
 
         dados_marcacoes = []
         if hasattr(trajeto, 'marcacoes') and trajeto.marcacoes:
             for marcacao in trajeto.marcacoes:
                 item = asdict(marcacao)
-                dados_marcacoes.append(item)
+                dados_marcacoes.append(ExportadorTrajeto._converter_marcacao_para_unidade(item, fator))
 
         espacamento_medio_m = GeometriaTrajeto.espacamento_medio(trajeto, qtd_pontos) if qtd_pontos is not None else None
+        espacamento_medio_saida = espacamento_medio_m * fator if espacamento_medio_m is not None else None
+        comprimento_total_saida = GeometriaTrajeto.comprimento_total(trajeto) * fator
 
         return {
             "origem_trajeto_m": {"x": 0.0, "y": 0.0},
             "origem_visual_exportacao_m": {"x": origem_x, "y": origem_y},
+            "origem_trajeto": {"x": 0.0, "y": 0.0},
+            "origem_visual_exportacao": {"x": origem_x * fator, "y": origem_y * fator},
             "comprimento_total_m": GeometriaTrajeto.comprimento_total(trajeto),
+            "comprimento_total": comprimento_total_saida,
             "qtd_pontos_exportados": qtd_pontos,
             "espacamento_medio_entre_pontos_m": espacamento_medio_m,
+            "espacamento_medio_entre_pontos": espacamento_medio_saida,
             "unidade_saida": unidade_saida,
             "fator_multiplicador_da_unidade": fator,
+            "dimensoes_convertidas_para_unidade_saida": True,
             "modo_resolucao_auto": modo_resolucao_auto,
             "pontos_por_metro": pontos_por_metro,
             "segmentos": dados_segmentos,

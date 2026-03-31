@@ -248,20 +248,47 @@ class GeometriaTrajeto:
             distancia: Distância perpendicular em metros
             
         Returns:
-            tupla (x, y) ou None se o índice for inválido
+            tupla (x, y, angulo_perpendicular) ou None se o índice for inválido
         """
-        if indice_segmento < 0 or indice_segmento >= len(trajeto.poses) - 1:
+        if indice_segmento < 0 or indice_segmento >= len(trajeto.segmentos):
             return None
         
-        # Pega a pose final do segmento especificado
-        x, y, heading = trajeto.poses[indice_segmento + 1]
-        
-        # Calcula a perpendicular (rotaciona heading em 90 graus)
+        seg = trajeto.segmentos[indice_segmento]
+        x, y, heading_final = trajeto.poses[indice_segmento + 1]
+
+        # Estima a direção tangente no ponto final do segmento.
+        # Em curvas, usa a secante entre o último e o penúltimo ponto para aproximar a derivada.
+        if isinstance(seg, SegmentoReta):
+            heading_tangente = math.radians(seg.angulo_graus)
+        elif isinstance(seg, SegmentoCurva):
+            x0, y0, heading0 = trajeto.poses[indice_segmento]
+            comprimento = GeometriaTrajeto.comprimento_segmento(seg)
+            delta = min(0.01, comprimento * 0.1)
+            if comprimento <= 0 or delta <= 0:
+                heading_tangente = heading_final
+            else:
+                x_prev, y_prev = GeometriaTrajeto.ponto_no_segmento(
+                    x0,
+                    y0,
+                    heading0,
+                    seg,
+                    max(0.0, comprimento - delta),
+                )
+                dx = x - x_prev
+                dy = y - y_prev
+                if abs(dx) < 1e-12 and abs(dy) < 1e-12:
+                    heading_tangente = heading_final
+                else:
+                    heading_tangente = math.atan2(dy, dx)
+        else:
+            heading_tangente = heading_final
+
+        # Calcula a perpendicular (rotaciona tangente em 90 graus)
         sinal = 1 if lado == "esquerda" else -1
-        perpendicular_heading = heading + sinal * math.pi / 2
-        
+        perpendicular_heading = GeometriaTrajeto.normalizar_angulo(heading_tangente + sinal * math.pi / 2)
+
         # Calcula a posição da marcação
         x_marcacao = x + distancia * math.cos(perpendicular_heading)
         y_marcacao = y + distancia * math.sin(perpendicular_heading)
-        
-        return x_marcacao, y_marcacao
+
+        return x_marcacao, y_marcacao, perpendicular_heading

@@ -18,10 +18,12 @@ class Marcacao:
     distancia: float  # em metros
     x: float = 0.0  # será calculado
     y: float = 0.0  # será calculado
+    angulo_eixo_x: float = 0.0  # em radianos
     
     @property
     def tipo(self):
         return "marcacao"
     
     def __str__(self):
-        return f"Marcação #{self.ordem} | lado={self.lado} | distância={self.distancia:.3f}m | pos=({self.x:.3f}, {self.y:.3f})"
+        angulo_graus = math.degrees(self.angulo_eixo_x)
+        return f"Marcação #{self.ordem} | lado={self.lado} | distância={self.distancia:.3f}m | pos=({self.x:.3f}, {self.y:.3f}) | ang={angulo_graus:.2f}°"

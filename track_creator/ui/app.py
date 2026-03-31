@@ -434,7 +434,7 @@ class GeradorTrajetoApp:
                     marcacao.distancia
                 )
                 if pos is not None:
-                    marcacao.x, marcacao.y = pos
+                    marcacao.x, marcacao.y, marcacao.angulo_eixo_x = pos
 
     def _construir_segmento_reta(self):
         comprimento = float(self.var_reta_comprimento.get())
