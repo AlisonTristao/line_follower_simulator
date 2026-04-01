@@ -143,6 +143,38 @@ class GameSimulation:
             for k in cluster_matrix[i]:
                 cluster.add_point(k)
             self.track.set_obj(position[i][0], position[i][1], cluster)
+            
+        # create marking clusters
+        for x, y, angle in getattr(self, 'markings', []):
+            i = int(round(x))
+            j = int(round(y))
+            if -self.LENGTH/2 <= i < self.LENGTH/2 and -self.WIDTH/2 <= j < self.WIDTH/2:
+                row = int(i + self.LENGTH / 2)
+                col = int(j + self.WIDTH / 2)
+                
+                # relative pixels
+                x_pix = (x - i) * self.SCALE
+                y_pix = (y - j) * self.SCALE
+                
+                # try to find existing MarkingCluster in this cell
+                existing = None
+                cell_item = self.track.matrix[row][col]
+                if isinstance(cell_item, list):
+                    for item in cell_item:
+                        if isinstance(item, MarkingCluster):
+                            existing = item
+                            break
+                elif isinstance(cell_item, MarkingCluster):
+                    existing = cell_item
+                    
+                if not existing:
+                    existing = MarkingCluster(
+                        width_pixels=int(self.track_length * self.SCALE), 
+                        length_pixels=int(0.04 * self.SCALE)
+                    )
+                    self.track.set_obj(row, col, existing)
+                
+                existing.add_marking(x_pix, y_pix, angle + math.pi/2)  # Adjust angle for correct orientation
 
     def _setup_simulator(self):
         # print the initialization message
@@ -153,7 +185,7 @@ class GameSimulation:
             # Load track from .tfg file
             if self.config.track_file_path is None:
                 raise ValueError("track_file_path must be provided when using TFG track type")
-            self.x_track, self.y_track, resolution = load_track_from_tfg(self.config.track_file_path)
+            self.x_track, self.y_track, resolution, self.markings = load_track_from_tfg(self.config.track_file_path)
             # Save resolution to config
             if resolution is not None:
                 self.config.resolution = resolution
@@ -165,11 +197,12 @@ class GameSimulation:
             self.x_track, self.y_track = generate_track(
                 self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=self.resolution, track_rad=self.config.track_radius
             )
+            self.markings = []
         self.win = len(self.x_track) - 1
 
         # create car with configured size (convert meters to pixels)
         car_size_pixels = int(self.car_size_meters * self.SCALE)//2
-        # onde o carrinho vai ficar 1,36 e 1,8 // original 
+        # onde o carrinho vai ficar 1,36 e 1,8 // original
         self.car_draw = Car(self.simulator.get_center(), size=car_size_pixels, center=(1.4, 1.4))
 
         # create the track
@@ -235,10 +268,21 @@ class GameSimulation:
 
         # set track properties
         self.track.set_coordinates(
-            ((self.x_track[0] + self.LENGTH // 2) * self.SCALE, (self.y_track[0] + self.WIDTH // 2) * self.SCALE)
+            ((self.x_track[0] + self.LENGTH / 2) * self.SCALE, (self.y_track[0] + self.WIDTH / 2) * self.SCALE)
         )
         self.track.set_center(self.car_draw.get_center())
         self.track.set_pivot(self.car_draw.get_center())
+
+        if len(self.x_track) > 1:
+            dx = self.x_track[1] - self.x_track[0]
+            dy = self.y_track[1] - self.y_track[0]
+            track_native_angle = math.atan2(dy, dx)
+        else:
+            track_native_angle = 0
+        
+        # We rotate the track so its native direction visually aligns with the car's UP direction (-math.pi / 2).
+        track_initial_rot = -math.pi / 2 - track_native_angle
+        self.track.set_angle(track_initial_rot)
 
         # create coordinates display
         coordinates_position = (1.85 * self.simulator.get_center()[0], 1.95 * self.simulator.get_center()[1])
@@ -459,12 +503,9 @@ class GameSimulation:
             f"x: {round(self.track.get_center()[0]/self.SCALE, 2):.2f} y: {round(self.track.get_center()[1]/self.SCALE, 2):.2f}"
         )
 
-        minimap_x = 2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1
-        minimap_y = -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1
-        
-        self.minimap.set_player_position((minimap_x, minimap_y))
-        
-        # Add current position to minimap trail (only every 0.5 seconds to reduce memory usage)
+        # Track absolute position natively corresponds directly to the origin
+        minimap_x = 2 * (self.track.get_center()[0] / self.SCALE - self.LENGTH / 2) / self.LENGTH
+        minimap_y = -2 * (self.track.get_center()[1] / self.SCALE - self.WIDTH / 2) / self.WIDTH
         current_time = time.time()
         if current_time - self.last_trail_update_time >= self.config.tail_time:
             self.minimap.add_trail_point(minimap_x, minimap_y)

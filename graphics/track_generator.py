@@ -90,8 +90,8 @@ def points_in_square(x0, y0, size, x_arr, y_arr):
     x_arr = np.array(x_arr)
     y_arr = np.array(y_arr)
     
-    inside_x = (x_arr > x0 - size) & (x_arr < x0 + size)
-    inside_y = (y_arr > y0 - size) & (y_arr < y0 + size)
+    inside_x = (x_arr >= x0 - size) & (x_arr < x0 + size)
+    inside_y = (y_arr >= y0 - size) & (y_arr < y0 + size)
     inside_square = inside_x & inside_y
 
     return np.where(inside_square)[0].tolist()
@@ -134,6 +134,13 @@ def generate_cluster(length, width, scale, x_arr, y_arr):
                 cluster_matrix[-1] = cluster_array
                 position.append((i + length // 2, j + width // 2))
 
+    total_points = len(x_arr)
+    missing_points = set(range(total_points)) - processed_points
+    if missing_points:
+        print(f"[Aviso Clustering] {len(missing_points)} pontos NÃO foram adicionados a nenhum cluster! (Fora do grid ou limites exatos)")
+    else:
+        print(f"[Clustering] Todos os {total_points} pontos foram adicionados com sucesso ao grid.")
+
     return cluster_matrix, position
 
 
@@ -150,7 +157,8 @@ def load_track_from_tfg(tfg_file_path):
     x_points = []
     y_points = []
     resolution = None
-    
+    markings = []
+
     # Open the .tfg file (which is a ZIP archive)
     with zipfile.ZipFile(tfg_file_path, 'r') as zip_file:
         # List all files in the ZIP
@@ -202,8 +210,38 @@ def load_track_from_tfg(tfg_file_path):
                     except (ValueError, IndexError):
                         continue
     
+        # Read markings if the file exists
+        markings_csv = None
+        for file_name in file_list:
+            if file_name.endswith('.csv') and '_marcacoes' in file_name:       
+                markings_csv = file_name
+                break
+
+        if markings_csv:
+            with zip_file.open(markings_csv) as csv_file:
+                text_file = csv_file.read().decode('utf-8').splitlines()       
+                reader = csv.reader(text_file)
+
+                # Skip header row
+                try:
+                    next(reader)
+                except StopIteration:
+                    pass
+
+                for row in reader:
+                    if len(row) >= 6:
+                        try:
+                            # row[3] is angle in degrees, convert to radians   
+                            ang_deg = float(row[3])
+                            ang = math.radians(ang_deg)
+                            x = float(row[4])
+                            y = float(row[5])
+                            markings.append((x, y, ang))
+                        except ValueError:
+                            continue
+
     # Convert to numpy arrays
     x_array = np.array(x_points)
     y_array = np.array(y_points)
-    
-    return x_array, y_array, resolution
+
+    return x_array, y_array, resolution, markings

@@ -373,6 +373,53 @@ class Cluster(Shape):
         x0, y0 = self._master
         return (x0 - self._master_distance < x1 < x0 + self._master_distance) and (y0 < y1 < y0 + self._master_distance)
 
+class MarkingCluster(Shape):
+    """
+    Represents a cluster of side markings on the track.
+    Each marking has an x, y position and an angle.
+    Rendered as a rotated rectangle.
+    """
+    def __init__(self, coo=(0, 0), color=(0, 0, 0), width_pixels=10, length_pixels=20, angle=0):
+        super().__init__(coo, color, max(width_pixels, length_pixels), angle)
+        self.rect_w = width_pixels
+        self.rect_h = length_pixels
+        self.__markings_arr = [] # list of (x, y, angle)
+
+    def add_marking(self, x, y, angle):
+        # A referência original é o eixo X, então somamos 90 graus (pi/2 radianos) para ficar na orientação correta 
+        self.__markings_arr.append((x, y, angle + math.pi/2))
+
+    def update(self):
+        pass
+
+    def draw(self, surface):
+        hw = self.rect_w / 2
+        hh = self.rect_h / 2
+        corners = [
+            (-hw, -hh),
+            (hw, -hh),
+            (hw, hh),
+            (-hw, hh)
+        ]
+
+        for x_m, y_m, ang in self.__markings_arr:
+            point_ = self._rotate_point((x_m, y_m))
+            x = point_[0] + self._x
+            y = point_[1] + self._y
+            
+            # The angle should be minus theta to rotate the rectangle correctly
+            total_angle = -ang - self._angle
+            cos_a = math.cos(-total_angle)
+            sin_a = math.sin(-total_angle)
+            
+            rotated_corners = []
+            for cx, cy in corners:
+                nx = cx * cos_a - cy * sin_a
+                ny = cx * sin_a + cy * cos_a
+                rotated_corners.append((x + nx, y + ny))
+                
+            pygame.draw.polygon(surface, self._color, rotated_corners)
+
 class MiniMap(Shape):
     """
     Represents a minimap object on the simulator
@@ -536,7 +583,13 @@ class Track(Shape):
     def set_obj(self, row, col, obj):
         # sets a specific object in the matrix at the given row and column
         if 0 <= row < self._size[0] and 0 <= col < self._size[1]:
-            self.matrix[row][col] = obj
+            current = self.matrix[row][col]
+            if isinstance(current, list):
+                current.append(obj)
+            elif current == self.default or current in (self.wall_hor, self.wall_ver, self.wall_lim):
+                self.matrix[row][col] = [obj]
+            else:
+                self.matrix[row][col] = [current, obj]
 
     def set_center(self, coo):
         # sets the center of the track
@@ -558,13 +611,25 @@ class Track(Shape):
             y = j * self.__point_spacing + d[1]
             x, y = self.rotate_around_pivot((x, y))
 
-            self.matrix[i][j].set_coordinates((x, y))
-            self.matrix[i][j].set_angle(self._angle)
-            self.matrix[i][j].draw(surface)
+            obj = self.matrix[i][j]
+            if isinstance(obj, list):
+                for item in obj:
+                    item.set_coordinates((x, y))
+                    item.set_angle(self._angle)
+                    item.draw(surface)
+            else:
+                obj.set_coordinates((x, y))
+                obj.set_angle(self._angle)
+                obj.draw(surface)
 
         # update the elements
         for i, j in points:
-            self.matrix[i][j].update()
+            obj = self.matrix[i][j]
+            if isinstance(obj, list):
+                for item in obj:
+                    item.update()
+            else:
+                obj.update()
 
     def __points_in_circle(self, x0, y0):
         # returns the points within a circle of visibility
