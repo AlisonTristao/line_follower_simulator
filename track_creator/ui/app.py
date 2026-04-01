@@ -19,6 +19,7 @@ class GeradorTrajetoApp:
 
         self.trajeto = Trajeto()
         self.indice_selecionado = None
+        self.projeto_modificado = False
 
         self._criar_variaveis()
         self._configurar_menu()
@@ -26,10 +27,41 @@ class GeradorTrajetoApp:
         
         # Defer shortcuts configuration to after UI is fully loaded
         self.root.after(100, self._configurar_atalhos)
+        self.root.protocol("WM_DELETE_WINDOW", self.fechar_aplicativo)
 
         GeometriaTrajeto.recalcular_poses(self.trajeto)
         self._atualizar_lista_segmentos()
         self._redesenhar()
+
+    def _marcar_como_modificado(self):
+        if not self.projeto_modificado:
+            self.projeto_modificado = True
+            self.root.title("Gerador de Trajeto *")
+
+    def _marcar_como_salvo(self):
+        if self.projeto_modificado:
+            self.projeto_modificado = False
+            self.root.title("Gerador de Trajeto")
+
+    def fechar_aplicativo(self):
+        if self.projeto_modificado:
+            # askyesnocancel: True (Yes), False (No), None (Cancel)
+            resposta = messagebox.askyesnocancel(
+                "Alterações não salvas", 
+                "Você possui alterações não salvas. Deseja salvar antes de sair?"
+            )
+            if resposta is True:
+                # O usuário quer salvar antes de sair
+                # Se não exportar com sucesso (ex: cancelar no dialog de salvar), a gente aborta o fechamento
+                if self.exportar_tfg():
+                    self.root.destroy()
+            elif resposta is False:
+                # O usuário NÃO quer salvar, apenas sair
+                self.root.destroy()
+            # Se resposta is None, o usuário cancelou a ação de fechar, então não fazemos nada.
+        else:
+            # Não tem alterações, pode sair direto
+            self.root.destroy()
 
     def _criar_variaveis(self):
         self.var_reta_comprimento = tk.StringVar(value="10")
@@ -69,7 +101,7 @@ class GeradorTrajetoApp:
         menu_arquivo.add_command(label="Salvar como .tfg...", command=self.exportar_tfg, accelerator="Ctrl+S")
         menu_arquivo.add_command(label="Carregar arquivo .tfg...", command=self.carregar_tfg, accelerator="Ctrl+O")
         menu_arquivo.add_separator()
-        menu_arquivo.add_command(label="Sair", command=self.root.quit)
+        menu_arquivo.add_command(label="Sair", command=self.fechar_aplicativo)
         menubar.add_cascade(label="Arquivo", menu=menu_arquivo)
 
         menu_editar = tk.Menu(menubar, tearoff=0)
@@ -162,6 +194,9 @@ class GeradorTrajetoApp:
         
         ttk.Label(frame_marcacao, textvariable=self.var_label_distancia_marcacao).grid(row=1, column=0, sticky="w")
         ttk.Entry(frame_marcacao, textvariable=self.var_marcacao_distancia, width=18).grid(row=1, column=1, padx=6, pady=4)
+        ttk.Button(frame_marcacao, text="Aplicar a todas", command=self.aplicar_marcacao_a_todas).grid(
+            row=2, column=0, columnspan=2, sticky="ew", pady=(8, 4)
+        )
 
     def _montar_canvas(self, parent):
         frame_canvas = ttk.LabelFrame(parent, text="Visualização", padding=8)
@@ -414,7 +449,9 @@ class GeradorTrajetoApp:
         self.frame_resolucao_conteudo.pack_forget()
         self.btn_expandir_resolucao.config(text="▼ Resolução")
 
-    def _atualizar_estado(self, preservar_selecao=True):
+    def _atualizar_estado(self, preservar_selecao=True, modificado=True):
+        if modificado:
+            self._marcar_como_modificado()
         indice = self.indice_selecionado if preservar_selecao else None
         GeometriaTrajeto.recalcular_poses(self.trajeto)
         self._recalcular_posicoes_marcacoes()
@@ -581,7 +618,47 @@ class GeradorTrajetoApp:
                 novo_y,
                 novo_angulo
             )
+            self._marcar_como_modificado()
             self._redesenhar()
+
+    def aplicar_marcacao_a_todas(self):
+        """Aplica a distância atual a todas as marcações do trajeto, mantendo os lados originais."""
+        try:
+            distancia = float(self.var_marcacao_distancia.get())
+            if distancia <= 0:
+                messagebox.showerror("Valor inválido", "A distância deve ser maior que zero.")
+                return
+        except ValueError:
+            messagebox.showerror("Valor inválido", "Distância inválida.")
+            return
+        
+        atualizou_alguma = False
+        for i, marcacao in enumerate(self.trajeto.marcacoes):
+            if marcacao.distancia == distancia:
+                continue
+                
+            pos = GeometriaTrajeto.calcular_posicao_marcacao(
+                self.trajeto,
+                i,
+                marcacao.lado, # Mantém o lado original
+                distancia
+            )
+            if pos is not None:
+                novo_x, novo_y, novo_angulo = pos
+                self.trajeto.modificar_marcacao(
+                    i,
+                    marcacao.lado, # Mantém o lado original
+                    distancia,
+                    novo_x,
+                    novo_y,
+                    novo_angulo
+                )
+                atualizou_alguma = True
+                
+        if atualizou_alguma:
+            self._redesenhar()
+            self._atualizar_estado()
+            messagebox.showinfo("Sucesso", "Marcações atualizadas com sucesso!")
 
     def desfazer(self):
         if self.trajeto.desfazer():
@@ -600,15 +677,28 @@ class GeradorTrajetoApp:
 
     def novo_projeto(self):
         if self.trajeto.segmentos:
-            ok = messagebox.askyesno("Novo projeto", "Limpar o trajeto atual e começar um projeto novo?")
-            if not ok:
-                return
+            if self.projeto_modificado:
+                resposta = messagebox.askyesnocancel(
+                    "Novo projeto", 
+                    "Você possui alterações não salvas. Deseja salvar antes de começar um novo projeto?"
+                )
+                if resposta is True:
+                    if not self.exportar_tfg():
+                        return
+                elif resposta is None:
+                    return
+            else:
+                ok = messagebox.askyesno("Novo projeto", "Limpar o trajeto atual e começar um projeto novo?")
+                if not ok:
+                    return
+
         self.trajeto.substituir_segmentos([])
         self.trajeto.segmentos_desfeitos.clear()
         self.indice_selecionado = None
         self.canvas_view.centralizar_visao()
         self.resetar_origem_visual()
-        self._atualizar_estado(preservar_selecao=False)
+        self._atualizar_estado(preservar_selecao=False, modificado=False)
+        self._marcar_como_salvo()
 
     def remover_selecao(self):
         if self.indice_selecionado is None:
@@ -839,7 +929,7 @@ DICAS
             qtd_pontos = self._obter_resolucao()
         except ValueError as e:
             messagebox.showerror("Resolução inválida", str(e))
-            return
+            return False
 
         caminho = filedialog.asksaveasfilename(
             title="Exportar pista como pacote .tfg",
@@ -847,7 +937,7 @@ DICAS
             filetypes=[("Track File Generator", "*.tfg"), ("Todos os arquivos", "*.*")],
         )
         if not caminho:
-            return
+            return False
 
         try:
             origem_x, origem_y = self.canvas_view.obter_origem_visual_m()
@@ -864,15 +954,17 @@ DICAS
             )
         except ValueError as e:
             messagebox.showerror("Erro na exportação", str(e))
-            return
+            return False
         except OSError as e:
             messagebox.showerror("Erro ao salvar", str(e))
-            return
+            return False
 
         messagebox.showinfo(
             "Exportação concluída",
             f"Pacote .tfg salvo com sucesso!\n\n{caminho}",
         )
+        self._marcar_como_salvo()
+        return True
 
     def carregar_tfg(self):
         caminho = filedialog.askopenfilename(
@@ -916,7 +1008,8 @@ DICAS
         self._atualizar_estado_fator()
         self._atualizar_estado_resolucao()
         self.canvas_view.centralizar_visao()
-        self._atualizar_estado()
+        self._atualizar_estado(modificado=False)
+        self._marcar_como_salvo()
 
         messagebox.showinfo(
             "Projeto carregado",

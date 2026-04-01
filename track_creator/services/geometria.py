@@ -36,7 +36,14 @@ class GeometriaTrajeto:
 
         x1 = cx + raio * math.cos(ang1)
         y1 = cy + raio * math.sin(ang1)
-        heading1 = heading0 + sinal * angulo_central_rad
+        
+        # Aproximar a reta tangente usando derivada com o último e penúltimo ponto
+        delta = 0.001
+        ang_penultimo = ang0 + (ang1 - ang0) * (1.0 - delta)
+        px = cx + raio * math.cos(ang_penultimo)
+        py = cy + raio * math.sin(ang_penultimo)
+        
+        heading1 = math.atan2(y1 - py, x1 - px)
 
         return x1, y1, GeometriaTrajeto.normalizar_angulo(heading1)
 
