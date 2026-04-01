@@ -148,9 +148,9 @@ class GameSimulation:
         for x, y, angle in getattr(self, 'markings', []):
             i = int(round(x))
             j = int(round(y))
-            if -self.LENGTH/2 <= i < self.LENGTH/2 and -self.WIDTH/2 <= j < self.WIDTH/2:
-                row = int(i + self.LENGTH / 2)
-                col = int(j + self.WIDTH / 2)
+            if -self.LENGTH//2 <= i < self.LENGTH//2 and -self.WIDTH//2 <= j < self.WIDTH//2:
+                row = i + self.LENGTH // 2
+                col = j + self.WIDTH // 2
                 
                 # relative pixels
                 x_pix = (x - i) * self.SCALE
@@ -268,7 +268,7 @@ class GameSimulation:
 
         # set track properties
         self.track.set_coordinates(
-            ((self.x_track[0] + self.LENGTH / 2) * self.SCALE, (self.y_track[0] + self.WIDTH / 2) * self.SCALE)
+            ((self.x_track[0] + self.LENGTH // 2) * self.SCALE, (self.y_track[0] + self.WIDTH // 2) * self.SCALE)
         )
         self.track.set_center(self.car_draw.get_center())
         self.track.set_pivot(self.car_draw.get_center())
@@ -503,9 +503,12 @@ class GameSimulation:
             f"x: {round(self.track.get_center()[0]/self.SCALE, 2):.2f} y: {round(self.track.get_center()[1]/self.SCALE, 2):.2f}"
         )
 
-        # Track absolute position natively corresponds directly to the origin
-        minimap_x = 2 * (self.track.get_center()[0] / self.SCALE - self.LENGTH / 2) / self.LENGTH
-        minimap_y = -2 * (self.track.get_center()[1] / self.SCALE - self.WIDTH / 2) / self.WIDTH
+        minimap_x = 2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1
+        minimap_y = -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1
+        
+        self.minimap.set_player_position((minimap_x, minimap_y))
+        
+        # Add current position to minimap trail (only every 0.5 seconds to reduce memory usage)
         current_time = time.time()
         if current_time - self.last_trail_update_time >= self.config.tail_time:
             self.minimap.add_trail_point(minimap_x, minimap_y)

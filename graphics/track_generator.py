@@ -241,7 +241,7 @@ def load_track_from_tfg(tfg_file_path):
                             continue
 
     # Convert to numpy arrays
-    x_array = np.array(x_points)
-    y_array = np.array(y_points)
+    x_array = np.array(x_points[::-1])
+    y_array = np.array(y_points[::-1])
 
     return x_array, y_array, resolution, markings

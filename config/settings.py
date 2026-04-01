@@ -31,7 +31,7 @@ def settings():
         side_sensor_size=0.03,           # Side sensor diameter in meters
         # track generation configuration
         track_type=TFG,                 # Load track from file
-        track_file_path="tracks/track_01.tfg"  # Path to .tfg file
+        track_file_path="tracks/track_03.tfg"  # Path to .tfg file
 
     )
     sim = GameSimulation(sim_config)
