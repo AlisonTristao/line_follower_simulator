@@ -16,8 +16,8 @@ def settings():
     sim_config = SimulationConfig(
         screen_size=FULL,
         fps=300,
-        length=140,                      # track length in meters
-        width=70,                        # track width in meters
+        length=50,                      # track length in meters
+        width=25,                        # track width in meters
         scale=500, # pixels per unity
         meter_per_scale = METER_PER_SCALE,
         render=2,                        # number of chuncks render

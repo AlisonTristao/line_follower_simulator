@@ -174,7 +174,7 @@ class GameSimulation:
                     )
                     self.track.set_obj(row, col, existing)
                 
-                existing.add_marking(x_pix, y_pix, angle + math.pi/2)  # Adjust angle for correct orientation
+                existing.add_marking(x_pix, y_pix, angle)  # Adjust angle for correct orientation
 
     def _setup_simulator(self):
         # print the initialization message
