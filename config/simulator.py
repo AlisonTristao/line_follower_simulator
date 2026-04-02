@@ -20,7 +20,6 @@ class SimulationConfig:
     width: int
     scale: int
     render: int
-    meter_per_scale: int
     sensor_spacing: float = 0.001
     tail_time: float = 0.1
     
@@ -67,7 +66,6 @@ class GameSimulation:
         
         # Robot dimensions (in meters) - converted to pixels via SCALE
         self.car_size_meters = config.car_size
-        self.front_sensor_distance_meters = config.front_sensor_distance
         self.front_sensor_size_meters = config.front_sensor_size
         self.side_sensor_distance_x_meters = config.side_sensor_distance_x
         self.side_sensor_distance_y_meters = config.side_sensor_distance_y

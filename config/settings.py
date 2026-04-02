@@ -16,10 +16,9 @@ def settings():
     sim_config = SimulationConfig(
         screen_size=FULL,
         fps=300,
-        length=8,                      # track length in meters
-        width=4,                        # track width in meters
+        length=12,                      # track length in meters
+        width=6,                        # track width in meters
         scale=500, # pixels per unity
-        meter_per_scale = METER_PER_SCALE,
         render=2,                        # number of chuncks render
         tail_time=0.01,
         # Robot dimensions in METERS
@@ -30,7 +29,7 @@ def settings():
         side_sensor_distance_y=0.10,     # Vertical distance from car center to side sensors in meters (forward/backward)
         side_sensor_size=0.03,           # Side sensor diameter in meters
         # track generation configuration
-        track_file_path="tracks/track_03.tfg"  # Path to .tfg file
+        track_file_path="tracks/track_04.tfg"  # Path to .tfg file
 
     )
     sim = GameSimulation(sim_config)
