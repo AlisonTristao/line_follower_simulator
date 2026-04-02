@@ -6,6 +6,7 @@ import shutil
 
 from models.segmentos import SegmentoCurva, SegmentoReta
 from models.marcacao import Marcacao
+from models.borda_deteccao import BordaDeteccao
 
 
 class ImportadorTrajeto:
@@ -77,6 +78,35 @@ class ImportadorTrajeto:
         modo_resolucao_auto = dados.get("modo_resolucao_auto")
         pontos_por_metro = dados.get("pontos_por_metro")
 
+        # Carregar borda de detecção (compatibilidade com arquivos antigos)
+        borda_dados = dados.get("borda_deteccao", {})
+        if borda_dados and isinstance(borda_dados, dict):
+            try:
+                # Arquivo novo: tem altura em metros ou altura em unidades
+                if "altura_m" in borda_dados:
+                    altura_borda = float(borda_dados.get("altura_m", 0.5))
+                else:
+                    # Arquivo antigo: altura já está em metros (retrocampatibilidade)
+                    altura_borda = float(borda_dados.get("altura", 0.5))
+                
+                cor = str(borda_dados.get("cor", "gray"))
+                estilo = str(borda_dados.get("estilo_borda", "dashed"))
+                
+                print(f"[DEBUG] Borda carregada do JSON: altura={altura_borda}, cor={cor}, estilo={estilo}")
+                
+                borda_deteccao = BordaDeteccao(
+                    altura=altura_borda,
+                    cor=cor,
+                    estilo_borda=estilo,
+                )
+            except (KeyError, ValueError, TypeError) as e:
+                print(f"[WARN] Erro ao carregar borda_deteccao: {e}. Usando padrão.")
+                borda_deteccao = BordaDeteccao()
+        else:
+            # Arquivo antigo sem borda_deteccao: cria uma com valores padrão
+            print("[DEBUG] Borda não encontrada no JSON. Criando com valores padrão.")
+            borda_deteccao = BordaDeteccao()
+
         config = {
             "origem_x": float(origem_visual.get("x", 0.0)) * fator_inverso,
             "origem_y": float(origem_visual.get("y", 0.0)) * fator_inverso,
@@ -86,7 +116,7 @@ class ImportadorTrajeto:
             "modo_resolucao_auto": modo_resolucao_auto,
             "pontos_por_metro": pontos_por_metro,
         }
-        return segmentos, config, marcacoes
+        return segmentos, config, marcacoes, borda_deteccao
 
     @staticmethod
     def importar_tfg(caminho_tfg):
@@ -105,7 +135,7 @@ class ImportadorTrajeto:
             caminho_json = os.path.join(tmpdir, arquivos_json[0])
             
             # Carrega usando o método carregar_json
-            segmentos, config, marcacoes = ImportadorTrajeto.carregar_json(caminho_json)
+            segmentos, config, marcacoes, borda_deteccao = ImportadorTrajeto.carregar_json(caminho_json)
             
             # Obtém o fator de conversão para converter de volta para metros
             fator_unidade = config.get("fator_personalizado", 1.0)
@@ -144,7 +174,7 @@ class ImportadorTrajeto:
                                 )
                             )
             
-            return segmentos, config, marcacoes
+            return segmentos, config, marcacoes, borda_deteccao
         
         finally:
             shutil.rmtree(tmpdir, ignore_errors=True)

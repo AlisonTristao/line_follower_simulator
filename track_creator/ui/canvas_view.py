@@ -401,6 +401,10 @@ class CanvasTrajetoView:
         self.canvas.create_oval(sx_ini - 5, sy_ini - 5, sx_ini + 5, sy_ini + 5, fill="green", outline="")
         self.canvas.create_text(sx_ini + 24, sy_ini - 12, text="Início", fill="green")
         
+        # Desenhar borda de detecção se existir
+        if hasattr(trajeto, 'borda_deteccao') and trajeto.borda_deteccao:
+            self._desenhar_limites_pista(trajeto, largura, altura)
+        
         # Se em modo de seleção de origem, mostrar indicação
         if self.modo_selecionando_origem:
             origem_x, origem_y = self.obter_origem_visual_m()
@@ -563,3 +567,34 @@ class CanvasTrajetoView:
         while y_px <= altura:
             self.canvas.create_line(largura_regua - 10, y_px, largura_regua - 2, y_px, fill="#666666", width=2)
             y_px += espaco_px
+
+    def _desenhar_limites_pista(self, trajeto, largura, altura):
+        """Desenha os limites da pista como um retângulo com borda tracejada cinza, centrado na origem visual.
+        Largura = altura * 2 (proporção fixa)."""
+        limites = trajeto.borda_deteccao
+        altura_limites = limites.altura
+        largura_limites = altura_limites * 2.0  # Largura é altura × 2
+        
+        # Obter origem visual (centro do retângulo)
+        origem_x, origem_y = self.obter_origem_visual_m()
+        
+        # Posição dos limites centrada na origem visual
+        # Quanto à horizontal: largura_limites
+        # Quanto à vertical: altura_limites
+        x1_mundo = origem_x - largura_limites / 2.0
+        y1_mundo = origem_y - altura_limites / 2.0
+        x2_mundo = origem_x + largura_limites / 2.0
+        y2_mundo = origem_y + altura_limites / 2.0
+        
+        # Converter para coordenadas de tela
+        sx1, sy1 = self.mundo_para_tela(x1_mundo, y1_mundo, largura, altura)
+        sx2, sy2 = self.mundo_para_tela(x2_mundo, y2_mundo, largura, altura)
+        
+        # Desenhar retângulo com borda tracejada cinza
+        # dash=(5, 5) cria um padrão tracejado (5 px sólido, 5 px vazio)
+        self.canvas.create_rectangle(
+            sx1, sy1, sx2, sy2,
+            outline="gray",
+            width=2,
+            dash=(5, 5)
+        )

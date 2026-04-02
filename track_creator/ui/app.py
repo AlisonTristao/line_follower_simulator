@@ -40,6 +40,7 @@ class GeradorTrajetoApp:
         self._criar_variaveis()
         self._configurar_menu()
         self._montar_interface()
+        self._atualizar_campo_limites_largura()
         
         # Defer shortcuts configuration to after UI is fully loaded
         self.root.after(100, self._configurar_atalhos)
@@ -106,6 +107,9 @@ class GeradorTrajetoApp:
         self.var_label_distancia_marcacao = tk.StringVar(value="Distância (m)")
         self.var_label_origem_x = tk.StringVar(value="Origem X (m)")
         self.var_label_origem_y = tk.StringVar(value="Origem Y (m)")
+        # Variáveis para limites da pista
+        self.var_limites_altura = tk.StringVar(value="0.5")
+        self.var_label_limites_altura = tk.StringVar(value="Altura (m)")
 
     def _configurar_menu(self):
         menubar = tk.Menu(self.root)
@@ -385,6 +389,24 @@ class GeradorTrajetoApp:
         self._ocultar_resolucao()
         self._atualizar_estado_resolucao()
 
+        frame_limites = ttk.LabelFrame(parent, text="Limites da Pista", padding=10)
+        frame_limites.pack(fill="x", pady=(10, 0))
+        
+        frame_limites_altura = ttk.Frame(frame_limites)
+        frame_limites_altura.pack(fill="x", pady=(0, 4))
+        ttk.Label(frame_limites_altura, textvariable=self.var_label_limites_altura).pack(side="left")
+        ttk.Entry(frame_limites_altura, textvariable=self.var_limites_altura, width=18).pack(side="right", padx=(4, 0))
+        
+        # Campo de largura não editável (calcula automaticamente: altura × 2)
+        frame_limites_largura = ttk.Frame(frame_limites)
+        frame_limites_largura.pack(fill="x", pady=(0, 8))
+        ttk.Label(frame_limites_largura, text="Largura (altura × 2)").pack(side="left")
+        self.entry_limites_largura_display = ttk.Entry(frame_limites_largura, width=18, state="readonly")
+        self.entry_limites_largura_display.pack(side="right", padx=(4, 0))
+        
+        # Callback quando altura muda
+        self.var_limites_altura.trace("w", lambda *args: self._ao_mudar_limites_altura())
+
     def _configurar_atalhos(self):
         # Usar bind() no root e bind_all() para garantir cobertura global
         self.root.bind("<Control-z>", lambda e: self._atalho_desfazer(e) or "break")
@@ -451,6 +473,7 @@ class GeradorTrajetoApp:
         self.var_label_distancia_marcacao.set(f"Distância ({unidade_label})")
         self.var_label_origem_x.set(f"Origem X ({unidade_label})")
         self.var_label_origem_y.set(f"Origem Y ({unidade_label})")
+        self.var_label_limites_altura.set(f"Altura ({unidade_label})")
 
     def _atualizar_estado_resolucao(self):
         modo_auto = self.var_modo_resolucao_auto.get()
@@ -498,6 +521,7 @@ class GeradorTrajetoApp:
         self._recalcular_posicoes_marcacoes()
         if self.var_modo_resolucao_auto.get():
             self._recalcular_resolucao_automatica()
+        self._atualizar_campo_borda_largura()
         self._atualizar_lista_segmentos(indice)
         self._redesenhar()
 
@@ -736,6 +760,7 @@ class GeradorTrajetoApp:
         self.trajeto.substituir_segmentos([])
         self.trajeto.segmentos_desfeitos.clear()
         self.indice_selecionado = None
+        self.var_limites_altura.set("0.5")  # Reset limites para valor padrão
         self.canvas_view.centralizar_visao()
         self.resetar_origem_visual()
         self._atualizar_estado(preservar_selecao=False, modificado=False)
@@ -820,6 +845,37 @@ class GeradorTrajetoApp:
         
         # Desativar o modo de seleção
         self.desativar_selecionador_origem()
+
+    def _ao_mudar_limites_altura(self):
+        """Callback quando a altura dos limites é alterada."""
+        try:
+            altura = float(self.var_limites_altura.get())
+            self.trajeto.borda_deteccao.altura = altura
+            self._atualizar_campo_limites_largura()
+            self._redesenhar()
+            self._marcar_como_modificado()
+        except ValueError:
+            pass
+
+    def _atualizar_campo_limites_largura(self):
+        """Atualiza o campo de largura com base na altura (largura = altura * 2)."""
+        try:
+            # Largura = altura * 2 (proporção fixa, sem precisar de unidade)
+            altura_str = self.var_limites_altura.get()
+            altura = float(altura_str) if altura_str else 0.5
+            largura = altura * 2.0
+            
+            valor_formatado = f"{largura:.2f}"
+            print(f"[DEBUG] Atualizando largura: altura={altura}, largura={largura}")
+            
+            self.entry_limites_largura_display.config(state="normal")
+            self.entry_limites_largura_display.delete(0, tk.END)
+            self.entry_limites_largura_display.insert(0, valor_formatado)
+            self.entry_limites_largura_display.config(state="readonly")
+        except Exception as e:
+            print(f"[ERROR] Erro ao atualizar campo limites largura: {e}")
+            import traceback
+            traceback.print_exc()
 
     def mostrar_ajuda(self):
         ajuda_window = tk.Toplevel(self.root)
@@ -1016,13 +1072,14 @@ DICAS
             return
 
         try:
-            segmentos, config, marcacoes = ImportadorTrajeto.importar_tfg(caminho)
+            segmentos, config, marcacoes, limites_pista = ImportadorTrajeto.importar_tfg(caminho)
         except (ValueError, KeyError, TypeError, OSError, zipfile.BadZipFile) as e:
             messagebox.showerror("Erro ao carregar .tfg", str(e))
             return
 
         self.trajeto.substituir_segmentos(segmentos)
         self.trajeto.substituir_marcacoes(marcacoes)
+        self.trajeto.borda_deteccao = limites_pista
         self.indice_selecionado = 0 if self.trajeto.segmentos else None
 
         if config.get("qtd_pontos") is not None:
@@ -1048,8 +1105,14 @@ DICAS
         
         self._atualizar_estado_fator()
         self._atualizar_estado_resolucao()
+        
+        # Carregar dados dos limites da pista (APÓS restaurar unidade)
+        self.var_limites_altura.set(str(limites_pista.altura))
+        
         self.canvas_view.centralizar_visao()
         self._atualizar_estado(modificado=False)
+        # Garantir que o campo de largura está atualizado após tudo
+        self._atualizar_campo_limites_largura()
         self._marcar_como_salvo()
 
         messagebox.showinfo(

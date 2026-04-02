@@ -1,4 +1,5 @@
 from models.marcacao import Marcacao
+from models.borda_deteccao import BordaDeteccao
 from copy import deepcopy
 
 
@@ -20,6 +21,7 @@ class Trajeto:
         self.historico_desfazer = []  # Pilha para refazer
         self.marcacoes = []  # Lista de marcações (waypoints)
         self.poses = [(0.0, 0.0, 0.0)]  # (x, y, heading_rad)
+        self.borda_deteccao = BordaDeteccao()  # Borda de detecção (altura configurável)
     
     @property
     def segmentos_desfeitos(self):

@@ -65,6 +65,17 @@ class ExportadorTrajeto:
         espacamento_medio_saida = espacamento_medio_m * fator if espacamento_medio_m is not None else None
         comprimento_total_saida = GeometriaTrajeto.comprimento_total(trajeto) * fator
 
+        # Preparar dados da borda (com conversão de unidade)
+        dados_borda = {}
+        if hasattr(trajeto, 'borda_deteccao') and trajeto.borda_deteccao:
+            altura_m = trajeto.borda_deteccao.altura
+            dados_borda = {
+                "altura_m": altura_m,
+                "altura": altura_m * fator,
+                "cor": trajeto.borda_deteccao.cor,
+                "estilo_borda": trajeto.borda_deteccao.estilo_borda,
+            }
+
         return {
             "origem_trajeto_m": {"x": 0.0, "y": 0.0},
             "origem_visual_exportacao_m": {"x": origem_x, "y": origem_y},
@@ -82,6 +93,7 @@ class ExportadorTrajeto:
             "pontos_por_metro": pontos_por_metro,
             "segmentos": dados_segmentos,
             "marcacoes": dados_marcacoes,
+            "borda_deteccao": dados_borda,
         }
 
     @staticmethod
