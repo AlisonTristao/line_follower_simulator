@@ -12,6 +12,22 @@ from services.importador import ImportadorTrajeto
 from ui.canvas_view import CanvasTrajetoView
 
 
+# Dicionário de ícones representativos
+ICONOS = {
+    "adicionar": "➕",
+    "inserir": "⬇",
+    "atualizar": "↻",
+    "aplicar": "✓",
+    "resetar": "↺",
+    "selecionar": "◉",
+    "centralizar": "⊕",
+    "desfazer": "↶",
+    "refazer": "↷",
+    "limpar": "🗑",
+    "remover": "✕",
+}
+
+
 class GeradorTrajetoApp:
     def __init__(self, root: tk.Tk):
         self.root = root
@@ -70,11 +86,11 @@ class GeradorTrajetoApp:
         self.var_curva_lado = tk.StringVar(value="esquerda")
         self.var_curva_angulo = tk.StringVar(value="180")
         self.var_resolucao = tk.StringVar(value="300")
-        self.var_unidade = tk.StringVar(value="m")
+        self.var_unidade = tk.StringVar(value="cm")
         self.var_fator_personalizado = tk.StringVar(value="1.0")
         self.var_zoom = tk.DoubleVar(value=18.0)
+        self.var_zoom_max = tk.StringVar(value="120")
         self.var_mostrar_grade = tk.BooleanVar(value=True)
-        self.var_grade_espaco = tk.StringVar(value="1")
         self.var_origem_x = tk.StringVar(value="0")
         self.var_origem_y = tk.StringVar(value="0")
         self.var_segmento_selecionado = tk.StringVar(value="Nenhum trecho selecionado")
@@ -88,7 +104,6 @@ class GeradorTrajetoApp:
         self.var_label_comprimento = tk.StringVar(value="Comprimento (m)")
         self.var_label_raio = tk.StringVar(value="Raio (m)")
         self.var_label_distancia_marcacao = tk.StringVar(value="Distância (m)")
-        self.var_label_grade_espaco = tk.StringVar(value="Espaço da grade (m)")
         self.var_label_origem_x = tk.StringVar(value="Origem X (m)")
         self.var_label_origem_y = tk.StringVar(value="Origem Y (m)")
 
@@ -143,60 +158,73 @@ class GeradorTrajetoApp:
     def _montar_painel_esquerdo(self, parent):
         frame_reta = ttk.LabelFrame(parent, text="Reta", padding=10)
         frame_reta.pack(fill="x", pady=(0, 10))
-        ttk.Label(frame_reta, textvariable=self.var_label_comprimento).grid(row=0, column=0, sticky="w")
-        ttk.Entry(frame_reta, textvariable=self.var_reta_comprimento, width=18).grid(row=0, column=1, padx=6, pady=4)
-        ttk.Label(frame_reta, text="Ângulo absoluto (graus)").grid(row=1, column=0, sticky="w")
-        ttk.Entry(frame_reta, textvariable=self.var_reta_angulo, width=18).grid(row=1, column=1, padx=6, pady=4)
-        ttk.Button(frame_reta, text="Adicionar reta no fim", command=self.adicionar_reta).grid(
-            row=2, column=0, columnspan=2, sticky="ew", pady=(8, 4)
-        )
-        ttk.Button(frame_reta, text="Inserir reta após seleção", command=self.inserir_reta_apos_selecao).grid(
-            row=3, column=0, columnspan=2, sticky="ew", pady=(0, 4)
-        )
-        ttk.Button(frame_reta, text="Atualizar reta selecionada", command=self.atualizar_reta_selecionada).grid(
-            row=4, column=0, columnspan=2, sticky="ew"
-        )
+        
+        frame_reta_comp = ttk.Frame(frame_reta)
+        frame_reta_comp.pack(fill="x", pady=(0, 4))
+        ttk.Label(frame_reta_comp, textvariable=self.var_label_comprimento).pack(side="left")
+        ttk.Entry(frame_reta_comp, textvariable=self.var_reta_comprimento, width=18).pack(side="right", padx=(4, 0))
+        
+        frame_reta_ang = ttk.Frame(frame_reta)
+        frame_reta_ang.pack(fill="x", pady=(0, 8))
+        ttk.Label(frame_reta_ang, text="Ângulo absoluto (graus)").pack(side="left")
+        ttk.Entry(frame_reta_ang, textvariable=self.var_reta_angulo, width=18).pack(side="right", padx=(4, 0))
+        
+        frame_botoes_reta = ttk.Frame(frame_reta)
+        frame_botoes_reta.pack(fill="x")
+        ttk.Button(frame_botoes_reta, text=f"{ICONOS['adicionar']} Adicionar", command=self.adicionar_reta).pack(side="left", fill="both", expand=True, padx=(0, 2))
+        ttk.Button(frame_botoes_reta, text=f"{ICONOS['inserir']} Inserir", command=self.inserir_reta_apos_selecao).pack(side="left", fill="both", expand=True, padx=(1, 2))
+        ttk.Button(frame_botoes_reta, text=f"{ICONOS['atualizar']} Atualizar", command=self.atualizar_reta_selecionada).pack(side="left", fill="both", expand=True, padx=(1, 0))
 
         frame_curva = ttk.LabelFrame(parent, text="Curva", padding=10)
         frame_curva.pack(fill="x", pady=(0, 10))
-        ttk.Label(frame_curva, textvariable=self.var_label_raio).grid(row=0, column=0, sticky="w")
-        ttk.Entry(frame_curva, textvariable=self.var_curva_raio, width=18).grid(row=0, column=1, padx=6, pady=4)
-        ttk.Label(frame_curva, text="Lado").grid(row=1, column=0, sticky="w")
+        
+        frame_curva_raio = ttk.Frame(frame_curva)
+        frame_curva_raio.pack(fill="x", pady=(0, 4))
+        ttk.Label(frame_curva_raio, textvariable=self.var_label_raio).pack(side="left")
+        ttk.Entry(frame_curva_raio, textvariable=self.var_curva_raio, width=18).pack(side="right", padx=(4, 0))
+        
+        frame_curva_lado = ttk.Frame(frame_curva)
+        frame_curva_lado.pack(fill="x", pady=(0, 4))
+        ttk.Label(frame_curva_lado, text="Lado").pack(side="left")
         ttk.Combobox(
-            frame_curva,
+            frame_curva_lado,
             textvariable=self.var_curva_lado,
             values=["esquerda", "direita"],
-            width=15,
+            width=20,
             state="readonly",
-        ).grid(row=1, column=1, padx=6, pady=4)
-        ttk.Label(frame_curva, text="Ângulo da curva (graus)").grid(row=2, column=0, sticky="w")
-        ttk.Entry(frame_curva, textvariable=self.var_curva_angulo, width=18).grid(row=2, column=1, padx=6, pady=4)
-        ttk.Button(frame_curva, text="Adicionar curva no fim", command=self.adicionar_curva).grid(
-            row=3, column=0, columnspan=2, sticky="ew", pady=(8, 4)
-        )
-        ttk.Button(frame_curva, text="Inserir curva após seleção", command=self.inserir_curva_apos_selecao).grid(
-            row=4, column=0, columnspan=2, sticky="ew", pady=(0, 4)
-        )
-        ttk.Button(frame_curva, text="Atualizar curva selecionada", command=self.atualizar_curva_selecionada).grid(
-            row=5, column=0, columnspan=2, sticky="ew"
-        )
+        ).pack(side="right", padx=(4, 0))
+        
+        frame_curva_ang = ttk.Frame(frame_curva)
+        frame_curva_ang.pack(fill="x", pady=(0, 8))
+        ttk.Label(frame_curva_ang, text="Ângulo da curva (graus)").pack(side="left")
+        ttk.Entry(frame_curva_ang, textvariable=self.var_curva_angulo, width=18).pack(side="right", padx=(4, 0))
+        
+        frame_botoes_curva = ttk.Frame(frame_curva)
+        frame_botoes_curva.pack(fill="x")
+        ttk.Button(frame_botoes_curva, text=f"{ICONOS['adicionar']} Adicionar", command=self.adicionar_curva).pack(side="left", fill="both", expand=True, padx=(0, 2))
+        ttk.Button(frame_botoes_curva, text=f"{ICONOS['inserir']} Inserir", command=self.inserir_curva_apos_selecao).pack(side="left", fill="both", expand=True, padx=(1, 2))
+        ttk.Button(frame_botoes_curva, text=f"{ICONOS['atualizar']} Atualizar", command=self.atualizar_curva_selecionada).pack(side="left", fill="both", expand=True, padx=(1, 0))
 
         frame_marcacao = ttk.LabelFrame(parent, text="Marcações", padding=10)
         frame_marcacao.pack(fill="x", pady=(0, 10))
-        ttk.Label(frame_marcacao, text="Lado").grid(row=0, column=0, sticky="w")
+        
+        frame_marcacao_lado = ttk.Frame(frame_marcacao)
+        frame_marcacao_lado.pack(fill="x", pady=(0, 4))
+        ttk.Label(frame_marcacao_lado, text="Lado").pack(side="left")
         ttk.Combobox(
-            frame_marcacao,
+            frame_marcacao_lado,
             textvariable=self.var_marcacao_lado,
             values=["esquerda", "direita"],
-            width=15,
+            width=20,
             state="readonly",
-        ).grid(row=0, column=1, padx=6, pady=4)
+        ).pack(side="right", padx=(4, 0))
         
-        ttk.Label(frame_marcacao, textvariable=self.var_label_distancia_marcacao).grid(row=1, column=0, sticky="w")
-        ttk.Entry(frame_marcacao, textvariable=self.var_marcacao_distancia, width=18).grid(row=1, column=1, padx=6, pady=4)
-        ttk.Button(frame_marcacao, text="Aplicar a todas", command=self.aplicar_marcacao_a_todas).grid(
-            row=2, column=0, columnspan=2, sticky="ew", pady=(8, 4)
-        )
+        frame_marcacao_dist = ttk.Frame(frame_marcacao)
+        frame_marcacao_dist.pack(fill="x", pady=(0, 8))
+        ttk.Label(frame_marcacao_dist, textvariable=self.var_label_distancia_marcacao).pack(side="left")
+        ttk.Entry(frame_marcacao_dist, textvariable=self.var_marcacao_distancia, width=18).pack(side="right", padx=(4, 0))
+        
+        ttk.Button(frame_marcacao, text=f"{ICONOS['aplicar']} Aplicar a todas", command=self.aplicar_marcacao_a_todas).pack(fill="x")
 
     def _montar_canvas(self, parent):
         frame_canvas = ttk.LabelFrame(parent, text="Visualização", padding=8)
@@ -212,15 +240,17 @@ class GeradorTrajetoApp:
             variable=self.var_zoom,
             command=lambda v: self._redesenhar(),
         ).pack(side="left", fill="x", expand=True, padx=(8, 12))
-        ttk.Button(toolbar_canvas, text="Centralizar visão", command=self.centralizar_visao).pack(side="left")
+        ttk.Button(toolbar_canvas, text=f"{ICONOS['centralizar']} Centralizar", command=self.centralizar_visao).pack(side="left")
 
         self.canvas_view = CanvasTrajetoView(
             frame_canvas,
             zoom_var=self.var_zoom,
+            zoom_max_var=self.var_zoom_max,
             mostrar_grade_var=self.var_mostrar_grade,
-            grade_espaco_var=self.var_grade_espaco,
             origem_x_var=self.var_origem_x,
             origem_y_var=self.var_origem_y,
+            unidade_var=self.var_unidade,
+            fator_personalizado_var=self.var_fator_personalizado,
         )
         self.canvas_view.set_redraw_callback(self._redesenhar)
         self.canvas_view.set_segmento_click_callback(self._ao_clicar_segmento_no_canvas)
@@ -239,11 +269,10 @@ class GeradorTrajetoApp:
         ).pack(anchor="w", pady=(0, 6))
         
         # Frames para organizar labels e entries em duas colunas
-        frame_config = ttk.Frame(frame_visual)
-        frame_config.pack(fill="x", pady=(0, 8))
-        
-        ttk.Label(frame_config, textvariable=self.var_label_grade_espaco).pack(side="left")
-        ttk.Entry(frame_config, textvariable=self.var_grade_espaco, width=10).pack(side="right", padx=(4, 0))
+        frame_zoom_max = ttk.Frame(frame_visual)
+        frame_zoom_max.pack(fill="x", pady=(0, 4))
+        ttk.Label(frame_zoom_max, text="Limite máximo zoom").pack(side="left")
+        ttk.Entry(frame_zoom_max, textvariable=self.var_zoom_max, width=10).pack(side="right", padx=(4, 0))
         
         frame_origem_x = ttk.Frame(frame_visual)
         frame_origem_x.pack(fill="x", pady=(0, 4))
@@ -258,9 +287,9 @@ class GeradorTrajetoApp:
         # Frame para botões horizontais
         frame_botoes_visual = ttk.Frame(frame_visual)
         frame_botoes_visual.pack(fill="x", pady=(0, 0))
-        ttk.Button(frame_botoes_visual, text="Aplicar", command=self._redesenhar).pack(side="left", fill="x", expand=True, padx=(0, 2))
-        ttk.Button(frame_botoes_visual, text="Resetar", command=self.resetar_origem_visual).pack(side="left", fill="x", expand=True, padx=(1, 2))
-        ttk.Button(frame_botoes_visual, text="Selecionar", command=self.ativar_selecionador_origem).pack(side="left", fill="x", expand=True, padx=(1, 0))
+        ttk.Button(frame_botoes_visual, text=f"{ICONOS['aplicar']} Aplicar", command=self._redesenhar).pack(side="left", fill="x", expand=True, padx=(0, 2))
+        ttk.Button(frame_botoes_visual, text=f"{ICONOS['resetar']} Resetar", command=self.resetar_origem_visual).pack(side="left", fill="x", expand=True, padx=(1, 2))
+        ttk.Button(frame_botoes_visual, text=f"{ICONOS['selecionar']} Selecionar", command=self.ativar_selecionador_origem).pack(side="left", fill="x", expand=True, padx=(1, 0))
 
         frame_status = ttk.LabelFrame(parent, text="Status", padding=10)
         frame_status.pack(fill="x", pady=(10, 10))
@@ -325,13 +354,13 @@ class GeradorTrajetoApp:
 
         botoes_lista = ttk.Frame(frame_lista)
         botoes_lista.pack(fill="x", pady=(0, 8))
-        ttk.Button(botoes_lista, text="Desfazer", command=self.desfazer).pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ttk.Button(botoes_lista, text="Refazer", command=self.refazer).pack(side="left", fill="x", expand=True, padx=4)
-        ttk.Button(botoes_lista, text="Limpar tudo", command=self.limpar_tudo).pack(side="left", fill="x", expand=True, padx=(4, 0))
+        ttk.Button(botoes_lista, text=f"{ICONOS['desfazer']} Desfazer", command=self.desfazer).pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ttk.Button(botoes_lista, text=f"{ICONOS['refazer']} Refazer", command=self.refazer).pack(side="left", fill="x", expand=True, padx=4)
+        ttk.Button(botoes_lista, text=f"{ICONOS['limpar']} Limpar tudo", command=self.limpar_tudo).pack(side="left", fill="x", expand=True, padx=(4, 0))
 
         botoes_lista2 = ttk.Frame(frame_lista)
         botoes_lista2.pack(fill="x", pady=(0, 8))
-        ttk.Button(botoes_lista2, text="Remover seleção", command=self.remover_selecao).pack(side="left", fill="x", expand=True)
+        ttk.Button(botoes_lista2, text=f"{ICONOS['remover']} Remover seleção", command=self.remover_selecao).pack(side="left", fill="x", expand=True)
 
         self.listbox_segmentos = tk.Listbox(frame_lista, width=40, height=15, selectmode=tk.SINGLE, 
                                             selectbackground="#4CAF50", selectforeground="white",
@@ -407,7 +436,6 @@ class GeradorTrajetoApp:
         self.var_label_comprimento.set(f"Comprimento ({unidade_label})")
         self.var_label_raio.set(f"Raio ({unidade_label})")
         self.var_label_distancia_marcacao.set(f"Distância ({unidade_label})")
-        self.var_label_grade_espaco.set(f"Espaço da grade ({unidade_label})")
         self.var_label_origem_x.set(f"Origem X ({unidade_label})")
         self.var_label_origem_y.set(f"Origem Y ({unidade_label})")
 

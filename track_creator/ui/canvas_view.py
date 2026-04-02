@@ -6,10 +6,14 @@ from services.geometria import GeometriaTrajeto
 
 
 class CanvasTrajetoView:
-    def __init__(self, parent, zoom_var, mostrar_grade_var, grade_espaco_var, origem_x_var, origem_y_var):
+    GRADE_ESPACO_PADRAO = 1.0  # 1 metro por padrão
+    
+    def __init__(self, parent, zoom_var, zoom_max_var, mostrar_grade_var, origem_x_var, origem_y_var, unidade_var, fator_personalizado_var=None):
         self.zoom_var = zoom_var
+        self.zoom_max_var = zoom_max_var
         self.mostrar_grade_var = mostrar_grade_var
-        self.grade_espaco_var = grade_espaco_var
+        self.unidade_var = unidade_var
+        self.fator_personalizado_var = fator_personalizado_var
         self.origem_x_var = origem_x_var
         self.origem_y_var = origem_y_var
 
@@ -19,6 +23,8 @@ class CanvasTrajetoView:
         self.drag_inicio_y = None
         self.pan_inicio_x = 0.0
         self.pan_inicio_y = 0.0
+        self.mouse_x_px = 0
+        self.mouse_y_px = 0
 
         self.frame = tk.Frame(parent)
         self.canvas = tk.Canvas(self.frame, bg="white", cursor="fleur")
@@ -31,6 +37,7 @@ class CanvasTrajetoView:
         self.canvas.bind("<MouseWheel>", self._zoom_mousewheel)
         self.canvas.bind("<Button-4>", self._zoom_mousewheel_linux)
         self.canvas.bind("<Button-5>", self._zoom_mousewheel_linux)
+        self.canvas.bind("<Motion>", self._ao_mover_mouse)
 
         self._callback_redesenho = None
         self._callback_selecionar_segmento = None
@@ -189,6 +196,12 @@ class CanvasTrajetoView:
         self.drag_inicio_y = None
         self.movimento_iniciado = False
 
+    def _ao_mover_mouse(self, event):
+        """Rastreia posição do mouse para exibir informações"""
+        self.mouse_x_px = event.x
+        self.mouse_y_px = event.y
+        self._disparar_redesenho()
+
     def _encontrar_segmento_proximo(self, px_click, py_click, distancia_max=10):
         """Encontra o índice do segmento mais próximo do clique"""
         melhor_indice = None
@@ -228,19 +241,73 @@ class CanvasTrajetoView:
         return ((px - proj_x) ** 2 + (py - proj_y) ** 2) ** 0.5
 
     def _zoom_mousewheel(self, event):
+        """Realiza zoom centrado na posição do mouse"""
+        # Obter posição do mouse em pixel
+        mouse_px = event.x
+        mouse_py = event.y
+        
+        # Obter dimensões do canvas
+        largura = max(self.canvas.winfo_width(), 10)
+        altura = max(self.canvas.winfo_height(), 10)
+        
+        # Converter mouse para coordenadas de mundo (antes do zoom)
+        x_mundo, y_mundo = self.tela_para_mundo(mouse_px, mouse_py, largura, altura)
+        
+        # Obter o novo zoom
+        try:
+            zoom_max = float(self.zoom_max_var.get())
+        except ValueError:
+            zoom_max = 120.0
+        
         if event.delta > 0:
-            novo_zoom = min(120.0, self.zoom_var.get() * 1.1)
+            novo_zoom = min(zoom_max, self.zoom_var.get() * 1.1)
         else:
             novo_zoom = max(2.0, self.zoom_var.get() / 1.1)
+        
         self.zoom_var.set(novo_zoom)
+        
+        # Converter mouse world back to screen (com novo zoom)
+        novo_mouse_px, novo_mouse_py = self.mundo_para_tela(x_mundo, y_mundo, largura, altura)
+        
+        # Ajustar pan para manter a mesma posição de mundo sob o mouse
+        self.pan_x_px += mouse_px - novo_mouse_px
+        self.pan_y_px += mouse_py - novo_mouse_py
+        
         self._disparar_redesenho()
 
     def _zoom_mousewheel_linux(self, event):
+        """Realiza zoom centrado na posição do mouse (Linux)"""
+        # Obter posição do mouse em pixel
+        mouse_px = event.x
+        mouse_py = event.y
+        
+        # Obter dimensões do canvas
+        largura = max(self.canvas.winfo_width(), 10)
+        altura = max(self.canvas.winfo_height(), 10)
+        
+        # Converter mouse para coordenadas de mundo (antes do zoom)
+        x_mundo, y_mundo = self.tela_para_mundo(mouse_px, mouse_py, largura, altura)
+        
+        # Obter o novo zoom
+        try:
+            zoom_max = float(self.zoom_max_var.get())
+        except ValueError:
+            zoom_max = 120.0
+        
         if event.num == 4:
-            novo_zoom = min(120.0, self.zoom_var.get() * 1.1)
+            novo_zoom = min(zoom_max, self.zoom_var.get() * 1.1)
         else:
             novo_zoom = max(2.0, self.zoom_var.get() / 1.1)
+        
         self.zoom_var.set(novo_zoom)
+        
+        # Converter mouse world back to screen (com novo zoom)
+        novo_mouse_px, novo_mouse_py = self.mundo_para_tela(x_mundo, y_mundo, largura, altura)
+        
+        # Ajustar pan para manter a mesma posição de mundo sob o mouse
+        self.pan_x_px += mouse_px - novo_mouse_px
+        self.pan_y_py += mouse_py - novo_mouse_py
+        
         self._disparar_redesenho()
 
     def centralizar_visao(self):
@@ -267,15 +334,6 @@ class CanvasTrajetoView:
             return origem_x, origem_y
         except ValueError:
             return 0.0, 0.0
-
-    def obter_grade_espaco_m(self):
-        try:
-            espaco = float(self.grade_espaco_var.get())
-            if espaco <= 0:
-                return 0.0
-            return espaco
-        except ValueError:
-            return 0.0
 
     def mundo_para_tela(self, x_mundo, y_mundo, largura, altura):
         origem_x, origem_y = self.obter_origem_visual_m()
@@ -368,19 +426,85 @@ class CanvasTrajetoView:
                 self.canvas.create_oval(sx_marc - 6, sy_marc - 6, sx_marc + 6, sy_marc + 6, fill=cor, outline="white", width=2)
                 # Opcional: desenhar número da marcação
                 self.canvas.create_text(sx_marc, sy_marc, text=str(marcacao.ordem), fill="white", font=("Arial", 8, "bold"))
+        
+        # Desenhar informações no canto (escala e posição do mouse)
+        self._desenhar_info_canto(largura, altura)
+
+    def _desenhar_info_canto(self, largura, altura):
+        """Desenha informações de escala da grid e posição do mouse no canto inferior direito"""
+        zoom = self.zoom_var.get()
+        
+        # Calcular escala atual da grid em pixels por metro
+        espaco_m = self.GRADE_ESPACO_PADRAO
+        passo_px = espaco_m * zoom
+        
+        # Se o passo ficar muito pequeno, aumentar o espaçamento progressivamente
+        espaco_grade = espaco_m
+        while passo_px < 8 and espaco_grade > 0:
+            espaco_grade *= 2
+            passo_px = espaco_grade * zoom
+        
+        # Converter posição do mouse para coordenadas do mundo
+        x_mundo, y_mundo = self.tela_para_mundo(self.mouse_x_px, self.mouse_y_px, largura, altura)
+        
+        # Obter unidade atual e aplicar fator de conversão
+        unidade = self.unidade_var.get()
+        
+        # Fatores de conversão invertidos (10^n em vez de múltiplos diretos)
+        # m: 10^0 = 1.0
+        # cm: 10^-2 = 0.01
+        # mm: 10^-3 = 0.001
+        # km: 10^3 = 1000
+        fatores_conversao = {
+            "m": 1.0,           # 10^0
+            "cm": 0.01,         # 10^-2
+            "mm": 0.001,        # 10^-3
+            "km": 1000.0        # 10^3
+        }
+        
+        # Se for unidade personalizada, usar o fator configurado
+        if unidade == "personalizada":
+            try:
+                fator = float(self.fator_personalizado_var.get()) if self.fator_personalizado_var else 1.0
+            except (ValueError, TypeError):
+                fator = 1.0
+            unidade_label = "unid."
+        else:
+            fator = fatores_conversao.get(unidade, 1.0)
+            unidade_label = unidade
+        
+        # Converter valores
+        # A escala não precisa de conversão, apenas muda a etiqueta
+        x_mundo_convertido = x_mundo * fator
+        y_mundo_convertido = y_mundo * fator
+        
+        # Formatar informações apenas com valores
+        info_escala = f"{espaco_grade:.1f} {unidade_label}"
+        info_mouse = f"({x_mundo_convertido:.3f}, {y_mundo_convertido:.3f})"
+        
+        # Desenhar texto no canto inferior direito sem fundo
+        x_pos = largura - 120
+        y_pos = altura - 50
+        
+        # Desenhar textos (alinhado à direita)
+        self.canvas.create_text(x_pos, y_pos, text=info_escala, anchor="nw", 
+                               fill="#000000", font=("Arial", 9))
+        self.canvas.create_text(x_pos, y_pos + 15, text=info_mouse, anchor="nw", 
+                               fill="#000000", font=("Arial", 9))
 
     def _desenhar_grade(self, largura, altura):
         if not self.mostrar_grade_var.get():
             return
 
-        espaco_m = self.obter_grade_espaco_m()
-        if espaco_m <= 0:
-            return
-
+        espaco_m = self.GRADE_ESPACO_PADRAO
         zoom = self.zoom_var.get()
         passo_px = espaco_m * zoom
-        if passo_px < 8:
-            return
+        
+        # Se o passo ficar muito pequeno, aumentar o espaçamento progressivamente
+        espaco_grade = espaco_m
+        while passo_px < 8 and espaco_grade > 0:
+            espaco_grade *= 2
+            passo_px = espaco_grade * zoom
 
         cx = largura / 2 + self.pan_x_px
         cy = altura / 2 + self.pan_y_px
