@@ -34,9 +34,8 @@ class ExportadorTrajeto:
     def obter_fator_unidade(unidade, fator_personalizado):
         mapa = {
             "m": 1.0,
-            "cm": 100.0,
-            "mm": 1000.0,
-            "km": 0.001,
+            "cm": 0.01,
+            "mm": 0.001,
         }
 
         if unidade in mapa:
@@ -112,8 +111,8 @@ class ExportadorTrajeto:
             writer = csv.writer(f)
             writer.writerow(["idx", "x", "y"])
             for i, (x, y) in enumerate(pontos):
-                x_convertido = x * fator
-                y_convertido = y * fator
+                x_convertido = (x - origem_x) * fator
+                y_convertido = (y - origem_y) * fator
                 writer.writerow([i, f"{x_convertido:.6f}", f"{y_convertido:.6f}"])
 
         # JSON com metadata e config
@@ -140,8 +139,8 @@ class ExportadorTrajeto:
                 for marcacao in trajeto.marcacoes:
                     angulo_graus = math.degrees(marcacao.angulo_eixo_x)
                     distancia_convertida = marcacao.distancia * fator
-                    x_convertido = marcacao.x * fator
-                    y_convertido = marcacao.y * fator
+                    x_convertido = (marcacao.x - origem_x) * fator
+                    y_convertido = (marcacao.y - origem_y) * fator
                     writer.writerow([marcacao.ordem, marcacao.lado, f"{distancia_convertida:.2f}", f"{angulo_graus:.2f}", f"{x_convertido:.6f}", f"{y_convertido:.6f}"])
         
         return caminho_json

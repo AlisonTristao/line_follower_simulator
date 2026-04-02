@@ -6,73 +6,6 @@ import json
 import zipfile
 from scipy.interpolate import splprep, splev
 
-LEMNISCATE = 0
-CIRCLE = 1
-TFG = 2
-
-def circle_checkpoints(ckeckpoints_number, track_radius, noise):
-    checkpoints = []
-    for c in range(ckeckpoints_number):
-        # Angle steps
-        t = 2 * math.pi * c / ckeckpoints_number
-
-        # Point coordinates
-        x = track_radius * math.cos(t)
-        y = track_radius * math.sin(t)
-
-        # Add noise to points
-        x += random.uniform(noise/2, noise)
-        y += random.uniform(noise/2, noise)
-
-        checkpoints.append((x, y))
-    
-    return checkpoints
-
-def lemniscate_checkpoints(ckeckpoints_number, track_radius, noise):
-    checkpoints = []
-    for c in range(ckeckpoints_number):
-        # Angle steps
-        t = 2 * math.pi * c / ckeckpoints_number
-
-        # Point coordinates
-        x = track_radius * math.cos(t)
-        y = track_radius * math.sin(t) * math.cos(t)  
-
-        # Add noise to points
-        x += random.uniform(noise/3, noise)
-        y += random.uniform(noise/3, noise)
-
-        checkpoints.append((x, y))
-
-    return checkpoints
-
-def generate_track(type=LEMNISCATE, checkpoints=24, track_rad=40, noise_level=0.12, resolution=250):
-    # Seed random generator
-    SEED = None
-    if SEED is None:
-        SEED = random.randint(0, 2**32 - 1)
-    random.seed(SEED)
-
-    CHECKPOINTS = checkpoints
-    TRACK_RADIUS = track_rad
-    NOISE_LEVEL = noise_level * track_rad
-
-    # Generate checkpoints 
-    if type == CIRCLE:
-        checkpoints = circle_checkpoints(CHECKPOINTS, TRACK_RADIUS, NOISE_LEVEL)
-    elif type == LEMNISCATE:
-        checkpoints = lemniscate_checkpoints(CHECKPOINTS, TRACK_RADIUS, NOISE_LEVEL)
-    else:
-        raise ValueError("Invalid track type")
-
-    # Smooth the track using spline interpolation
-    checkpoints = np.array(checkpoints)
-    tck, u = splprep([checkpoints[:, 0], checkpoints[:, 1]], s=0, per=True)
-    u_new = np.linspace(0, 1, len(checkpoints) * resolution)  # More points for smoothing
-    smooth_x, smooth_y = splev(u_new, tck)
-
-    return smooth_x[::-1], smooth_y[::-1]
-
 def points_in_square(x0, y0, size, x_arr, y_arr):
     """
     Returns the indices of points inside a square centered at (x0, y0) with a side length of 2 * size.
@@ -144,6 +77,41 @@ def generate_cluster(length, width, scale, x_arr, y_arr):
     return cluster_matrix, position
 
 
+def process_markings(markings, length, width, scale):
+    """
+    Process markings into grid cells.
+    
+    Args:
+        markings (list): List of (x, y, angle) tuples
+        length (int): Grid length
+        width (int): Grid width
+        scale (int): Scale factor for pixel conversion
+        
+    Returns:
+        dict: {(row, col): [(x_pix, y_pix, angle), ...]}
+    """
+    marking_data = {}
+    
+    for x, y, angle in markings:
+        i = int(x)
+        j = int(y)
+        
+        if -length//2 <= i < length//2 and -width//2 <= j < width//2:
+            row = i + length // 2
+            col = j + width // 2
+            key = (row, col)
+            
+            x_pix = (x - i) * scale
+            y_pix = (y - j) * scale
+            
+            if key not in marking_data:
+                marking_data[key] = []
+            
+            marking_data[key].append((x_pix, y_pix, angle))
+    
+    return marking_data
+
+
 def load_track_from_tfg(tfg_file_path):
     """
     Load track points from a .tfg file (which is a ZIP archive).
@@ -157,6 +125,7 @@ def load_track_from_tfg(tfg_file_path):
     x_points = []
     y_points = []
     resolution = None
+    fator_multiplicador = None
     markings = []
 
     # Open the .tfg file (which is a ZIP archive)
@@ -177,6 +146,7 @@ def load_track_from_tfg(tfg_file_path):
                 with zip_file.open(json_file) as jf:
                     json_data = json.loads(jf.read().decode('utf-8'))
                     resolution = json_data.get('qtd_pontos_exportados')
+                    fator_multiplicador = json_data.get('fator_multiplicador_da_unidade')
             except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
                 pass
         
@@ -203,8 +173,9 @@ def load_track_from_tfg(tfg_file_path):
             for row in reader:
                 if len(row) >= 3:  # idx, x, y
                     try:
-                        x = float(row[1])
-                        y = float(row[2])
+                        # multiplica todos os valores do vetor pelo fator multiplicador para converter para metros
+                        x = float(row[1]) * fator_multiplicador #if fator_multiplicador is not None else float(row[1])
+                        y = float(row[2]) * fator_multiplicador #if fator_multiplicador is not None else float(row[2])
                         x_points.append(x)
                         y_points.append(y)
                     except (ValueError, IndexError):
@@ -229,19 +200,20 @@ def load_track_from_tfg(tfg_file_path):
                     pass
 
                 for row in reader:
-                    if len(row) >= 6:
-                        try:
-                            # row[3] is angle in degrees, convert to radians   
-                            ang_deg = float(row[3])
-                            ang = math.radians(ang_deg)
-                            x = float(row[4])
-                            y = float(row[5])
-                            markings.append((x, y, ang))
-                        except ValueError:
-                            continue
+                    try:
+                        # row[3] is angle in degrees, convert to radians   
+                        ang_deg = float(row[3])
+                        ang = math.radians(ang_deg)
+                        # multiplica os valores de x e y pelo fator multiplicador para converter para metros
+                        x = float(row[4]) * fator_multiplicador
+                        y = float(row[5]) * fator_multiplicador
+                        markings.append((x, y, ang))
+                    except (ValueError, IndexError) as e:
+                        print(f"Erro ao processar marcação: {e}")
+                        continue
 
     # Convert to numpy arrays
     x_array = np.array(x_points[::-1])
     y_array = np.array(y_points[::-1])
 
-    return x_array, y_array, resolution, markings
+    return x_array, y_array, markings, resolution

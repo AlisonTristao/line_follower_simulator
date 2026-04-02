@@ -6,7 +6,6 @@ import threading
 from dataclasses import dataclass
 
 from graphics.graphics_elements import *
-from graphics.track_generator import LEMNISCATE, CIRCLE, TFG
 from graphics.track_generator import *
 from .serial_com import SerialCom
 import numpy as np
@@ -33,8 +32,7 @@ class SimulationConfig:
     side_sensor_distance_y: float = 0.10  # Vertical distance from car center to side sensors in meters
     side_sensor_size: float = 0.03      # Side sensor diameter in meters
 
-    # track configuration 
-    track_type: int = 0
+    # track 
     track_length: float = 0.02
     track_noise: float = 0.12
     track_radius: float = 30
@@ -64,7 +62,6 @@ class GameSimulation:
         self.WIDTH = config.width
         self.SCALE = config.scale
         self.RENDER = config.render
-        self.track_type = config.track_type
         self.track_length = config.track_length
         self.array_sensor_dist = config.sensor_spacing
         
@@ -144,60 +141,41 @@ class GameSimulation:
                 cluster.add_point(k)
             self.track.set_obj(position[i][0], position[i][1], cluster)
             
-        # create marking clusters
-        for x, y, angle in getattr(self, 'markings', []):
-            i = int(round(x))
-            j = int(round(y))
-            if -self.LENGTH//2 <= i < self.LENGTH//2 and -self.WIDTH//2 <= j < self.WIDTH//2:
-                row = i + self.LENGTH // 2
-                col = j + self.WIDTH // 2
+        # Process markings into grid cells
+        marking_data = process_markings(self.markings, self.LENGTH, self.WIDTH, self.SCALE)
+        
+        # Add markings to track
+        for (row, col), marking_list in marking_data.items():
+            existing = None
+            cell_item = self.track.matrix[row][col]
+            
+            if isinstance(cell_item, list):
+                for item in cell_item:
+                    if isinstance(item, MarkingCluster):
+                        existing = item
+                        break
+            elif isinstance(cell_item, MarkingCluster):
+                existing = cell_item
                 
-                # relative pixels
-                x_pix = (x - i) * self.SCALE
-                y_pix = (y - j) * self.SCALE
-                
-                # try to find existing MarkingCluster in this cell
-                existing = None
-                cell_item = self.track.matrix[row][col]
-                if isinstance(cell_item, list):
-                    for item in cell_item:
-                        if isinstance(item, MarkingCluster):
-                            existing = item
-                            break
-                elif isinstance(cell_item, MarkingCluster):
-                    existing = cell_item
-                    
-                if not existing:
-                    existing = MarkingCluster(
-                        width_pixels=int(self.track_length * self.SCALE), 
-                        length_pixels=int(0.04 * self.SCALE)
-                    )
-                    self.track.set_obj(row, col, existing)
-                
-                existing.add_marking(x_pix, y_pix, angle)  # Adjust angle for correct orientation
+            if not existing:
+                existing = MarkingCluster(
+                    width_pixels=int(self.track_length * self.SCALE), 
+                    length_pixels=int(0.04 * self.SCALE)
+                )
+                self.track.set_obj(row, col, existing)
+            
+            for x_pix, y_pix, angle in marking_list:
+                existing.add_marking(x_pix, y_pix, angle)
 
     def _setup_simulator(self):
         # print the initialization message
         print("Initializing simulator...")
 
         # generate trajectory
-        if self.track_type == TFG:
-            # Load track from .tfg file
-            if self.config.track_file_path is None:
-                raise ValueError("track_file_path must be provided when using TFG track type")
-            self.x_track, self.y_track, resolution, self.markings = load_track_from_tfg(self.config.track_file_path)
-            # Save resolution to config
-            if resolution is not None:
-                self.config.resolution = resolution
-            # Store for later use
-            self.resolution = resolution if resolution is not None else len(self.x_track)
-        else:
-            # Generate track from CIRCLE or LEMNISCATE
-            self.resolution = int((self.config.length + self.config.width)*3.0)
-            self.x_track, self.y_track = generate_track(
-                self.track_type, noise_level=self.config.track_noise, checkpoints=36, resolution=self.resolution, track_rad=self.config.track_radius
-            )
-            self.markings = []
+        # Load track from .tfg file
+        if self.config.track_file_path is None:
+            raise ValueError("track_file_path must be provided when using TFG track type")
+        self.x_track, self.y_track, self.markings, self.config.resolution = load_track_from_tfg(self.config.track_file_path)
         self.win = len(self.x_track) - 1
 
         # create car with configured size (convert meters to pixels)
@@ -746,7 +724,6 @@ def start_simulation(
     scale=300,
     render=4,
     seed=None,
-    track_type=0,
     track_length=0.02,
     sensor_spacing=0.001,
 ):
@@ -767,7 +744,6 @@ def start_simulation(
         width,
         scale,
         render,
-        track_type,
         track_length,
         sensor_spacing,
     )
