@@ -142,14 +142,27 @@ class GeradorTrajetoApp:
         container = ttk.Frame(self.root, padding=10)
         container.pack(fill="both", expand=True)
 
+        # Configurar grid: esquerda 10%, meio 80%, direita 10%
+        # Usando pesos proporcionais: 1, 8, 1
+        container.columnconfigure(0, weight=1)    # Esquerda 10%
+        container.columnconfigure(1, weight=8)    # Meio 80%
+        container.columnconfigure(2, weight=1)    # Direita 10%
+        container.rowconfigure(0, weight=1)
+
         painel_esquerdo = ttk.Frame(container)
-        painel_esquerdo.pack(side="left", fill="y")
+        painel_esquerdo.grid(row=0, column=0, sticky="nsew", padx=(0, 5))
+        painel_esquerdo.rowconfigure(0, weight=1)
+        painel_esquerdo.columnconfigure(0, weight=1)
 
         painel_centro = ttk.Frame(container)
-        painel_centro.pack(side="left", fill="both", expand=True, padx=(10, 10))
+        painel_centro.grid(row=0, column=1, sticky="nsew", padx=5)
+        painel_centro.rowconfigure(0, weight=1)
+        painel_centro.columnconfigure(0, weight=1)
 
         painel_direito = ttk.Frame(container)
-        painel_direito.pack(side="right", fill="y")
+        painel_direito.grid(row=0, column=2, sticky="nsew", padx=(5, 0))
+        painel_direito.rowconfigure(0, weight=1)
+        painel_direito.columnconfigure(0, weight=1)
 
         self._montar_painel_esquerdo(painel_esquerdo)
         self._montar_canvas(painel_centro)
@@ -225,6 +238,31 @@ class GeradorTrajetoApp:
         ttk.Entry(frame_marcacao_dist, textvariable=self.var_marcacao_distancia, width=18).pack(side="right", padx=(4, 0))
         
         ttk.Button(frame_marcacao, text=f"{ICONOS['aplicar']} Aplicar a todas", command=self.aplicar_marcacao_a_todas).pack(fill="x")
+
+        frame_lista = ttk.LabelFrame(parent, text="Ordem dos trajetos", padding=10)
+        frame_lista.pack(fill="both", expand=True, pady=(10, 0))
+
+        ttk.Label(frame_lista, textvariable=self.var_segmento_selecionado, justify="left").pack(anchor="w", pady=(0, 8))
+
+        botoes_lista = ttk.Frame(frame_lista)
+        botoes_lista.pack(fill="x", pady=(0, 8))
+        ttk.Button(botoes_lista, text=f"{ICONOS['desfazer']} Desfazer", command=self.desfazer).pack(side="left", fill="x", expand=True, padx=(0, 4))
+        ttk.Button(botoes_lista, text=f"{ICONOS['refazer']} Refazer", command=self.refazer).pack(side="left", fill="x", expand=True, padx=4)
+        ttk.Button(botoes_lista, text=f"{ICONOS['limpar']} Limpar tudo", command=self.limpar_tudo).pack(side="left", fill="x", expand=True, padx=(4, 0))
+
+        botoes_lista2 = ttk.Frame(frame_lista)
+        botoes_lista2.pack(fill="x", pady=(0, 8))
+        ttk.Button(botoes_lista2, text=f"{ICONOS['remover']} Remover seleção", command=self.remover_selecao).pack(side="left", fill="x", expand=True)
+
+        self.listbox_segmentos = tk.Listbox(frame_lista, width=40, height=10, selectmode=tk.SINGLE, 
+                                            selectbackground="#4CAF50", selectforeground="white",
+                                            bg="white", fg="black")
+        self.listbox_segmentos.pack(side="left", fill="both", expand=True)
+        self.listbox_segmentos.bind("<<ListboxSelect>>", self._ao_selecionar_segmento)
+
+        scrollbar_lista = ttk.Scrollbar(frame_lista, orient="vertical", command=self.listbox_segmentos.yview)
+        scrollbar_lista.pack(side="right", fill="y")
+        self.listbox_segmentos.config(yscrollcommand=scrollbar_lista.set)
 
     def _montar_canvas(self, parent):
         frame_canvas = ttk.LabelFrame(parent, text="Visualização", padding=8)
@@ -346,31 +384,6 @@ class GeradorTrajetoApp:
         
         self._ocultar_resolucao()
         self._atualizar_estado_resolucao()
-
-        frame_lista = ttk.LabelFrame(parent, text="Ordem dos trajetos", padding=10)
-        frame_lista.pack(fill="both", expand=True)
-
-        ttk.Label(frame_lista, textvariable=self.var_segmento_selecionado, justify="left").pack(anchor="w", pady=(0, 8))
-
-        botoes_lista = ttk.Frame(frame_lista)
-        botoes_lista.pack(fill="x", pady=(0, 8))
-        ttk.Button(botoes_lista, text=f"{ICONOS['desfazer']} Desfazer", command=self.desfazer).pack(side="left", fill="x", expand=True, padx=(0, 4))
-        ttk.Button(botoes_lista, text=f"{ICONOS['refazer']} Refazer", command=self.refazer).pack(side="left", fill="x", expand=True, padx=4)
-        ttk.Button(botoes_lista, text=f"{ICONOS['limpar']} Limpar tudo", command=self.limpar_tudo).pack(side="left", fill="x", expand=True, padx=(4, 0))
-
-        botoes_lista2 = ttk.Frame(frame_lista)
-        botoes_lista2.pack(fill="x", pady=(0, 8))
-        ttk.Button(botoes_lista2, text=f"{ICONOS['remover']} Remover seleção", command=self.remover_selecao).pack(side="left", fill="x", expand=True)
-
-        self.listbox_segmentos = tk.Listbox(frame_lista, width=40, height=15, selectmode=tk.SINGLE, 
-                                            selectbackground="#4CAF50", selectforeground="white",
-                                            bg="white", fg="black")
-        self.listbox_segmentos.pack(side="left", fill="both", expand=True)
-        self.listbox_segmentos.bind("<<ListboxSelect>>", self._ao_selecionar_segmento)
-
-        scrollbar_lista = ttk.Scrollbar(frame_lista, orient="vertical", command=self.listbox_segmentos.yview)
-        scrollbar_lista.pack(side="right", fill="y")
-        self.listbox_segmentos.config(yscrollcommand=scrollbar_lista.set)
 
     def _configurar_atalhos(self):
         # Usar bind() no root e bind_all() para garantir cobertura global
