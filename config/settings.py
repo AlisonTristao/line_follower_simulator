@@ -28,7 +28,7 @@ def settings():
         side_sensor_distance_x=0.05,
         side_sensor_distance_y=0.05,
         side_sensor_size=0.01,
-        track_file_path="tracks/track_02.tfg",
+        track_file_path="tracks/track_01.tfg",
     )
     sim = GameSimulation(sim_config)
 
