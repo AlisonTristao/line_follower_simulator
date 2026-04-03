@@ -73,6 +73,8 @@ class GameSimulation:
 
         self.time_simulation = 0
         self.timer = time.time()
+        self._last_graph_update = 0.0
+        self._graph_update_interval = 1.0 / 60.0
 
         self._init_simulation_objects()
         self._setup_simulator()
@@ -228,19 +230,53 @@ class GameSimulation:
         minimap_y = int(display_height + 140) - 40  # Position below the graphs
         minimap_position = (minimap_center_x, minimap_y)
         self.minimap = MiniMap(minimap_position, minimap_size)
+
+        # Build minimap world bounds from the loaded path in the same frame used by Track.
+        world_x_points = self.x_track + self.LENGTH // 2
+        world_y_points = self.y_track + self.WIDTH // 2
+        self._minimap_min_x = float(np.min(world_x_points))
+        self._minimap_max_x = float(np.max(world_x_points))
+        self._minimap_min_y = float(np.min(world_y_points))
+        self._minimap_max_y = float(np.max(world_y_points))
+
+        # Add a small padding so points don't stick to minimap borders.
+        span_x = max(self._minimap_max_x - self._minimap_min_x, 1e-6)
+        span_y = max(self._minimap_max_y - self._minimap_min_y, 1e-6)
+        pad_x = 0.05 * span_x
+        pad_y = 0.05 * span_y
+        self._minimap_min_x -= pad_x
+        self._minimap_max_x += pad_x
+        self._minimap_min_y -= pad_y
+        self._minimap_max_y += pad_y
+
+        # Preserve aspect ratio: compute a single world-per-pixel scale for both axes.
+        self._minimap_half_width = minimap_size[0] / 2.0
+        self._minimap_half_height = minimap_size[1] / 2.0
+        self._minimap_world_center_x = 0.5 * (self._minimap_min_x + self._minimap_max_x)
+        self._minimap_world_center_y = 0.5 * (self._minimap_min_y + self._minimap_max_y)
+
+        half_span_x = max((self._minimap_max_x - self._minimap_min_x) / 2.0, 1e-6)
+        half_span_y = max((self._minimap_max_y - self._minimap_min_y) / 2.0, 1e-6)
+        world_units_per_pixel = max(
+            half_span_x / max(self._minimap_half_width, 1e-6),
+            half_span_y / max(self._minimap_half_height, 1e-6),
+            1e-6,
+        )
+        self._minimap_world_half_width = self._minimap_half_width * world_units_per_pixel
+        self._minimap_world_half_height = self._minimap_half_height * world_units_per_pixel
         
         # Calculate spacing proportional to real map size vs minimap size
         # Each minimap pixel represents this many real pixels
-        pixels_per_minimap_pixel_x = (self.LENGTH * self.SCALE) / minimap_size[0] 
-        pixels_per_minimap_pixel_y = (self.WIDTH * self.SCALE) / minimap_size[1]
+        pixels_per_minimap_pixel_x = ((self._minimap_max_x - self._minimap_min_x) * self.SCALE) / minimap_size[0]
+        pixels_per_minimap_pixel_y = ((self._minimap_max_y - self._minimap_min_y) * self.SCALE) / minimap_size[1]
         max_ratio = max(pixels_per_minimap_pixel_x, pixels_per_minimap_pixel_y)
         minimap_spacing = max(1, int(max_ratio / 3))  # Divide by 3 for denser points
         
         for k in range(0, len(self.x_track), minimap_spacing):
-            # Keep minimap path in the same centered world frame used by Track (LENGTH//2, WIDTH//2 offsets).
-            minimap_x = 2 * (self.x_track[k] + self.LENGTH // 2) / self.LENGTH - 1
-            # Track points are drawn with +Y in MiniMap, so this formula mirrors player/trail placement.
-            minimap_y = 2 * (self.y_track[k] + self.WIDTH // 2) / self.WIDTH - 1
+            # Convert path points using the same normalization used for player/trail points.
+            world_x = self.x_track[k] + self.LENGTH // 2
+            world_y = self.y_track[k] + self.WIDTH // 2
+            minimap_x, minimap_y = self._world_to_minimap(world_x, world_y)
             self.minimap.add_point((minimap_x, minimap_y))
         
         # Create controls below the minimap and keep them centered as a group.
@@ -353,6 +389,17 @@ class GameSimulation:
     def get_rand_color(self):
         random.seed(None)
         return tuple(random.randint(0, 255) for _ in range(3))
+
+    def _world_to_minimap(self, world_x, world_y):
+        """Convert world coordinates (Track frame) to normalized minimap coordinates [-1, 1]."""
+        normalized_x = (world_x - self._minimap_world_center_x) / max(self._minimap_world_half_width, 1e-6)
+        # Invert Y so positive world down maps visually down when drawing with `center - y * scale`.
+        normalized_y = -(world_y - self._minimap_world_center_y) / max(self._minimap_world_half_height, 1e-6)
+
+        # Clamp values to avoid occasional out-of-bounds points from numerical drift.
+        normalized_x = max(-1.0, min(1.0, normalized_x))
+        normalized_y = max(-1.0, min(1.0, normalized_y))
+        return normalized_x, normalized_y
 
     def _setup_display_graphs(self):
         """Setup all graphs to display real robot data."""
@@ -501,8 +548,9 @@ class GameSimulation:
         world_y = -self.track.get_center()[1] / self.SCALE
         self.coordinates_display.set_text(f"x: {world_x:.2f} y: {world_y:.2f}")
 
-        minimap_x = 2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1
-        minimap_y = -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1
+        world_map_x = self.track.get_center()[0] / self.SCALE
+        world_map_y = self.track.get_center()[1] / self.SCALE
+        minimap_x, minimap_y = self._world_to_minimap(world_map_x, world_map_y)
         
         self.minimap.set_player_position((minimap_x, minimap_y))
         
@@ -511,17 +559,6 @@ class GameSimulation:
         if current_time - self.last_trail_update_time >= self.config.tail_time:
             self.minimap.add_trail_point(minimap_x, minimap_y)
             self.last_trail_update_time = current_time
-
-        # Update all clusters BEFORE drawing to recalculate future points
-        # This ensures FuturePoints are synchronized with current position
-        for i in range(len(self.track.matrix)):
-            for j in range(len(self.track.matrix[i])):
-                if hasattr(self.track.matrix[i][j], 'update'):
-                    self.track.matrix[i][j].update()
-        
-        # Now get the updated future points for FuturePoints object
-        future_point = Cluster.get_next_point()
-        #self.future_points.set_points(future_point)
 
         self.simulator.draw()
         
@@ -577,16 +614,20 @@ class GameSimulation:
             pygame.quit()
             return None
 
-        self.time_simulation += 1 / self.FPS
+        dt = self.simulator.tick()
+        if dt <= 0 and self.FPS > 0:
+            dt = 1 / self.FPS
+        self.time_simulation += dt
         #while (time.time() - self.timer) < 1 / self.FPS:
         #    pass
 
+        now = time.time()
         self.frames_per_secod += 1
-        if time.time() - self.last_FPS_update >= 1.0:
+        if now - self.last_FPS_update >= 1.0:
             self.update_FPS("{:.1f}".format(self.frames_per_secod))
             self.frames_per_secod = 0
-            self.last_FPS_update = time.time()
-        self.timer = time.time()
+            self.last_FPS_update = now
+        self.timer = now
 
         return data
 
@@ -620,7 +661,10 @@ class GameSimulation:
         
         # Update robot data and graphs
         self.update_robot_data(robot_data)
-        self.update_graphs_from_robot_data()
+        now = time.time()
+        if now - self._last_graph_update >= self._graph_update_interval:
+            self.update_graphs_from_robot_data()
+            self._last_graph_update = now
         
         # Update sensor states
         self.set_left_sensor(left_sensor_active)
@@ -631,8 +675,9 @@ class GameSimulation:
         
         # Track sensor activations on minimap (after step calculates positions)
         if result is not None:  # step() returns tuple
-            minimap_x = 2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1
-            minimap_y = -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1
+            world_map_x = self.track.get_center()[0] / self.SCALE
+            world_map_y = self.track.get_center()[1] / self.SCALE
+            minimap_x, minimap_y = self._world_to_minimap(world_map_x, world_map_y)
             if left_sensor_active:
                 self.minimap.add_left_sensor_point(minimap_x, minimap_y)
             if right_sensor_active:

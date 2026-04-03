@@ -1,7 +1,22 @@
-import numpy as np
 import random
 import pygame
 from config.settings import *
+
+SPEED_BUFFER_SIZE = 512
+_speed_buffer = None
+_speed_buffer_index = 0
+
+
+def _get_next_speed_sample():
+    """Return a speed sample from a cyclic random buffer."""
+    global _speed_buffer, _speed_buffer_index
+
+    if _speed_buffer is None:
+        _speed_buffer = [random.uniform(-25.0, 25.0) for _ in range(SPEED_BUFFER_SIZE)]
+
+    value = _speed_buffer[_speed_buffer_index]
+    _speed_buffer_index = (_speed_buffer_index + 1) % SPEED_BUFFER_SIZE
+    return value
 
 def get_keyboard_input():
     """
@@ -47,9 +62,8 @@ def simulate_robot_data():
     # Get movement from keyboard
     delta_x, delta_y, delta_theta = get_keyboard_input()
     
-    # Simulate some varying data for visualization
-    timestamp = np.linspace(0, 10, 1000)
-    sine_wave = 50 * np.sin(2 * np.pi * timestamp)
+    # Use a cyclic random buffer for speed simulation.
+    simulated_speed = _get_next_speed_sample()
     
     return {
         # Robot sensor data
@@ -63,7 +77,7 @@ def simulate_robot_data():
         "PWM_left": random.uniform(-100, 100),
         "PWM_right": random.uniform(-100, 100),
         "Array_Sensor": random.uniform(0, 100),
-        "speed": sine_wave[int(timestamp[0] * 100) % 1000] / 2,
+        "speed": simulated_speed,
         "omega_filtered": random.uniform(-50, 50),
         
         # Control inputs from keyboard

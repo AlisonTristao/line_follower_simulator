@@ -53,6 +53,8 @@ class Shape:
 
     def set_angle(self, angle):
         # sets a new angle for the shape
+        if angle == self._angle:
+            return
         self._angle = angle
         self._update_rotation_matrix()
 
@@ -104,8 +106,7 @@ class Shape:
 
     def _rotate(self, angle):
         # rotates the shape by the given angle
-        self._angle += angle
-        self.set_angle(self._angle)
+        self.set_angle(self._angle + angle)
 
     def _move(self, dx, dy):
         # moves the shape by dx and dy considering rotation
@@ -496,7 +497,7 @@ class MiniMap(Shape):
         for px, py in self._points:
             # normalize the point coordinates
             x = int(self._x + px * scale_x)
-            y = int(self._y + py * scale_y)
+            y = int(self._y - py * scale_y)
             pygame.draw.circle(surface, point_color, (x, y), 1)
         
         # draw trail (blue line showing where the robot has been)
@@ -563,6 +564,18 @@ class Track(Shape):
         self.wall_lim = Wall(size=(len_chunk, len_chunk))
         self.default = Default()
         self.matrix = self._create_matrix(size)
+        self._visible_offsets = self._build_visible_offsets()
+
+    def _build_visible_offsets(self):
+        """Precompute circle offsets once to avoid full-grid numpy scans per frame."""
+        radius = int(self.__visible)
+        radius_sq = self.__visible ** 2
+        offsets = []
+        for di in range(-radius, radius + 1):
+            for dj in range(-radius, radius + 1):
+                if di * di + dj * dj < radius_sq:
+                    offsets.append((di, dj))
+        return offsets
 
     def _create_matrix(self, size):
         # creates the initial matrix of track objects
@@ -636,9 +649,13 @@ class Track(Shape):
     def __points_in_circle(self, x0, y0):
         # returns the points within a circle of visibility
         rows, cols = self._size
-        x, y = np.ogrid[:rows, :cols]
-        dist_sq = (x - x0) ** 2 + (y - y0) ** 2
-        return np.argwhere(dist_sq < self.__visible ** 2)
+        points = []
+        for di, dj in self._visible_offsets:
+            i = x0 + di
+            j = y0 + dj
+            if 0 <= i < rows and 0 <= j < cols:
+                points.append((i, j))
+        return points
 
 class Checkbox:
     def __init__(self, x, y, size, label="", font_size=24, text_color=(0, 0, 0)):
@@ -686,6 +703,7 @@ class Display(Shape):
             vertical_div (int): number of vertical divisions
         """
         self.font = pygame.font.SysFont("courier", 12, bold=True)
+        self.title_font = pygame.font.SysFont(None, 20)
 
         # limits of y axis
         self.__max_value = self.__saturation
@@ -825,8 +843,7 @@ class Display(Shape):
 
     # draw title 
     def __draw_title(self, surface, title, graph_width, graph_x, graph_y):
-        font = pygame.font.SysFont(None, 20)
-        title_label = font.render(title, True, (0, 0, 0))
+        title_label = self.title_font.render(title, True, (0, 0, 0))
         text_width = title_label.get_width()
         text_height = title_label.get_height()
 
@@ -974,6 +991,7 @@ class Compass(Shape):
         """
         #coo = (coo[0] - 2 * size, coo[1] - 2 * size)
         super().__init__(coo, color, size, angle)
+        self._direction_font = pygame.font.Font(None, 24)
 
     def draw(self, surface):
         # Check if visible before drawing
@@ -1004,14 +1022,13 @@ class Compass(Shape):
             "W": (-1, 0),
         }
 
-        font = pygame.font.Font(None, 24)
         for direction, (dx, dy) in directions.items():
             end_x = self._x + dx * self._size * 1.3
             end_y = self._y + dy * self._size * 1.3
             color = self._color
             if direction in ["N"]:
                 color = (200, 0, 0)
-            text_surface = font.render(direction, True, color)
+            text_surface = self._direction_font.render(direction, True, color)
             text_rect = text_surface.get_rect(center=(end_x, end_y))
             surface.blit(text_surface, text_rect)
 
@@ -1874,6 +1891,7 @@ class Simulator:
         self.__height = height
         self.__FPS = FPS
         self.__objects = []
+        self.__clock = None
 
     def start(self):
 
@@ -1884,6 +1902,16 @@ class Simulator:
 
         pygame.display.set_caption("SIMULATOR")
         self.__clock = pygame.time.Clock()
+
+    def tick(self):
+        """Limit render loop speed and return frame delta time in seconds."""
+        if self.__clock is None:
+            return 0.0
+        if self.__FPS > 0:
+            dt_ms = self.__clock.tick(self.__FPS)
+        else:
+            dt_ms = self.__clock.tick()
+        return dt_ms / 1000.0
 
     def set_FPS(self, FPS):
         # sets the frames per second for the simulator
