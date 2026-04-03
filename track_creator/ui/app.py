@@ -521,7 +521,7 @@ class GeradorTrajetoApp:
         self._recalcular_posicoes_marcacoes()
         if self.var_modo_resolucao_auto.get():
             self._recalcular_resolucao_automatica()
-        self._atualizar_campo_borda_largura()
+        self._atualizar_campo_limites_largura()
         self._atualizar_lista_segmentos(indice)
         self._redesenhar()
 

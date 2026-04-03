@@ -116,6 +116,7 @@ class ExportadorTrajeto:
     @staticmethod
     def exportar_csv_e_json(caminho_csv, trajeto, qtd_pontos, unidade, fator_personalizado, origem_x, origem_y, modo_resolucao_auto=True, pontos_por_metro="10"):
         pontos = GeometriaTrajeto.amostrar_por_quantidade(trajeto, qtd_pontos)
+        pontos = pontos[::-1]  # Inverter ordem dos pontos
 
         # CSV da pista com unit conversion
         fator, unidade_saida = ExportadorTrajeto.obter_fator_unidade(unidade, fator_personalizado)
@@ -124,7 +125,7 @@ class ExportadorTrajeto:
             writer.writerow(["idx", "x", "y"])
             for i, (x, y) in enumerate(pontos):
                 x_convertido = (x - origem_x) * fator
-                y_convertido = (y - origem_y) * fator
+                y_convertido = -((y - origem_y) * fator)
                 writer.writerow([i, f"{x_convertido:.6f}", f"{y_convertido:.6f}"])
 
         # JSON com metadata e config
@@ -152,7 +153,7 @@ class ExportadorTrajeto:
                     angulo_graus = math.degrees(marcacao.angulo_eixo_x)
                     distancia_convertida = marcacao.distancia * fator
                     x_convertido = (marcacao.x - origem_x) * fator
-                    y_convertido = (marcacao.y - origem_y) * fator
+                    y_convertido = -((marcacao.y - origem_y) * fator)
                     writer.writerow([marcacao.ordem, marcacao.lado, f"{distancia_convertida:.2f}", f"{angulo_graus:.2f}", f"{x_convertido:.6f}", f"{y_convertido:.6f}"])
         
         return caminho_json

@@ -95,19 +95,19 @@ def process_markings(markings, length, width, scale):
     for x, y, angle in markings:
         i = int(x)
         j = int(y)
+        ''
+        #if -length//2 <= i < length//2 and -width//2 <= j < width//2:
+        row = i + length // 2
+        col = j + width // 2
+        key = (row, col)
         
-        if -length//2 <= i < length//2 and -width//2 <= j < width//2:
-            row = i + length // 2
-            col = j + width // 2
-            key = (row, col)
-            
-            x_pix = (x - i) * scale
-            y_pix = (y - j) * scale
-            
-            if key not in marking_data:
-                marking_data[key] = []
-            
-            marking_data[key].append((x_pix, y_pix, angle))
+        x_pix = (x - i) * scale
+        y_pix = (y - j) * scale
+        
+        if key not in marking_data:
+            marking_data[key] = []
+        
+        marking_data[key].append((x_pix, y_pix, angle))
     
     return marking_data
 
