@@ -7,7 +7,7 @@ def get_keyboard_input():
     """
     Read arrow keys and return delta_x, delta_y, and delta_theta.
     - Left/Right arrows: control delta_x (horizontal movement)
-    - Up/Down arrows: control delta_y (vertical movement)
+    - Up/Down arrows: control delta_y (+Y up, -Y down)
     - Q/E keys: control delta_theta (rotation)
     
     Returns:
@@ -27,9 +27,9 @@ def get_keyboard_input():
     
     # Vertical movement (Up/Down arrows)
     if keys[pygame.K_UP]:
-        delta_y = -0.01
-    elif keys[pygame.K_DOWN]:
         delta_y = 0.01
+    elif keys[pygame.K_DOWN]:
+        delta_y = -0.01
 
     # Rotation (Q/E keys)
     if keys[pygame.K_q]:

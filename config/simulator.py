@@ -176,8 +176,8 @@ class GameSimulation:
         self.x_track, self.y_track, self.markings, self.config.resolution, limites_altura, limites_largura = load_track_from_tfg(self.config.track_file_path)
         
         # Calcular dimensões do track com base nos limites (ceil(altura) + 2, ceil(largura) + 2)
-        self.WIDTH = math.ceil(limites_altura) + 1
-        self.LENGTH = math.ceil(limites_largura) + 1
+        self.WIDTH = math.ceil(limites_altura) + 2
+        self.LENGTH = math.ceil(limites_largura) + 4
         self.win = len(self.x_track) - 1
 
         # create car with configured size (convert meters to pixels)
@@ -230,18 +230,27 @@ class GameSimulation:
         minimap_spacing = max(1, int(max_ratio / 3))  # Divide by 3 for denser points
         
         for k in range(0, len(self.x_track), minimap_spacing):
-            self.minimap.add_point((2 * self.x_track[k] / self.LENGTH, 2 * self.y_track[k] / self.WIDTH))
+            # Keep minimap path in the same centered world frame used by Track (LENGTH//2, WIDTH//2 offsets).
+            minimap_x = 2 * (self.x_track[k] + self.LENGTH // 2) / self.LENGTH - 1
+            # Track points are drawn with +Y in MiniMap, so this formula mirrors player/trail placement.
+            minimap_y = 2 * (self.y_track[k] + self.WIDTH // 2) / self.WIDTH - 1
+            self.minimap.add_point((minimap_x, minimap_y))
         
-        # create clear trail button (positioned at top-left corner of minimap)
-        button_x = int(minimap_position[0] - minimap_size[0] // 2 + 10)
-        button_y = int(minimap_position[1] - minimap_size[1] // 2 + 10)
+        # Create controls below the minimap and keep them centered as a group.
+        controls_top = int(minimap_position[1] + minimap_size[1] // 2 + 12)
+        controls_group_width = 100 + 20 + 200  # button + gap + slider
+        controls_start_x = int(minimap_position[0] - controls_group_width // 2)
+
+        # create clear trail button (below minimap)
+        button_x = controls_start_x
+        button_y = controls_top
         self.clear_trail_button = Button(button_x, button_y, 100, 30, text="Clear Trail", font_size=12, 
                                         bg_color=(200, 50, 50), text_color=(255, 255, 255))
         self.clear_trail_button.callback = lambda: self.minimap.clear_trail()
         
-        # create trail limit slider (positioned next to clear trail button)
-        slider_x = button_x + 110
-        slider_y = button_y - 5
+        # create trail limit slider (below minimap, next to clear trail button)
+        slider_x = button_x + 120
+        slider_y = controls_top + 2
         self.slider_trail_limit = Slider(slider_x, slider_y, 200, 35, min_val=10, max_val=7500, 
                                          initial_val=50, label="Max Trail")
         self.slider_trail_limit.callback = lambda val: setattr(self.minimap, 'MAX_TRAIL_POINTS', val)
@@ -470,8 +479,10 @@ class GameSimulation:
 
     def _step_physics(self, delta_x, delta_y, delta_theta=0.0):
         """Apply robot movement to the track without simulating car dynamics."""
-        # Apply the delta movement received from real robot
-        self.track.step(delta_x * self.SCALE, delta_y * self.SCALE, delta_theta)
+        # Input convention: +Y means up in world frame.
+        # Pygame screen coordinates grow downwards, so we invert Y here.
+        screen_delta_y = -delta_y
+        self.track.step(delta_x * self.SCALE, screen_delta_y * self.SCALE, delta_theta)
 
         # Update cluster master position (car's current position) for tracking coverage
         car_pos = self.car_draw.get_center()
@@ -479,9 +490,9 @@ class GameSimulation:
         Cluster.set_master(car_pos, car_size)
 
         self.compass.set_angle(-self.track.get_angle() - math.pi / 2)
-        self.coordinates_display.set_text(
-            f"x: {round(self.track.get_center()[0]/self.SCALE, 2):.2f} y: {round(self.track.get_center()[1]/self.SCALE, 2):.2f}"
-        )
+        world_x = self.track.get_center()[0] / self.SCALE
+        world_y = -self.track.get_center()[1] / self.SCALE
+        self.coordinates_display.set_text(f"x: {world_x:.2f} y: {world_y:.2f}")
 
         minimap_x = 2 * self.track.get_center()[0] / (self.SCALE * self.LENGTH) - 1
         minimap_y = -2 * self.track.get_center()[1] / (self.SCALE * self.WIDTH) + 1
@@ -580,7 +591,7 @@ class GameSimulation:
         Args:
             step_data (dict): Dictionary containing:
                 - "delta_x" (float): movement in x direction (in meters)
-                - "delta_y" (float): movement in y direction (in meters)
+                - "delta_y" (float): movement in y direction (in meters, +Y is up)
                 - "delta_theta" (float): rotation angle (in radians)
                 - "left_sensor_active" (bool): activate left side sensor
                 - "right_sensor_active" (bool): activate right side sensor
