@@ -173,11 +173,15 @@ class GameSimulation:
         # Load track from .tfg file
         if self.config.track_file_path is None:
             raise ValueError("track_file_path must be provided when using TFG track type")
-        self.x_track, self.y_track, self.markings, self.config.resolution = load_track_from_tfg(self.config.track_file_path)
+        self.x_track, self.y_track, self.markings, self.config.resolution, limites_altura, limites_largura = load_track_from_tfg(self.config.track_file_path)
+        
+        # Calcular dimensões do track com base nos limites (ceil(altura) + 2, ceil(largura) + 2)
+        self.WIDTH = math.ceil(limites_altura) + 2
+        self.LENGTH = math.ceil(limites_largura) + 2
         self.win = len(self.x_track) - 1
 
         # create car with configured size (convert meters to pixels)
-        car_size_pixels = int(self.car_size_meters * self.SCALE)//2
+        car_size_pixels = int(self.car_size_meters * self.SCALE) 
         # onde o carrinho vai ficar 1,36 e 1,8 // original
         self.car_draw = Car(self.simulator.get_center(), size=car_size_pixels, center=(1.4, 1.4))
 
@@ -220,7 +224,7 @@ class GameSimulation:
         
         # Calculate spacing proportional to real map size vs minimap size
         # Each minimap pixel represents this many real pixels
-        pixels_per_minimap_pixel_x = (self.LENGTH * self.SCALE) / minimap_size[0]
+        pixels_per_minimap_pixel_x = (self.LENGTH * self.SCALE) / minimap_size[0] 
         pixels_per_minimap_pixel_y = (self.WIDTH * self.SCALE) / minimap_size[1]
         max_ratio = max(pixels_per_minimap_pixel_x, pixels_per_minimap_pixel_y)
         minimap_spacing = max(1, int(max_ratio / 3))  # Divide by 3 for denser points

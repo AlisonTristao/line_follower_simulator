@@ -866,8 +866,6 @@ class GeradorTrajetoApp:
             largura = altura * 2.0
             
             valor_formatado = f"{largura:.2f}"
-            print(f"[DEBUG] Atualizando largura: altura={altura}, largura={largura}")
-            
             self.entry_limites_largura_display.config(state="normal")
             self.entry_limites_largura_display.delete(0, tk.END)
             self.entry_limites_largura_display.insert(0, valor_formatado)

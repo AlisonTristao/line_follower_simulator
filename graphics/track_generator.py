@@ -120,13 +120,18 @@ def load_track_from_tfg(tfg_file_path):
         tfg_file_path (str): Path to the .tfg file
         
     Returns:
-        tuple: (x_array, y_array, resolution) - numpy arrays of x and y coordinates and the resolution value
+        tuple: (x_array, y_array, markings, resolution, limites_altura, limites_largura, fator_multiplicador)
+               - numpy arrays of x and y coordinates and the resolution value
+               - limites_altura, limites_largura: altura and largura from borda_deteccao
+               - fator_multiplicador: factor for scaling the track dimensions
     """
     x_points = []
     y_points = []
     resolution = None
     fator_multiplicador = None
     markings = []
+    limites_altura = 0.5  # default
+    limites_largura = 1.0  # default (altura * 2)
 
     # Open the .tfg file (which is a ZIP archive)
     with zipfile.ZipFile(tfg_file_path, 'r') as zip_file:
@@ -140,14 +145,21 @@ def load_track_from_tfg(tfg_file_path):
                 json_file = file_name
                 break
         
-        # Read resolution from JSON if found
+        # Read resolution and limites from JSON if found
         if json_file:
             try:
                 with zip_file.open(json_file) as jf:
                     json_data = json.loads(jf.read().decode('utf-8'))
                     resolution = json_data.get('qtd_pontos_exportados')
-                    fator_multiplicador = json_data.get('fator_multiplicador_da_unidade')
-            except (json.JSONDecodeError, KeyError, UnicodeDecodeError):
+
+                    # Ler dados de limites da pista (borda_deteccao)
+                    borda_dados = json_data.get('borda_deteccao', {})
+                    if borda_dados:
+                        # Altura está em metros (altura_m) ou em unidades (altura)
+                        limites_altura = float(borda_dados.get('altura', 0.5))
+                        limites_largura = limites_altura * 2.0 
+            except (json.JSONDecodeError, KeyError, UnicodeDecodeError) as e:
+                print(f"[WARN] Erro ao ler JSON: {e}. Usando valores padrão.")
                 pass
         
         # Find the track CSV file (ends with .csv and is not _marcacoes.csv)
@@ -174,8 +186,8 @@ def load_track_from_tfg(tfg_file_path):
                 if len(row) >= 3:  # idx, x, y
                     try:
                         # multiplica todos os valores do vetor pelo fator multiplicador para converter para metros
-                        x = float(row[1]) * fator_multiplicador #if fator_multiplicador is not None else float(row[1])
-                        y = float(row[2]) * fator_multiplicador #if fator_multiplicador is not None else float(row[2])
+                        x = float(row[1]) 
+                        y = float(row[2]) 
                         x_points.append(x)
                         y_points.append(y)
                     except (ValueError, IndexError):
@@ -205,8 +217,8 @@ def load_track_from_tfg(tfg_file_path):
                         ang_deg = float(row[3])
                         ang = math.radians(ang_deg)
                         # multiplica os valores de x e y pelo fator multiplicador para converter para metros
-                        x = float(row[4]) * fator_multiplicador
-                        y = float(row[5]) * fator_multiplicador
+                        x = float(row[4])
+                        y = float(row[5])
                         markings.append((x, y, ang))
                     except (ValueError, IndexError) as e:
                         print(f"Erro ao processar marcação: {e}")
@@ -216,4 +228,4 @@ def load_track_from_tfg(tfg_file_path):
     x_array = np.array(x_points[::-1])
     y_array = np.array(y_points[::-1])
 
-    return x_array, y_array, markings, resolution
+    return x_array, y_array, markings, resolution, limites_altura, limites_largura

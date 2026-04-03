@@ -158,7 +158,9 @@ class Car(Shape):
             size (int): size of the car
             angle (float): initial angle in degrees
             center (tuple): center position multiplier for car positioning
+            sqrt(3) ~= 1.73 is used to adjust the size for a more realistic car shape (equilateral triangle)
         """
+        size = int(size/math.sqrt(3))  # Adjust size for more realistic car shape
         super().__init__(coo, color, size, angle)
         self._x = center[0] * coo[0] #+ math.cos(math.radians(angle))
         self._y = center[1] * coo[1]

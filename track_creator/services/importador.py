@@ -91,9 +91,6 @@ class ImportadorTrajeto:
                 
                 cor = str(borda_dados.get("cor", "gray"))
                 estilo = str(borda_dados.get("estilo_borda", "dashed"))
-                
-                print(f"[DEBUG] Borda carregada do JSON: altura={altura_borda}, cor={cor}, estilo={estilo}")
-                
                 borda_deteccao = BordaDeteccao(
                     altura=altura_borda,
                     cor=cor,
@@ -104,7 +101,6 @@ class ImportadorTrajeto:
                 borda_deteccao = BordaDeteccao()
         else:
             # Arquivo antigo sem borda_deteccao: cria uma com valores padrão
-            print("[DEBUG] Borda não encontrada no JSON. Criando com valores padrão.")
             borda_deteccao = BordaDeteccao()
 
         config = {
