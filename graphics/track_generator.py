@@ -242,8 +242,10 @@ def load_track_from_tfg(tfg_file_path):
 
                 for row in reader:
                     try:
+                        # CSV already stores Y mirrored for simulator space.
+                        # Mirror the angle as well so non-orthogonal markings keep the expected direction.
                         ang_deg = float(row.get('angle_x_axis_degrees', 0.0))
-                        ang = math.radians(ang_deg)
+                        ang = math.radians(-ang_deg)
                         x = float(row.get('x', 0.0))
                         y = float(row.get('y', 0.0))
                         markings.append((x, y, ang))
