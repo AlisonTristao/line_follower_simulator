@@ -569,8 +569,11 @@ class CanvasTrajectoryView:
             y_px += espaco_px
 
     def _desenhar_limites_pista(self, trajeto, largura, altura):
-        """Desenha os limites da pista como um retângulo com borda tracejada cinza, centrado na origem visual.
-        Largura = altura * 2 (proporção fixa)."""
+        """Desenha os limites da pista com borda tracejada cinza.
+
+        A origem visual é usada como referência de alinhamento do centro do retângulo.
+        Largura = altura * 2 (proporção fixa).
+        """
         limites = trajeto.borda_deteccao
         altura_limites = limites.altura
         largura_limites = altura_limites * 2.0  # Largura é altura × 2
@@ -578,9 +581,7 @@ class CanvasTrajectoryView:
         # Obter origem visual (centro do retângulo)
         origem_x, origem_y = self.obter_origem_visual_m()
         
-        # Posição dos limites centrada na origem visual
-        # Quanto à horizontal: largura_limites
-        # Quanto à vertical: altura_limites
+        # Retângulo centralizado na origem visual.
         x1_mundo = origem_x - largura_limites / 2.0
         y1_mundo = origem_y - altura_limites / 2.0
         x2_mundo = origem_x + largura_limites / 2.0
