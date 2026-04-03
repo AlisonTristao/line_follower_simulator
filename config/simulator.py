@@ -176,8 +176,8 @@ class GameSimulation:
         self.x_track, self.y_track, self.markings, self.config.resolution, limites_altura, limites_largura = load_track_from_tfg(self.config.track_file_path)
         
         # Calcular dimensões do track com base nos limites (ceil(altura) + 2, ceil(largura) + 2)
-        self.WIDTH = math.ceil(limites_altura) + 2
-        self.LENGTH = math.ceil(limites_largura) + 2
+        self.WIDTH = math.ceil(limites_altura) + 1
+        self.LENGTH = math.ceil(limites_largura) + 1
         self.win = len(self.x_track) - 1
 
         # create car with configured size (convert meters to pixels)

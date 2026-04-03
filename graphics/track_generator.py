@@ -79,7 +79,8 @@ def generate_cluster(length, width, scale, x_arr, y_arr):
 
 def process_markings(markings, length, width, scale):
     """
-    Process markings into grid cells.
+    Process markings into grid cells using the same square assignment
+    strategy used by cluster generation (points_in_square).
     
     Args:
         markings (list): List of (x, y, angle) tuples
@@ -91,24 +92,56 @@ def process_markings(markings, length, width, scale):
         dict: {(row, col): [(x_pix, y_pix, angle), ...]}
     """
     marking_data = {}
-    
-    for x, y, angle in markings:
-        i = int(x)
-        j = int(y)
-        ''
-        #if -length//2 <= i < length//2 and -width//2 <= j < width//2:
-        row = i + length // 2
-        col = j + width // 2
-        key = (row, col)
-        
-        x_pix = (x - i) * scale
-        y_pix = (y - j) * scale
-        
+
+    if not markings:
+        return marking_data
+
+    x_arr = np.array([m[0] for m in markings])
+    y_arr = np.array([m[1] for m in markings])
+
+    # Keep one-cell ownership per marking, mirroring generate_cluster behavior.
+    processed_points = set()
+
+    for i in range(-length // 2, length // 2):
+        for j in range(-width // 2, width // 2):
+            index_arr = points_in_square(i, j, 0.5, x_arr, y_arr)
+            if not index_arr:
+                continue
+
+            unique_indices = [idx for idx in index_arr if idx not in processed_points]
+            if not unique_indices:
+                continue
+
+            key = (i + length // 2, j + width // 2)
+            if key not in marking_data:
+                marking_data[key] = []
+
+            for idx in unique_indices:
+                x, y, angle = markings[idx]
+                x_pix = (x - i) * scale
+                y_pix = (y - j) * scale
+                marking_data[key].append((x_pix, y_pix, angle))
+                processed_points.add(idx)
+
+    # Fallback for rare boundary/out-of-grid cases to avoid dropping markings.
+    missing_points = set(range(len(markings))) - processed_points
+    for idx in missing_points:
+        x, y, angle = markings[idx]
+
+        i = int(math.floor(x + 0.5))
+        j = int(math.floor(y + 0.5))
+
+        i = max(-length // 2, min(i, length // 2 - 1))
+        j = max(-width // 2, min(j, width // 2 - 1))
+
+        key = (i + length // 2, j + width // 2)
         if key not in marking_data:
             marking_data[key] = []
-        
+
+        x_pix = (x - i) * scale
+        y_pix = (y - j) * scale
         marking_data[key].append((x_pix, y_pix, angle))
-    
+
     return marking_data
 
 
