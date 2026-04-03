@@ -44,9 +44,6 @@ def simulate_robot_data():
     Simulate all robot data and control inputs for testing.
     Returns a single dictionary with everything needed for one simulation step.
     """
-    import random
-    import math
-    
     # Get movement from keyboard
     delta_x, delta_y, delta_theta = get_keyboard_input()
     
@@ -73,8 +70,8 @@ def simulate_robot_data():
         "delta_x": delta_x,
         "delta_y": delta_y,
         "delta_theta": delta_theta,
-        "left_sensor_active": 1 if random.random() < 0.001 else 0,    # 1% de chance
-        "right_sensor_active": 1 if random.random() < 0.001 else 0,   # 1% de chance
+        "left_sensor_active": 1 if random.random() < 0.001 else 0,    # 0.1% chance
+        "right_sensor_active": 1 if random.random() < 0.001 else 0,   # 0.1% chance
     }
 
 def main(sim) -> None:

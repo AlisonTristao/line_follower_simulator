@@ -7,7 +7,7 @@ from dataclasses import dataclass
 
 from graphics.graphics_elements import *
 from graphics.track_generator import *
-from .serial_com import SerialCom
+from .serial_connection import SerialConnection
 import numpy as np
 
 @dataclass
@@ -173,11 +173,18 @@ class GameSimulation:
         # Load track from .tfg file
         if self.config.track_file_path is None:
             raise ValueError("track_file_path must be provided when using TFG track type")
-        self.x_track, self.y_track, self.markings, self.config.resolution, limites_altura, limites_largura = load_track_from_tfg(self.config.track_file_path)
+        (
+            self.x_track,
+            self.y_track,
+            self.markings,
+            self.config.resolution,
+            track_height_limit,
+            track_width_limit,
+        ) = load_track_from_tfg(self.config.track_file_path)
         
-        # Calcular dimensões do track com base nos limites (ceil(altura) + 2, ceil(largura) + 2)
-        self.WIDTH = math.ceil(limites_altura) + 2
-        self.LENGTH = math.ceil(limites_largura) + 4
+        # Compute track dimensions from metadata limits.
+        self.WIDTH = math.ceil(track_height_limit) + 2
+        self.LENGTH = math.ceil(track_width_limit) + 4
         self.win = len(self.x_track) - 1
 
         # create car with configured size (convert meters to pixels)
@@ -638,7 +645,7 @@ class GameSimulation:
     # ========================================================================
 
     def _read_serial_thread(self):
-        """Thread para ler mensagens do rob├┤ continuamente"""
+        """Continuously read messages from the serial backend."""
         while self.serial_connected:
             try:
                 if self.com and self.com.is_connected():
@@ -654,7 +661,7 @@ class GameSimulation:
     def serial_connect(self, port: str):
         """Connect to serial port and start read thread"""
         if not self.com:
-            self.com = SerialCom()
+            self.com = SerialConnection()
         
         if self.com.connect(port):
             self.serial_connected = True
@@ -682,30 +689,30 @@ class GameSimulation:
         if not self.serial_monitor:
             return
         
-        # Get available ports - create SerialCom if needed
+        # Get available ports - create SerialConnection if needed
         if not self.com:
-            self.com = SerialCom()
+            self.com = SerialConnection()
         
         available_ports = self.com.list_ports()
         if available_ports:
             self.serial_monitor.port_dropdown.set_options(available_ports)
         else:
-            self.serial_monitor.port_dropdown.set_options(["Nenhuma porta"])
+            self.serial_monitor.port_dropdown.set_options(["No ports found"])
         
         # Create and connect callbacks
         def on_connect_click():
             port = self.serial_monitor.port_dropdown.get_selected()
             if self.serial_connect(port):
                 self.serial_monitor.connected = True
-                self.serial_monitor.add_message(f"[SISTEMA] Conectado em {port}", (0, 200, 0))
+                self.serial_monitor.add_message(f"[SYSTEM] Connected to {port}", (0, 200, 0))
             else:
                 self.serial_monitor.connected = False
-                self.serial_monitor.add_message(f"[SISTEMA] Falha ao conectar em {port}", (200, 0, 0))
+                self.serial_monitor.add_message(f"[SYSTEM] Failed to connect to {port}", (200, 0, 0))
         
         def on_disconnect_click():
             self.serial_disconnect()
             self.serial_monitor.connected = False
-            self.serial_monitor.add_message("[SISTEMA] Desconectado", (200, 100, 0))
+            self.serial_monitor.add_message("[SYSTEM] Disconnected", (200, 100, 0))
         
         def on_send_click():
             text = self.serial_monitor.text_input.get_text()
@@ -713,19 +720,19 @@ class GameSimulation:
                 if self.serial_send(text):
                     self.serial_monitor.add_message(f"[TX] {text}", (200, 200, 0))
                 else:
-                    self.serial_monitor.add_message("[SISTEMA] N├úo conectado", (200, 0, 0))
+                    self.serial_monitor.add_message("[SYSTEM] Not connected", (200, 0, 0))
                 self.serial_monitor.text_input.clear()
         
         def on_clear_click():
             self.serial_monitor.clear_messages()
-            self.serial_monitor.add_message("[SISTEMA] Hist├│rico limpo", (100, 200, 100))
+            self.serial_monitor.add_message("[SYSTEM] History cleared", (100, 200, 100))
         
         self.serial_monitor.btn_connect.callback = on_connect_click
         self.serial_monitor.btn_disconnect.callback = on_disconnect_click
         self.serial_monitor.btn_send.callback = on_send_click
         self.serial_monitor.btn_clear.callback = on_clear_click
         
-        self.serial_monitor.add_message("[SISTEMA] Inicializado", (100, 200, 100))
+        self.serial_monitor.add_message("[SYSTEM] Initialized", (100, 200, 100))
 
 _simulation: GameSimulation | None = None
 

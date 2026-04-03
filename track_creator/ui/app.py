@@ -4,12 +4,12 @@ import tkinter as tk
 import zipfile
 from tkinter import filedialog, messagebox, ttk
 
-from models.segmentos import SegmentoCurva, SegmentoReta
-from models.trajeto import Trajeto
-from services.exportador import ExportadorTrajeto
-from services.geometria import GeometriaTrajeto
-from services.importador import ImportadorTrajeto
-from ui.canvas_view import CanvasTrajetoView
+from models.segments import CurveSegment, StraightSegment
+from models.trajectory import Trajectory
+from services.trajectory_exporter import TrajectoryExporter
+from services.trajectory_geometry import TrajectoryGeometry
+from services.trajectory_importer import TrajectoryImporter
+from ui.canvas_view import CanvasTrajectoryView
 
 
 # Dicionário de ícones representativos
@@ -28,12 +28,12 @@ ICONOS = {
 }
 
 
-class GeradorTrajetoApp:
+class TrajectoryGeneratorApp:
     def __init__(self, root: tk.Tk):
         self.root = root
-        self.root.title("Gerador de Trajeto")
+        self.root.title("Trajectory Generator")
 
-        self.trajeto = Trajeto()
+        self.trajeto = Trajectory()
         self.indice_selecionado = None
         self.projeto_modificado = False
 
@@ -46,19 +46,19 @@ class GeradorTrajetoApp:
         self.root.after(100, self._configurar_atalhos)
         self.root.protocol("WM_DELETE_WINDOW", self.fechar_aplicativo)
 
-        GeometriaTrajeto.recalcular_poses(self.trajeto)
+        TrajectoryGeometry.recalculate_poses(self.trajeto)
         self._atualizar_lista_segmentos()
         self._redesenhar()
 
     def _marcar_como_modificado(self):
         if not self.projeto_modificado:
             self.projeto_modificado = True
-            self.root.title("Gerador de Trajeto *")
+            self.root.title("Trajectory Generator *")
 
     def _marcar_como_salvo(self):
         if self.projeto_modificado:
             self.projeto_modificado = False
-            self.root.title("Gerador de Trajeto")
+            self.root.title("Trajectory Generator")
 
     def fechar_aplicativo(self):
         if self.projeto_modificado:
@@ -284,7 +284,7 @@ class GeradorTrajetoApp:
         ).pack(side="left", fill="x", expand=True, padx=(8, 12))
         ttk.Button(toolbar_canvas, text=f"{ICONOS['centralizar']} Centralizar", command=self.centralizar_visao).pack(side="left")
 
-        self.canvas_view = CanvasTrajetoView(
+        self.canvas_view = CanvasTrajectoryView(
             frame_canvas,
             zoom_var=self.var_zoom,
             zoom_max_var=self.var_zoom_max,
@@ -488,7 +488,7 @@ class GeradorTrajetoApp:
 
     def _recalcular_resolucao_automatica(self):
         try:
-            comprimento_total = GeometriaTrajeto.comprimento_total(self.trajeto)
+            comprimento_total = TrajectoryGeometry.total_length(self.trajeto)
             pontos_por_metro = float(self.var_pontos_por_metro.get())
             if comprimento_total <= 0 or pontos_por_metro <= 0:
                 return
@@ -517,7 +517,7 @@ class GeradorTrajetoApp:
         if modificado:
             self._marcar_como_modificado()
         indice = self.indice_selecionado if preservar_selecao else None
-        GeometriaTrajeto.recalcular_poses(self.trajeto)
+        TrajectoryGeometry.recalculate_poses(self.trajeto)
         self._recalcular_posicoes_marcacoes()
         if self.var_modo_resolucao_auto.get():
             self._recalcular_resolucao_automatica()
@@ -529,7 +529,7 @@ class GeradorTrajetoApp:
         """Recalcula as posições de todas as marcações baseado nos segmentos atuais."""
         for i, marcacao in enumerate(self.trajeto.marcacoes):
             if i < len(self.trajeto.segmentos):
-                pos = GeometriaTrajeto.calcular_posicao_marcacao(
+                pos = TrajectoryGeometry.compute_marking_position(
                     self.trajeto,
                     i,
                     marcacao.lado,
@@ -545,7 +545,7 @@ class GeradorTrajetoApp:
             raise ValueError("Informe comprimento > 0.")
         if not (-360 <= angulo_graus <= 360):
             raise ValueError("Informe ângulo entre -360° e 360°.")
-        return SegmentoReta(comprimento=comprimento, angulo_graus=angulo_graus)
+        return StraightSegment(length=comprimento, angle_degrees=angulo_graus)
 
     def _construir_segmento_curva(self):
         raio = float(self.var_curva_raio.get())
@@ -554,10 +554,10 @@ class GeradorTrajetoApp:
             raise ValueError("Informe raio > 0.")
         if not (-360 <= angulo_central_graus <= 360):
             raise ValueError("Informe ângulo da curva entre -360° e 360°.")
-        return SegmentoCurva(
-            raio=raio,
-            lado=self.var_curva_lado.get(),
-            angulo_central_graus=angulo_central_graus,
+        return CurveSegment(
+            radius=raio,
+            side=self.var_curva_lado.get(),
+            central_angle_degrees=angulo_central_graus,
         )
 
     def adicionar_reta(self):
@@ -589,7 +589,7 @@ class GeradorTrajetoApp:
             messagebox.showwarning("Nenhuma seleção", "Selecione uma reta na lista antes de atualizar.")
             return
         segmento_atual = self.trajeto.obter_segmento(self.indice_selecionado)
-        if not isinstance(segmento_atual, SegmentoReta):
+        if not isinstance(segmento_atual, StraightSegment):
             messagebox.showwarning("Tipo incorreto", "O item selecionado não é uma reta.")
             return
         try:
@@ -630,7 +630,7 @@ class GeradorTrajetoApp:
             messagebox.showwarning("Nenhuma seleção", "Selecione uma curva na lista antes de atualizar.")
             return
         segmento_atual = self.trajeto.obter_segmento(self.indice_selecionado)
-        if not isinstance(segmento_atual, SegmentoCurva):
+        if not isinstance(segmento_atual, CurveSegment):
             messagebox.showwarning("Tipo incorreto", "O item selecionado não é uma curva.")
             return
         try:
@@ -665,7 +665,7 @@ class GeradorTrajetoApp:
             return
         
         # Recalcula a posição da marcação
-        pos = GeometriaTrajeto.calcular_posicao_marcacao(
+        pos = TrajectoryGeometry.compute_marking_position(
             self.trajeto,
             self.indice_selecionado,
             novo_lado,
@@ -702,7 +702,7 @@ class GeradorTrajetoApp:
             if marcacao.distancia == distancia:
                 continue
                 
-            pos = GeometriaTrajeto.calcular_posicao_marcacao(
+            pos = TrajectoryGeometry.compute_marking_position(
                 self.trajeto,
                 i,
                 marcacao.lado, # Mantém o lado original
@@ -780,10 +780,10 @@ class GeradorTrajetoApp:
             messagebox.showwarning("Nenhuma seleção", "Selecione um trecho na lista primeiro.")
             return
         segmento = self.trajeto.obter_segmento(self.indice_selecionado)
-        if isinstance(segmento, SegmentoReta):
+        if isinstance(segmento, StraightSegment):
             self.var_reta_comprimento.set(str(segmento.comprimento))
             self.var_reta_angulo.set(str(segmento.angulo_graus))
-        elif isinstance(segmento, SegmentoCurva):
+        elif isinstance(segmento, CurveSegment):
             self.var_curva_raio.set(str(segmento.raio))
             self.var_curva_lado.set(segmento.lado)
             self.var_curva_angulo.set(str(segmento.angulo_central_graus))
@@ -965,13 +965,13 @@ DICAS
             qtd_pontos_status = max(2, int(self.var_resolucao.get() or 2))
         except ValueError:
             qtd_pontos_status = 2
-        espacamento_medio = GeometriaTrajeto.espacamento_medio(self.trajeto, qtd_pontos_status) if self.trajeto.segmentos else 0.0
+        espacamento_medio = TrajectoryGeometry.average_spacing(self.trajeto, qtd_pontos_status) if self.trajeto.segmentos else 0.0
         txt = (
             f"Origem do trajeto: (0.00, 0.00) m\n"
             #f"Origem visual/exportação: ({origem_x:.3f}, {origem_y:.3f}) m\n"
             f"Segmentos: {len(self.trajeto.segmentos)}\n"
             #f"Segmentos desfeitos: {len(self.trajeto.segmentos_desfeitos)}\n"
-            f"Comprimento total: {GeometriaTrajeto.comprimento_total(self.trajeto):.3f} m\n"
+            f"Comprimento total: {TrajectoryGeometry.total_length(self.trajeto):.3f} m\n"
             f"Espaçamento médio atual: {espacamento_medio:.4f} m"
             #f"Ponto final exportado: ({x_fim_export:.3f}, {y_fim_export:.3f}) m\n"
             #f"Direção final: {math.degrees(heading):.2f}°"
@@ -981,7 +981,7 @@ DICAS
     def _atualizar_lista_segmentos(self, indice_preferido=None):
         self.listbox_segmentos.delete(0, tk.END)
         for i, seg in enumerate(self.trajeto.segmentos, start=1):
-            if isinstance(seg, SegmentoReta):
+            if isinstance(seg, StraightSegment):
                 txt = f"{i:02d} | reta | comprimento={seg.comprimento:.3f} m | ângulo={seg.angulo_graus:.2f}°"
             else:
                 txt = (
@@ -1036,16 +1036,16 @@ DICAS
 
         try:
             origem_x, origem_y = self.canvas_view.obter_origem_visual_m()
-            ExportadorTrajeto.exportar_tfg(
-                caminho_tfg=caminho,
-                trajeto=self.trajeto,
-                qtd_pontos=qtd_pontos,
-                unidade=self.var_unidade.get(),
-                fator_personalizado=self.var_fator_personalizado.get(),
-                origem_x=origem_x,
-                origem_y=origem_y,
-                modo_resolucao_auto=self.var_modo_resolucao_auto.get(),
-                pontos_por_metro=self.var_pontos_por_metro.get(),
+            TrajectoryExporter.export_tfg(
+                tfg_path=caminho,
+                trajectory=self.trajeto,
+                point_count=qtd_pontos,
+                unit=self.var_unidade.get(),
+                custom_factor=self.var_fator_personalizado.get(),
+                origin_x=origem_x,
+                origin_y=origem_y,
+                auto_resolution_mode=self.var_modo_resolucao_auto.get(),
+                points_per_meter=self.var_pontos_por_metro.get(),
             )
         except ValueError as e:
             messagebox.showerror("Erro na exportação", str(e))
@@ -1070,7 +1070,7 @@ DICAS
             return
 
         try:
-            segmentos, config, marcacoes, limites_pista = ImportadorTrajeto.importar_tfg(caminho)
+            segmentos, config, marcacoes, limites_pista = TrajectoryImporter.import_tfg(caminho)
         except (ValueError, KeyError, TypeError, OSError, zipfile.BadZipFile) as e:
             messagebox.showerror("Erro ao carregar .tfg", str(e))
             return
@@ -1080,26 +1080,26 @@ DICAS
         self.trajeto.borda_deteccao = limites_pista
         self.indice_selecionado = 0 if self.trajeto.segmentos else None
 
-        if config.get("qtd_pontos") is not None:
-            self.var_resolucao.set(str(config["qtd_pontos"]))
+        if config.get("point_count") is not None:
+            self.var_resolucao.set(str(config["point_count"]))
 
-        unidade = config.get("unidade")
+        unidade = config.get("unit")
         if unidade == "custom":
             self.var_unidade.set("personalizada")
-            if config.get("fator_personalizado") is not None:
-                self.var_fator_personalizado.set(str(config["fator_personalizado"]))
+            if config.get("custom_factor") is not None:
+                self.var_fator_personalizado.set(str(config["custom_factor"]))
         elif unidade in ["m", "cm", "mm", "km", "personalizada"]:
             self.var_unidade.set(unidade)
-        if unidade != "custom" and config.get("fator_personalizado") is not None:
-            self.var_fator_personalizado.set(str(config["fator_personalizado"]))
+        if unidade != "custom" and config.get("custom_factor") is not None:
+            self.var_fator_personalizado.set(str(config["custom_factor"]))
 
-        self.var_origem_x.set(str(config.get("origem_x", 0.0)))
-        self.var_origem_y.set(str(config.get("origem_y", 0.0)))
+        self.var_origem_x.set(str(config.get("origin_x", 0.0)))
+        self.var_origem_y.set(str(config.get("origin_y", 0.0)))
         
-        if config.get("modo_resolucao_auto") is not None:
-            self.var_modo_resolucao_auto.set(config["modo_resolucao_auto"])
-        if config.get("pontos_por_metro") is not None:
-            self.var_pontos_por_metro.set(str(config["pontos_por_metro"]))
+        if config.get("auto_resolution_mode") is not None:
+            self.var_modo_resolucao_auto.set(config["auto_resolution_mode"])
+        if config.get("points_per_meter") is not None:
+            self.var_pontos_por_metro.set(str(config["points_per_meter"]))
         
         self._atualizar_estado_fator()
         self._atualizar_estado_resolucao()

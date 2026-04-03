@@ -2,10 +2,10 @@ import tkinter as tk
 import time
 import math
 
-from services.geometria import GeometriaTrajeto
+from services.trajectory_geometry import TrajectoryGeometry
 
 
-class CanvasTrajetoView:
+class CanvasTrajectoryView:
     GRADE_ESPACO_PADRAO = 1.0  # 1 metro por padrão
     
     def __init__(self, parent, zoom_var, zoom_max_var, mostrar_grade_var, origem_x_var, origem_y_var, unidade_var, fator_personalizado_var=None):
@@ -374,7 +374,7 @@ class CanvasTrajetoView:
         self.canvas.create_text(cx + 55, cy + 14, text="Origem visual (0,0)", fill="#666666")
 
         # Desenhar trajeto segmento por segmento
-        pontos_segmentos = GeometriaTrajeto.pontos_segmentos_do_trajeto(trajeto)
+        pontos_segmentos = TrajectoryGeometry.segment_trajectory_points(trajeto)
         
         for indice, pontos_segmento in enumerate(pontos_segmentos):
             if len(pontos_segmento) >= 2:

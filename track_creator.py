@@ -1,16 +1,17 @@
 import sys
 import os
+import importlib
 import tkinter as tk
 from tkinter import ttk
 
-# Adicionar o diretório do track_creator ao path
+# Add the track_creator directory to sys.path.
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), 'track_creator'))
-
-from ui.app import GeradorTrajetoApp
-
 
 def main():
     try:
+        app_module = importlib.import_module("ui.app")
+        app_class = getattr(app_module, "TrajectoryGeneratorApp")
+
         root = tk.Tk()
         style = ttk.Style()
         try:
@@ -18,12 +19,12 @@ def main():
         except tk.TclError:
             pass
 
-        # Configurar tamanho e centralizar janela no monitor
+        # Configure size and center the window on screen.
         window_width = 1200
         window_height = 680
         
-        # Centralizar na tela
-        root.withdraw()  # Esconder janela temporariamente
+        # Center on screen.
+        root.withdraw()  # Hide temporarily while calculating geometry.
         root.update_idletasks()
         
         screen_width = root.winfo_screenwidth()
@@ -32,13 +33,13 @@ def main():
         y = (screen_height - window_height) // 2
         
         root.geometry(f"{window_width}x{window_height}+{x}+{y}")
-        root.deiconify()  # Mostrar janela centralizada
+        root.deiconify()  # Show centered window.
 
-        GeradorTrajetoApp(root)
+        app_class(root)
         root.mainloop()
     except Exception as e:
         import traceback
-        print(f"ERRO: {e}")
+        print(f"ERROR: {e}")
         print(traceback.format_exc())
 
 
