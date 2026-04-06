@@ -231,23 +231,17 @@ class GameSimulation:
         minimap_position = (minimap_center_x, minimap_y)
         self.minimap = MiniMap(minimap_position, minimap_size)
 
-        # Build minimap world bounds from the loaded path in the same frame used by Track.
-        world_x_points = self.x_track + self.LENGTH // 2
-        world_y_points = self.y_track + self.WIDTH // 2
-        self._minimap_min_x = float(np.min(world_x_points))
-        self._minimap_max_x = float(np.max(world_x_points))
-        self._minimap_min_y = float(np.min(world_y_points))
-        self._minimap_max_y = float(np.max(world_y_points))
+        # Limit minimap world using the dimensions configured in the TFG.
+        # This keeps minimap scale tied to map size (width/height), not only to path span.
+        map_center_x = self.LENGTH // 2
+        map_center_y = self.WIDTH // 2
+        half_limit_x = max(float(track_width_limit) / 2.0, 1e-6)
+        half_limit_y = max(float(track_height_limit) / 2.0, 1e-6)
 
-        # Add a small padding so points don't stick to minimap borders.
-        span_x = max(self._minimap_max_x - self._minimap_min_x, 1e-6)
-        span_y = max(self._minimap_max_y - self._minimap_min_y, 1e-6)
-        pad_x = 0.05 * span_x
-        pad_y = 0.05 * span_y
-        self._minimap_min_x -= pad_x
-        self._minimap_max_x += pad_x
-        self._minimap_min_y -= pad_y
-        self._minimap_max_y += pad_y
+        self._minimap_min_x = map_center_x - half_limit_x
+        self._minimap_max_x = map_center_x + half_limit_x
+        self._minimap_min_y = map_center_y - half_limit_y
+        self._minimap_max_y = map_center_y + half_limit_y
 
         # Preserve aspect ratio: compute a single world-per-pixel scale for both axes.
         self._minimap_half_width = minimap_size[0] / 2.0

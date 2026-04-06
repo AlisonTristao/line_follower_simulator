@@ -168,6 +168,20 @@ def load_track_from_tfg(tfg_file_path):
     track_height_limit = 0.5
     track_width_limit = 1.0
 
+    def _read_positive_float(data, *keys):
+        if not isinstance(data, dict):
+            return None
+        for key in keys:
+            if key not in data:
+                continue
+            try:
+                value = float(data.get(key))
+                if math.isfinite(value) and value > 0:
+                    return value
+            except (TypeError, ValueError):
+                continue
+        return None
+
     # Open the .tfg file (which is a ZIP archive)
     with zipfile.ZipFile(tfg_file_path, 'r') as zip_file:
         # List all files in the ZIP
@@ -187,12 +201,50 @@ def load_track_from_tfg(tfg_file_path):
                     json_data = json.loads(jf.read().decode('utf-8'))
                     resolution = json_data.get('exported_point_count')
 
-                    border_data = json_data.get('detection_border', {})
-                    if border_data:
-                        if 'height_m' in border_data:
-                            track_height_limit = float(border_data.get('height_m', 0.5))
-                        else:
-                            track_height_limit = float(border_data.get('height', 0.5))
+                    # CSV points are exported in output unit, so prefer limits in the
+                    # same unit (height/width). Fallback to *_m converted by unit_multiplier.
+                    unit_multiplier = _read_positive_float(json_data, 'unit_multiplier')
+                    if unit_multiplier is None:
+                        unit_multiplier = 1.0
+
+                    def _extract_limits(limit_data):
+                        height_limit = _read_positive_float(limit_data, 'height', 'altura')
+                        width_limit = _read_positive_float(limit_data, 'width', 'largura')
+
+                        if height_limit is None:
+                            height_m = _read_positive_float(limit_data, 'height_m', 'altura_m')
+                            if height_m is not None:
+                                height_limit = height_m * unit_multiplier
+
+                        if width_limit is None:
+                            width_m = _read_positive_float(limit_data, 'width_m', 'largura_m')
+                            if width_m is not None:
+                                width_limit = width_m * unit_multiplier
+
+                        if width_limit is None and height_limit is not None:
+                            width_limit = height_limit * 2.0
+                        if height_limit is None and width_limit is not None:
+                            height_limit = width_limit / 2.0
+
+                        return height_limit, width_limit
+
+                    size_data = json_data.get('track_size')
+                    if not isinstance(size_data, dict):
+                        size_data = json_data.get('tamanho_pista', {})
+
+                    size_height, size_width = _extract_limits(size_data)
+                    border_height, border_width = _extract_limits(json_data.get('detection_border', {}))
+
+                    if size_height is not None:
+                        track_height_limit = size_height
+                    elif border_height is not None:
+                        track_height_limit = border_height
+
+                    if size_width is not None:
+                        track_width_limit = size_width
+                    elif border_width is not None:
+                        track_width_limit = border_width
+                    elif track_height_limit > 0:
                         track_width_limit = track_height_limit * 2.0
             except (json.JSONDecodeError, KeyError, UnicodeDecodeError) as e:
                 print(f"[WARN] Failed to parse JSON metadata: {e}. Using defaults.")
