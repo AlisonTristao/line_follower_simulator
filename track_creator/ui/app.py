@@ -601,6 +601,7 @@ class TrajectoryGeneratorApp:
             self._recalcular_resolucao_automatica()
         self._atualizar_campo_limites_largura()
         self._atualizar_lista_segmentos(indice)
+        self._preselecionar_angulo_reta_final()
         self._redesenhar()
 
     def _recalcular_posicoes_marcacoes(self):
@@ -615,6 +616,62 @@ class TrajectoryGeneratorApp:
                 )
                 if pos is not None:
                     marcacao.x, marcacao.y, marcacao.angulo_eixo_x = pos
+
+    def _preselecionar_angulo_reta_final(self):
+        """Pré-seleciona o ângulo da próxima reta usando a tangente no fim do trajeto."""
+        if not self.trajeto.segmentos or len(self.trajeto.poses) < 2:
+            self.var_reta_angulo.set("0")
+            return
+
+        indice_referencia = len(self.trajeto.segmentos) - 1
+        if self.indice_selecionado is not None and 0 <= self.indice_selecionado < len(self.trajeto.segmentos):
+            segmento_selecionado = self.trajeto.segmentos[self.indice_selecionado]
+            if isinstance(segmento_selecionado, StraightSegment):
+                return
+            indice_referencia = self.indice_selecionado
+
+        angulo_saida_graus = self._calcular_angulo_saida_segmento_graus(indice_referencia)
+        if angulo_saida_graus is not None:
+            self.var_reta_angulo.set(f"{angulo_saida_graus:.2f}")
+
+    def _calcular_angulo_saida_segmento_graus(self, indice_segmento):
+        """Calcula o ângulo tangente no final de um segmento (em graus)."""
+        if (
+            indice_segmento < 0
+            or indice_segmento >= len(self.trajeto.segmentos)
+            or indice_segmento + 1 >= len(self.trajeto.poses)
+        ):
+            return None
+
+        segmento = self.trajeto.segmentos[indice_segmento]
+        x_inicio, y_inicio, heading_inicio = self.trajeto.poses[indice_segmento]
+        x_final, y_final, heading_final = self.trajeto.poses[indice_segmento + 1]
+
+        if isinstance(segmento, CurveSegment):
+            comprimento = TrajectoryGeometry.segment_length(segmento)
+            delta = min(0.01, comprimento * 0.1)
+            if comprimento <= 0 or delta <= 0:
+                heading_tangente = heading_final
+            else:
+                x_prev, y_prev = TrajectoryGeometry.point_on_segment(
+                    x_inicio,
+                    y_inicio,
+                    heading_inicio,
+                    segmento,
+                    max(0.0, comprimento - delta),
+                )
+                dx = x_final - x_prev
+                dy = y_final - y_prev
+                if abs(dx) < 1e-12 and abs(dy) < 1e-12:
+                    heading_tangente = heading_final
+                else:
+                    heading_tangente = math.atan2(dy, dx)
+        elif isinstance(segmento, StraightSegment):
+            heading_tangente = math.radians(segmento.angle_degrees)
+        else:
+            heading_tangente = heading_final
+
+        return math.degrees(TrajectoryGeometry.normalize_angle(heading_tangente))
 
     def _construir_segmento_reta(self):
         comprimento = float(self.var_reta_comprimento.get())
@@ -926,6 +983,7 @@ class TrajectoryGeneratorApp:
         
         # Carrega os dados do segmento automaticamente
         self.carregar_selecao()
+        self._preselecionar_angulo_reta_final()
 
     def centralizar_visao(self):
         self.canvas_view.centralizar_visao()
