@@ -1,12 +1,22 @@
 import tkinter as tk
 import time
-import math
+from io import BytesIO
+
+try:
+    from PIL import Image, ImageTk
+except ImportError:
+    Image = None
+    ImageTk = None
 
 from services.trajectory_geometry import TrajectoryGeometry
 
 
 class CanvasTrajectoryView:
     GRADE_ESPACO_PADRAO = 1.0  # 1 metro por padrão
+    FUNDO_RENDER_MAX_LADO = 2200
+    FUNDO_RENDER_MAX_PIXELS = 3_000_000
+    FUNDO_REDRAW_ZOOM_INTERVALO_MS = 20
+    FUNDO_INCLINACAO_LIMITE = 2.5
     
     def __init__(self, parent, zoom_var, zoom_max_var, mostrar_grade_var, origem_x_var, origem_y_var, unidade_var, fator_personalizado_var=None):
         self.zoom_var = zoom_var
@@ -25,6 +35,8 @@ class CanvasTrajectoryView:
         self.pan_inicio_y = 0.0
         self.mouse_x_px = 0
         self.mouse_y_px = 0
+        self._ultimo_redesenho_mouse_tempo = 0.0
+        self._redesenho_zoom_agendado = None
 
         self.frame = tk.Frame(parent)
         self.canvas = tk.Canvas(self.frame, bg="white", cursor="fleur")
@@ -55,6 +67,28 @@ class CanvasTrajectoryView:
         # Modo de seleção de origem
         self.modo_selecionando_origem = False
 
+        # Configuração de imagem de fundo
+        self._imagem_fundo_original = None
+        self._imagem_fundo_preparada = None
+        self._imagem_fundo_preparada_key = None
+        self._imagem_fundo_photo = None
+        self._imagem_fundo_cache_key = None
+        self._fundo_visivel = False
+        self._fundo_tamanho_quadrado_m = 1.0
+        self._fundo_escala_horizontal = 1.0
+        self._fundo_escala_vertical = 1.0
+        self._fundo_zoom = 1.0
+        self._fundo_offset_x_m = 0.0
+        self._fundo_offset_y_m = 0.0
+        self._fundo_opacidade_percent = 60.0
+        self._fundo_perspectiva_horizontal = 0.0
+        self._fundo_perspectiva_vertical = 0.0
+        self._fundo_canto_superior_esquerdo = 0.0
+        self._fundo_canto_superior_direito = 0.0
+        self._fundo_canto_inferior_direito = 0.0
+        self._fundo_canto_inferior_esquerdo = 0.0
+        self._fundo_rotacao_graus = 0.0
+
 
     def set_redraw_callback(self, callback):
         self._callback_redesenho = callback
@@ -66,6 +100,84 @@ class CanvasTrajectoryView:
     def set_origem_click_callback(self, callback):
         """Define callback para quando um ponto é clicado em modo de seleção de origem"""
         self._callback_origem_clicada = callback
+
+    @staticmethod
+    def suporte_imagem_fundo_disponivel():
+        return Image is not None and ImageTk is not None
+
+    def carregar_imagem_fundo_bytes(self, image_bytes):
+        if not self.suporte_imagem_fundo_disponivel():
+            raise RuntimeError("Pillow não está instalado. Instale com: pip install pillow")
+        if not image_bytes:
+            raise ValueError("Nenhum dado de imagem informado.")
+
+        imagem = Image.open(BytesIO(image_bytes)).convert("RGBA")
+        self._imagem_fundo_original = imagem
+        self._imagem_fundo_preparada = None
+        self._imagem_fundo_preparada_key = None
+        self._imagem_fundo_photo = None
+        self._imagem_fundo_cache_key = None
+
+    def limpar_imagem_fundo(self):
+        self._imagem_fundo_original = None
+        self._imagem_fundo_preparada = None
+        self._imagem_fundo_preparada_key = None
+        self._imagem_fundo_photo = None
+        self._imagem_fundo_cache_key = None
+        self._fundo_visivel = False
+
+    def configurar_imagem_fundo(
+        self,
+        tamanho_quadrado_m,
+        escala_horizontal,
+        escala_vertical,
+        zoom,
+        opacidade_percent,
+        offset_x_m=0.0,
+        offset_y_m=0.0,
+        perspectiva_horizontal=0.0,
+        perspectiva_vertical=0.0,
+        canto_superior_esquerdo=0.0,
+        canto_superior_direito=0.0,
+        canto_inferior_direito=0.0,
+        canto_inferior_esquerdo=0.0,
+        rotacao_graus=0.0,
+        visivel=True,
+    ):
+        self._fundo_tamanho_quadrado_m = max(0.001, float(tamanho_quadrado_m))
+        self._fundo_escala_horizontal = max(0.001, float(escala_horizontal))
+        self._fundo_escala_vertical = max(0.001, float(escala_vertical))
+        self._fundo_zoom = max(0.001, float(zoom))
+        self._fundo_offset_x_m = float(offset_x_m)
+        self._fundo_offset_y_m = float(offset_y_m)
+        self._fundo_opacidade_percent = max(0.0, min(100.0, float(opacidade_percent)))
+        limite_inclinacao = float(self.FUNDO_INCLINACAO_LIMITE)
+        self._fundo_perspectiva_horizontal = max(-limite_inclinacao, min(limite_inclinacao, float(perspectiva_horizontal)))
+        self._fundo_perspectiva_vertical = max(-limite_inclinacao, min(limite_inclinacao, float(perspectiva_vertical)))
+        self._fundo_canto_superior_esquerdo = max(-limite_inclinacao, min(limite_inclinacao, float(canto_superior_esquerdo)))
+        self._fundo_canto_superior_direito = max(-limite_inclinacao, min(limite_inclinacao, float(canto_superior_direito)))
+        self._fundo_canto_inferior_direito = max(-limite_inclinacao, min(limite_inclinacao, float(canto_inferior_direito)))
+        self._fundo_canto_inferior_esquerdo = max(-limite_inclinacao, min(limite_inclinacao, float(canto_inferior_esquerdo)))
+        self._fundo_rotacao_graus = max(-180.0, min(180.0, float(rotacao_graus)))
+        self._fundo_visivel = bool(visivel)
+
+        # Invalida cache intermediário quando parâmetros visuais mudam.
+        self._imagem_fundo_preparada = None
+        self._imagem_fundo_preparada_key = None
+        self._imagem_fundo_photo = None
+        self._imagem_fundo_cache_key = None
+
+    def _agendar_redesenho_zoom(self):
+        if self._redesenho_zoom_agendado is not None:
+            self.canvas.after_cancel(self._redesenho_zoom_agendado)
+        self._redesenho_zoom_agendado = self.canvas.after(
+            self.FUNDO_REDRAW_ZOOM_INTERVALO_MS,
+            self._executar_redesenho_zoom,
+        )
+
+    def _executar_redesenho_zoom(self):
+        self._redesenho_zoom_agendado = None
+        self._disparar_redesenho()
 
     def _disparar_redesenho(self):
         if self._callback_redesenho:
@@ -200,6 +312,13 @@ class CanvasTrajectoryView:
         """Rastreia posição do mouse para exibir informações"""
         self.mouse_x_px = event.x
         self.mouse_y_px = event.y
+
+        # Limita redraw por movimento do mouse para evitar gargalo com imagem de fundo.
+        tempo_atual = time.time()
+        if (tempo_atual - self._ultimo_redesenho_mouse_tempo) < (1.0 / 30.0):
+            return
+
+        self._ultimo_redesenho_mouse_tempo = tempo_atual
         self._disparar_redesenho()
 
     def _encontrar_segmento_proximo(self, px_click, py_click, distancia_max=10):
@@ -272,8 +391,8 @@ class CanvasTrajectoryView:
         # Ajustar pan para manter a mesma posição de mundo sob o mouse
         self.pan_x_px += mouse_px - novo_mouse_px
         self.pan_y_px += mouse_py - novo_mouse_py
-        
-        self._disparar_redesenho()
+
+        self._agendar_redesenho_zoom()
 
     def _zoom_mousewheel_linux(self, event):
         """Realiza zoom centrado na posição do mouse (Linux)"""
@@ -307,8 +426,8 @@ class CanvasTrajectoryView:
         # Ajustar pan para manter a mesma posição de mundo sob o mouse
         self.pan_x_px += mouse_px - novo_mouse_px
         self.pan_y_py += mouse_py - novo_mouse_py
-        
-        self._disparar_redesenho()
+
+        self._agendar_redesenho_zoom()
 
     def centralizar_visao(self):
         self.pan_x_px = 0.0
@@ -367,6 +486,7 @@ class CanvasTrajectoryView:
         cx = largura / 2 + self.pan_x_px
         cy = altura / 2 + self.pan_y_px
 
+        self._desenhar_imagem_fundo(largura, altura)
         self._desenhar_grade(largura, altura)
         self._desenhar_reguas(largura, altura, cx, cy)
         self.canvas.create_line(0, cy, largura, cy, fill="#bdbdbd")
@@ -433,6 +553,309 @@ class CanvasTrajectoryView:
         
         # Desenhar informações no canto (escala e posição do mouse)
         self._desenhar_info_canto(largura, altura)
+
+    def _desenhar_imagem_fundo(self, largura, altura):
+        if not self._fundo_visivel:
+            return
+        if self._imagem_fundo_original is None:
+            return
+
+        largura_base_px = max(1, int(self._imagem_fundo_original.width))
+        altura_base_px = max(1, int(self._imagem_fundo_original.height))
+        maior_lado_base_px = float(max(largura_base_px, altura_base_px))
+        fator_aspecto_largura = largura_base_px / maior_lado_base_px
+        fator_aspecto_altura = altura_base_px / maior_lado_base_px
+
+        origem_x, origem_y = self.obter_origem_visual_m()
+        centro_x_mundo = origem_x + self._fundo_offset_x_m
+        centro_y_mundo = origem_y + self._fundo_offset_y_m
+        largura_m = (
+            self._fundo_tamanho_quadrado_m
+            * self._fundo_escala_horizontal
+            * self._fundo_zoom
+            * fator_aspecto_largura
+        )
+        altura_m = (
+            self._fundo_tamanho_quadrado_m
+            * self._fundo_escala_vertical
+            * self._fundo_zoom
+            * fator_aspecto_altura
+        )
+        if largura_m <= 0 or altura_m <= 0:
+            return
+
+        x1_mundo = centro_x_mundo - largura_m / 2.0
+        y1_mundo = centro_y_mundo - altura_m / 2.0
+        x2_mundo = centro_x_mundo + largura_m / 2.0
+        y2_mundo = centro_y_mundo + altura_m / 2.0
+
+        sx1, sy1 = self.mundo_para_tela(x1_mundo, y1_mundo, largura, altura)
+        sx2, sy2 = self.mundo_para_tela(x2_mundo, y2_mundo, largura, altura)
+
+        esquerda = min(sx1, sx2)
+        direita = max(sx1, sx2)
+        topo = min(sy1, sy2)
+        base = max(sy1, sy2)
+
+        if direita < 0 or esquerda > largura or base < 0 or topo > altura:
+            return
+
+        largura_px = max(1, int(round(direita - esquerda)))
+        altura_px = max(1, int(round(base - topo)))
+        largura_px, altura_px = self._limitar_tamanho_render_fundo(largura_px, altura_px)
+
+        imagem = self._obter_imagem_fundo_renderizada(largura_px, altura_px)
+        if imagem is None:
+            return
+
+        centro_x = (esquerda + direita) / 2.0
+        centro_y = (topo + base) / 2.0
+        self.canvas.create_image(centro_x, centro_y, image=imagem, anchor="center")
+
+    def _obter_imagem_fundo_renderizada(self, largura_px, altura_px):
+        if self._imagem_fundo_original is None or not self.suporte_imagem_fundo_disponivel():
+            return None
+
+        imagem_preparada = self._obter_imagem_fundo_preparada()
+        if imagem_preparada is None:
+            return None
+
+        largura_px = self._quantizar_tamanho_render(largura_px)
+        altura_px = self._quantizar_tamanho_render(altura_px)
+        cantos_efetivos = self._obter_cantos_efetivos()
+
+        chave = (
+            largura_px,
+            altura_px,
+            round(cantos_efetivos["canto_superior_esquerdo"], 4),
+            round(cantos_efetivos["canto_superior_direito"], 4),
+            round(cantos_efetivos["canto_inferior_direito"], 4),
+            round(cantos_efetivos["canto_inferior_esquerdo"], 4),
+            round(self._fundo_rotacao_graus, 2),
+            id(imagem_preparada),
+        )
+        if self._imagem_fundo_cache_key == chave and self._imagem_fundo_photo is not None:
+            return self._imagem_fundo_photo
+
+        resample = Image.Resampling.BILINEAR if hasattr(Image, "Resampling") else Image.BILINEAR
+        imagem = imagem_preparada.resize((largura_px, altura_px), resample=resample)
+        imagem = self._aplicar_perspectiva(imagem)
+
+        self._imagem_fundo_photo = ImageTk.PhotoImage(imagem)
+        self._imagem_fundo_cache_key = chave
+        return self._imagem_fundo_photo
+
+    def _obter_imagem_fundo_preparada(self):
+        if self._imagem_fundo_original is None:
+            return None
+
+        chave_preparada = (
+            round(self._fundo_opacidade_percent, 2),
+            id(self._imagem_fundo_original),
+        )
+        if self._imagem_fundo_preparada_key == chave_preparada and self._imagem_fundo_preparada is not None:
+            return self._imagem_fundo_preparada
+
+        imagem = self._imagem_fundo_original.copy()
+
+        if self._fundo_opacidade_percent < 100.0:
+            fator = self._fundo_opacidade_percent / 100.0
+            canal_alpha = imagem.getchannel("A")
+            canal_alpha = canal_alpha.point(lambda p, f=fator: int(p * f))
+            imagem.putalpha(canal_alpha)
+
+        self._imagem_fundo_preparada = imagem
+        self._imagem_fundo_preparada_key = chave_preparada
+        self._imagem_fundo_photo = None
+        self._imagem_fundo_cache_key = None
+        return self._imagem_fundo_preparada
+
+    def _limitar_tamanho_render_fundo(self, largura_px, altura_px):
+        largura = max(1, int(largura_px))
+        altura = max(1, int(altura_px))
+        return largura, altura
+
+    @staticmethod
+    def _quantizar_tamanho_render(valor, passo=16):
+        valor = max(1, int(round(valor)))
+        if valor <= passo:
+            return valor
+        return max(1, int(round(valor / float(passo))) * passo)
+
+    def _aplicar_perspectiva(self, imagem):
+        cantos_efetivos = self._obter_cantos_efetivos()
+        return self.aplicar_transformacao_em_imagem(
+            imagem,
+            canto_superior_esquerdo=cantos_efetivos["canto_superior_esquerdo"],
+            canto_superior_direito=cantos_efetivos["canto_superior_direito"],
+            canto_inferior_direito=cantos_efetivos["canto_inferior_direito"],
+            canto_inferior_esquerdo=cantos_efetivos["canto_inferior_esquerdo"],
+            rotacao_graus=self._fundo_rotacao_graus,
+        )
+
+    def _obter_cantos_efetivos(self):
+        # Compatibilidade: combina controles novos por canto com os parâmetros legados.
+        legado_sup_esq = self._fundo_perspectiva_horizontal - self._fundo_perspectiva_vertical
+        legado_sup_dir = self._fundo_perspectiva_horizontal + self._fundo_perspectiva_vertical
+        legado_inf_dir = -self._fundo_perspectiva_horizontal + self._fundo_perspectiva_vertical
+        legado_inf_esq = -self._fundo_perspectiva_horizontal - self._fundo_perspectiva_vertical
+        limite_inclinacao = float(self.FUNDO_INCLINACAO_LIMITE)
+
+        return {
+            "canto_superior_esquerdo": max(-limite_inclinacao, min(limite_inclinacao, self._fundo_canto_superior_esquerdo + legado_sup_esq)),
+            "canto_superior_direito": max(-limite_inclinacao, min(limite_inclinacao, self._fundo_canto_superior_direito + legado_sup_dir)),
+            "canto_inferior_direito": max(-limite_inclinacao, min(limite_inclinacao, self._fundo_canto_inferior_direito + legado_inf_dir)),
+            "canto_inferior_esquerdo": max(-limite_inclinacao, min(limite_inclinacao, self._fundo_canto_inferior_esquerdo + legado_inf_esq)),
+        }
+
+    @staticmethod
+    def aplicar_transformacao_em_imagem(
+        imagem,
+        canto_superior_esquerdo=0.0,
+        canto_superior_direito=0.0,
+        canto_inferior_direito=0.0,
+        canto_inferior_esquerdo=0.0,
+        rotacao_graus=0.0,
+    ):
+        if imagem is None:
+            return imagem
+
+        limite_inclinacao = float(CanvasTrajectoryView.FUNDO_INCLINACAO_LIMITE)
+        canto_sup_esq = max(-limite_inclinacao, min(limite_inclinacao, float(canto_superior_esquerdo)))
+        canto_sup_dir = max(-limite_inclinacao, min(limite_inclinacao, float(canto_superior_direito)))
+        canto_inf_dir = max(-limite_inclinacao, min(limite_inclinacao, float(canto_inferior_direito)))
+        canto_inf_esq = max(-limite_inclinacao, min(limite_inclinacao, float(canto_inferior_esquerdo)))
+        rotacao = max(-180.0, min(180.0, float(rotacao_graus)))
+
+        if abs(rotacao) > 1e-6:
+            resample = Image.Resampling.BILINEAR if hasattr(Image, "Resampling") else Image.BILINEAR
+            try:
+                imagem = imagem.rotate(-rotacao, resample=resample, expand=True, fillcolor=(0, 0, 0, 0))
+            except Exception:
+                pass
+
+        largura, altura = imagem.size
+        if largura < 4 or altura < 4:
+            return imagem
+
+        if (
+            abs(canto_sup_esq) < 1e-6
+            and abs(canto_sup_dir) < 1e-6
+            and abs(canto_inf_dir) < 1e-6
+            and abs(canto_inf_esq) < 1e-6
+        ):
+            return imagem
+
+        max_deslocamento = min(largura, altura) * 0.35
+
+        def deslocamento(valor):
+            return valor * max_deslocamento
+
+        d_sup_esq = deslocamento(canto_sup_esq)
+        d_sup_dir = deslocamento(canto_sup_dir)
+        d_inf_dir = deslocamento(canto_inf_dir)
+        d_inf_esq = deslocamento(canto_inf_esq)
+
+        ul_x, ul_y = 0.0 - d_sup_esq, 0.0 - d_sup_esq
+        ur_x, ur_y = float(largura - 1) + d_sup_dir, 0.0 - d_sup_dir
+        lr_x, lr_y = float(largura - 1) + d_inf_dir, float(altura - 1) + d_inf_dir
+        ll_x, ll_y = 0.0 - d_inf_esq, float(altura - 1) + d_inf_esq
+
+        destino = [
+            (ul_x, ul_y),
+            (ur_x, ur_y),
+            (lr_x, lr_y),
+            (ll_x, ll_y),
+        ]
+
+        min_x = min(p[0] for p in destino)
+        max_x = max(p[0] for p in destino)
+        min_y = min(p[1] for p in destino)
+        max_y = max(p[1] for p in destino)
+
+        largura_saida = max(1, int(round(max_x - min_x)) + 1)
+        altura_saida = max(1, int(round(max_y - min_y)) + 1)
+
+        destino_ajustado = [(x - min_x, y - min_y) for (x, y) in destino]
+        origem = [
+            (0.0, 0.0),
+            (float(largura - 1), 0.0),
+            (float(largura - 1), float(altura - 1)),
+            (0.0, float(altura - 1)),
+        ]
+
+        coeficientes = CanvasTrajectoryView._resolver_coeficientes_perspectiva(destino_ajustado, origem)
+        if coeficientes is None:
+            return imagem
+
+        resample = Image.Resampling.BILINEAR if hasattr(Image, "Resampling") else Image.BILINEAR
+        try:
+            return imagem.transform(
+                (largura_saida, altura_saida),
+                Image.Transform.PERSPECTIVE,
+                coeficientes,
+                resample=resample,
+                fillcolor=(0, 0, 0, 0),
+            )
+        except Exception:
+            return imagem
+
+    @staticmethod
+    def aplicar_perspectiva_em_imagem(imagem, perspectiva_horizontal, perspectiva_vertical):
+        limite_inclinacao = float(CanvasTrajectoryView.FUNDO_INCLINACAO_LIMITE)
+        px = max(-limite_inclinacao, min(limite_inclinacao, float(perspectiva_horizontal)))
+        py = max(-limite_inclinacao, min(limite_inclinacao, float(perspectiva_vertical)))
+        return CanvasTrajectoryView.aplicar_transformacao_em_imagem(
+            imagem,
+            canto_superior_esquerdo=px - py,
+            canto_superior_direito=px + py,
+            canto_inferior_direito=-px + py,
+            canto_inferior_esquerdo=-px - py,
+            rotacao_graus=0.0,
+        )
+
+    @staticmethod
+    def _resolver_coeficientes_perspectiva(pontos_destino, pontos_origem):
+        matriz = []
+        vetor = []
+        for (x, y), (u, v) in zip(pontos_destino, pontos_origem):
+            matriz.append([x, y, 1.0, 0.0, 0.0, 0.0, -u * x, -u * y])
+            vetor.append(u)
+            matriz.append([0.0, 0.0, 0.0, x, y, 1.0, -v * x, -v * y])
+            vetor.append(v)
+
+        return CanvasTrajectoryView._resolver_sistema_linear(matriz, vetor)
+
+    @staticmethod
+    def _resolver_sistema_linear(matriz, vetor):
+        n = len(vetor)
+        if n == 0:
+            return None
+
+        a = [linha[:] + [vetor[i]] for i, linha in enumerate(matriz)]
+
+        for col in range(n):
+            piv = max(range(col, n), key=lambda r: abs(a[r][col]))
+            if abs(a[piv][col]) < 1e-9:
+                return None
+
+            if piv != col:
+                a[col], a[piv] = a[piv], a[col]
+
+            pivo = a[col][col]
+            for j in range(col, n + 1):
+                a[col][j] /= pivo
+
+            for row in range(n):
+                if row == col:
+                    continue
+                fator = a[row][col]
+                if abs(fator) < 1e-12:
+                    continue
+                for j in range(col, n + 1):
+                    a[row][j] -= fator * a[col][j]
+
+        return [a[i][n] for i in range(n)]
 
     def _desenhar_info_canto(self, largura, altura):
         """Desenha informações de escala da grid e posição do mouse no canto inferior direito"""

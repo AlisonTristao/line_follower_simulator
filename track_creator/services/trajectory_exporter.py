@@ -56,6 +56,7 @@ class TrajectoryExporter:
         origin_y,
         auto_resolution_mode=True,
         points_per_meter="10",
+        background_image_config=None,
     ):
         segments_data = []
         for i, segment in enumerate(trajectory.segments, start=1):
@@ -89,7 +90,7 @@ class TrajectoryExporter:
                 "border_style": trajectory.detection_border.border_style,
             }
 
-        return {
+        data = {
             "trajectory_origin_m": {"x": 0.0, "y": 0.0},
             "visual_export_origin_m": {"x": origin_x, "y": origin_y},
             "trajectory_origin": {"x": 0.0, "y": 0.0},
@@ -108,6 +109,9 @@ class TrajectoryExporter:
             "markings": markings_data,
             "detection_border": border_data,
         }
+        if background_image_config:
+            data["background_image"] = background_image_config
+        return data
 
     @staticmethod
     def save_project_json(
@@ -120,6 +124,7 @@ class TrajectoryExporter:
         origin_y,
         auto_resolution_mode=True,
         points_per_meter="10",
+        background_image_config=None,
     ):
         factor, output_unit = TrajectoryExporter.get_unit_factor(unit, custom_factor)
         data = TrajectoryExporter._build_json_data(
@@ -131,6 +136,7 @@ class TrajectoryExporter:
             origin_y=origin_y,
             auto_resolution_mode=auto_resolution_mode,
             points_per_meter=points_per_meter,
+            background_image_config=background_image_config,
         )
 
         with open(json_path, "w", encoding="utf-8") as f:
@@ -147,6 +153,7 @@ class TrajectoryExporter:
         origin_y,
         auto_resolution_mode=True,
         points_per_meter="10",
+        background_image_config=None,
     ):
         points = TrajectoryGeometry.sample_by_count(trajectory, point_count)
         points = points[::-1]
@@ -171,6 +178,7 @@ class TrajectoryExporter:
             origin_y=origin_y,
             auto_resolution_mode=auto_resolution_mode,
             points_per_meter=points_per_meter,
+            background_image_config=background_image_config,
         )
 
         if trajectory.markings:
@@ -209,12 +217,24 @@ class TrajectoryExporter:
         origin_y,
         auto_resolution_mode=True,
         points_per_meter="10",
+        background_image_payload=None,
     ):
         """Exports all data to a single .tfg file (ZIP with CSVs and JSON)."""
         temp_dir = tempfile.mkdtemp()
         try:
             base_name = os.path.splitext(os.path.basename(tfg_path))[0]
             temp_csv_path = os.path.join(temp_dir, f"{base_name}.csv")
+
+            background_json_config = None
+            background_archive_path = None
+            background_temp_path = None
+            if background_image_payload and background_image_payload.get("bytes"):
+                background_filename = os.path.basename(background_image_payload.get("filename") or "imagem_fundo.png")
+                background_archive_path = f"background/{background_filename}"
+                background_temp_path = os.path.join(temp_dir, background_filename)
+
+                background_json_config = dict(background_image_payload.get("config") or {})
+                background_json_config["archive_path"] = background_archive_path
 
             temp_json_path = TrajectoryExporter.export_csv_and_json(
                 temp_csv_path,
@@ -226,7 +246,12 @@ class TrajectoryExporter:
                 origin_y,
                 auto_resolution_mode,
                 points_per_meter,
+                background_image_config=background_json_config,
             )
+
+            if background_temp_path and background_image_payload and background_image_payload.get("bytes"):
+                with open(background_temp_path, "wb") as f:
+                    f.write(background_image_payload["bytes"])
 
             with zipfile.ZipFile(tfg_path, "w", zipfile.ZIP_DEFLATED) as zipf:
                 zipf.write(temp_csv_path, f"{base_name}.csv")
@@ -235,6 +260,9 @@ class TrajectoryExporter:
                 markings_path = temp_csv_path.rsplit(".", 1)[0] + "_markings.csv"
                 if os.path.exists(markings_path):
                     zipf.write(markings_path, os.path.basename(markings_path))
+
+                if background_temp_path and background_archive_path and os.path.exists(background_temp_path):
+                    zipf.write(background_temp_path, background_archive_path)
 
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)

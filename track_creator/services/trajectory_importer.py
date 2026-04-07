@@ -101,6 +101,10 @@ class TrajectoryImporter:
         else:
             detection_border = DetectionBorder()
 
+        background_image = data.get("background_image")
+        if not isinstance(background_image, dict):
+            background_image = None
+
         config = {
             "origin_x": float(visual_origin.get("x", 0.0)) * inverse_factor,
             "origin_y": float(visual_origin.get("y", 0.0)) * inverse_factor,
@@ -109,6 +113,7 @@ class TrajectoryImporter:
             "custom_factor": float(unit_factor) if unit_factor is not None else None,
             "auto_resolution_mode": auto_resolution_mode,
             "points_per_meter": points_per_meter,
+            "background_image": background_image,
         }
         return segments, config, markings, detection_border
 
@@ -172,7 +177,29 @@ class TrajectoryImporter:
                             )
                         )
 
-            return segments, config, markings, detection_border
+            background_payload = None
+            background_config = config.get("background_image") if isinstance(config, dict) else None
+            if isinstance(background_config, dict):
+                archive_path = background_config.get("archive_path")
+                if isinstance(archive_path, str) and archive_path.strip():
+                    arquivo_relativo = archive_path.replace("/", os.sep)
+                    caminho_arquivo = os.path.join(temp_dir, arquivo_relativo)
+
+                    if not os.path.exists(caminho_arquivo):
+                        nome_arquivo = os.path.basename(arquivo_relativo)
+                        caminho_alternativo = os.path.join(temp_dir, nome_arquivo)
+                        if os.path.exists(caminho_alternativo):
+                            caminho_arquivo = caminho_alternativo
+
+                    if os.path.exists(caminho_arquivo):
+                        with open(caminho_arquivo, "rb") as f:
+                            background_payload = {
+                                "bytes": f.read(),
+                                "filename": os.path.basename(caminho_arquivo),
+                                "config": background_config,
+                            }
+
+            return segments, config, markings, detection_border, background_payload
 
         finally:
             shutil.rmtree(temp_dir, ignore_errors=True)
