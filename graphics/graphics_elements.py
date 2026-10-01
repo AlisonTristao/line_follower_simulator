@@ -15,25 +15,16 @@ class Shape:
         initializes the shape
         args:
             coo (tuple): coordinates of the shape (x, y)
-            color (tuple): coatualize_next_pointlor of the shape in rgb format
+            color (tuple): color of the shape in rgb format
             size (int): size of the shape
             angle (float): initial angle in radians
         """
         self._x = coo[0]
         self._y = coo[1]
-        self._angle = angle
         self._color = color
         self._size = size
         self._pivot = (0, 0)
-
-        cos_theta = math.cos(self._angle)
-        sin_theta = math.sin(self._angle)
-
-        # Matriz de rotação 2D
-        self._rotation_matrix = [
-            [cos_theta, -sin_theta],
-            [sin_theta, cos_theta]
-        ]
+        self.set_angle(angle)
 
     def get_center(self):
         # returns the center coordinates of the shape
@@ -44,13 +35,10 @@ class Shape:
         return self._angle
 
     def set_angle(self, angle):
-        # sets a new angle for the shape
+        # sets a new angle for the shape and updates the 2D rotation matrix
         self._angle = angle
-
-        cos_theta = math.cos(self._angle)
-        sin_theta = math.sin(self._angle)
-
-        # Matriz de rotação 2D
+        cos_theta = math.cos(angle)
+        sin_theta = math.sin(angle)
         self._rotation_matrix = [
             [cos_theta, -sin_theta],
             [sin_theta, cos_theta]
@@ -71,12 +59,12 @@ class Shape:
     def get_pivot(self):
         # returns the pivot point for rotations
         return self._pivot
-    
+
     def set_size(self, size):
         # sets a new size for the shape
         self._size = size
 
-    def get_size(self): 
+    def get_size(self):
         # returns the size of the shape
         return self._size
 
@@ -87,16 +75,13 @@ class Shape:
 
     def _rotate(self, angle):
         # rotates the shape by the given angle
-        self._angle += angle
-        self.set_angle(self._angle)
+        self.set_angle(self._angle + angle)
 
     def _move(self, dx, dy):
         # moves the shape by dx and dy considering rotation
-        s = dx * math.cos(-self._angle) - dy * math.sin(-self._angle)
-        dy = dx * math.sin(-self._angle) + dy * math.cos(-self._angle)
-        dx = s
-        self._x += dx
-        self._y += dy
+        c, s = math.cos(-self._angle), math.sin(-self._angle)
+        self._x += dx * c - dy * s
+        self._y += dx * s + dy * c
 
     def rotate_around_origin(self, theta):
         # rotates the shape around the origin by theta radians
@@ -105,25 +90,19 @@ class Shape:
         self._x, self._y = x_new, y_new
 
     def _rotate_point(self, coo):
-        x = coo[0]
-        y = coo[1]
-        x_rotated = x * self._rotation_matrix[0][0] + y * self._rotation_matrix[0][1]
-        y_rotated = x * self._rotation_matrix[1][0] + y * self._rotation_matrix[1][1]
-        return x_rotated, y_rotated
+        R = self._rotation_matrix
+        return coo[0] * R[0][0] + coo[1] * R[0][1], coo[0] * R[1][0] + coo[1] * R[1][1]
 
     def rotate_around_pivot(self, coo):
         # rotates a point around the track's pivot
         ox, oy = self._pivot
-        translated_x = coo[0] - ox
-        translated_y = coo[1] - oy
-        x_rotated = translated_x * self._rotation_matrix[0][0] + translated_y * self._rotation_matrix[0][1]
-        y_rotated = translated_x * self._rotation_matrix[1][0] + translated_y * self._rotation_matrix[1][1]
-        return x_rotated + ox, y_rotated + oy
+        x, y = self._rotate_point((coo[0] - ox, coo[1] - oy))
+        return x + ox, y + oy
 
     def draw(self, surface):
         # raises an error because it must be implemented by subclasses
         raise NotImplementedError("this method should be implemented by subclasses.")
-    
+
     def update(self):
         pass
 
@@ -179,7 +158,7 @@ class Car(Shape):
 
 class FuturePoints(Shape):
     """
-    represents the future points of the car in the simulator
+    represents a set of points drawn in screen coordinates (reference / predicted path)
     """
     def __init__(self, coo, color=(200, 0, 0), size=5, angle=0):
         """
@@ -194,13 +173,14 @@ class FuturePoints(Shape):
         self._points = []
 
     def set_points(self, points):
-        # sets the future points to be drawn
-        self._points = points
+        # sets the future points to be drawn (iterable of (x, y) in pixels)
+        self._points = np.asarray(points, dtype=float).tolist()
 
     def draw(self, surface):
         # draws the future points as circles on the given surface
+        circle = pygame.draw.circle
         for point in self._points:
-            pygame.draw.circle(surface, self._color, (int(point[0]), int(point[1])), self._size)
+            circle(surface, self._color, point, self._size)
 
 class Default(Shape):
     """
@@ -233,12 +213,12 @@ class Wall(Shape):
             size (int): size of the wall
         """
         super().__init__(coo, color, size)
+        self._base_surface = pygame.Surface((size, size), pygame.SRCALPHA)
+        self._base_surface.fill(color)
 
     def draw(self, surface):
         # draws the wall as a rotated rectangle on the given surface
-        temp_surface = pygame.Surface((self._size, self._size), pygame.SRCALPHA)
-        temp_surface.fill(self._color)
-        rotated_surface = pygame.transform.rotate(temp_surface, math.degrees(self._angle))
+        rotated_surface = pygame.transform.rotate(self._base_surface, math.degrees(self._angle))
         rotated_rect = rotated_surface.get_rect(center=(int(self._x), int(self._y)))
         surface.blit(rotated_surface, rotated_rect)
 
@@ -249,36 +229,45 @@ class Cluster(Shape):
         _master (tuple): coordinates of the master point
         _master_distance (int): radius of the master point
         _next_point (int): next point to be reached
-        _arr_next_points (list): list of next points to be reached
+        _arr_next_points (np.ndarray): screen coordinates of the next points to be reached
+        _current_point (tuple): screen coordinates of the point that is being reached
         _future_count (int): number of future points
         _future_space (int): space between future points
     """
-    _master             = (0, 0)   
-    _master_distance    = 0         
-    _next_point         = 0        
-    _arr_next_points    = []        
-    _future_count       = 10       
-    _future_space       = 30        
+    _master             = (0, 0)
+    _master_distance    = 0
+    _next_point         = 0
+    _arr_next_points    = np.zeros((10, 2))
+    _current_point      = (0.0, 0.0)
+    _future_count       = 10
+    _future_space       = 30
+
+    _reached_color      = (100, 100, 100)
 
     def __init__(self, coo=(0, 0), color=(0, 0, 0), size=5, angle=0):
         """
         Initializes the cluster object
         """
         super().__init__(coo, color, size, angle)
-        self.__global_index = []
-        self.__points_arr = [] 
-        self.__colors_arr = []
+        self._local = np.empty((0, 2))
+        self._index = np.empty(0, dtype=int)
+        self._reached = np.empty(0, dtype=bool)
+        self._screen = None
 
-    def add_point(self, point, color=(0, 0, 0)):
-        self.__points_arr.append((point[0], point[1]))
-        self.__colors_arr.append(color)
-        self.__global_index.append(point[2])
+    def set_points(self, points):
+        # points: iterable of (x, y, global_index) relative to the cluster origin
+        arr = np.asarray(points, dtype=float).reshape(-1, 3)
+        order = np.argsort(arr[:, 2], kind="stable")
+        arr = arr[order]
+        self._local = arr[:, :2]
+        self._index = arr[:, 2].astype(int)
+        self._reached = np.zeros(len(arr), dtype=bool)
 
     @classmethod
     def set_future_count(cls, future_count, future_space):
         cls._future_count = future_count
         cls._future_space = future_space
-        cls._arr_next_points = [(0, 0)] * future_count
+        cls._arr_next_points = np.zeros((future_count, 2))
 
     @classmethod
     def set_master(cls, master, master_distance):
@@ -286,45 +275,68 @@ class Cluster(Shape):
         cls._master_distance = master_distance
 
     @classmethod
-    def update_next_point(cls):
-        cls._next_point += 1
+    def get_next_point(cls):
+        return cls._arr_next_points.copy()
 
     @classmethod
-    def add_next_point(cls, point, index):
-        cls._arr_next_points[index] = point
+    def get_current_point(cls):
+        return cls._current_point
 
-    @ classmethod
-    def get_next_point(cls):
-        return [(float(x), float(y)) for x, y in list(cls._arr_next_points)]
-
-    def update(self):
-        for i in range(len(self.__points_arr)):
-            point_ = self._rotate_point(self.__points_arr[i])
-            x = point_[0] + self._x
-            y = point_[1] + self._y
-
-            for j in range(self._future_space, self._future_space * self._future_count + self._future_space, self._future_space):
-                if self.__global_index[i] == self._next_point + j:
-                    self.add_next_point((x, y), (self.__global_index[i] - self._next_point)//self._future_space - 1)
+    def _to_screen(self):
+        R = self._rotation_matrix
+        lx, ly = self._local[:, 0], self._local[:, 1]
+        return np.column_stack((lx * R[0][0] + ly * R[0][1] + self._x,
+                                lx * R[1][0] + ly * R[1][1] + self._y))
 
     def draw(self, surface):
         """
-        Draws the cluster on the given surface
+        Draws the cluster on the given surface and advances the next point to be reached
         """
+        if len(self._index) == 0:
+            self._screen = None
+            return
 
-        for i in range(len(self.__points_arr)):
-            point_ = self._rotate_point(self.__points_arr[i])
-            x = point_[0] + self._x
-            y = point_[1] + self._y
+        pts = self._to_screen()
+        self._screen = pts
 
-            if self._points_in_square(x, y) and self.__global_index[i] == self._next_point:
-                self.__colors_arr[i] = (100, 100, 100)  # Modify the color of the point
-                self.update_next_point()
+        # advance the next point while the car is over it
+        while True:
+            pos = np.searchsorted(self._index, Cluster._next_point)
+            if pos < len(self._index) and self._index[pos] == Cluster._next_point and self._points_in_square(*pts[pos]):
+                self._reached[pos] = True
+                Cluster._next_point += 1
+            else:
+                break
 
-            pygame.draw.circle(surface, self.__colors_arr[i], (x, y), self._size)
-    
+        # draw only the points on the screen
+        w, h = surface.get_size()
+        s = self._size
+        visible = (pts[:, 0] > -s) & (pts[:, 0] < w + s) & (pts[:, 1] > -s) & (pts[:, 1] < h + s)
+        if not visible.any():
+            return
+
+        circle = pygame.draw.circle
+        color, reached_color = self._color, self._reached_color
+        for point, reached in zip(pts[visible].tolist(), self._reached[visible].tolist()):
+            circle(surface, reached_color if reached else color, point, s)
+
+    def update(self):
+        # stores the screen coordinates of the future points belonging to this cluster
+        if self._screen is None:
+            return
+
+        rel = self._index - Cluster._next_point
+        space = Cluster._future_space
+        mask = (rel > 0) & (rel % space == 0) & (rel <= space * Cluster._future_count)
+        if mask.any():
+            Cluster._arr_next_points[rel[mask] // space - 1] = self._screen[mask]
+
+        current = np.flatnonzero(rel == 0)
+        if len(current):
+            Cluster._current_point = tuple(self._screen[current[0]])
+
     def get_points(self):
-        return self.__points_arr
+        return self._local
 
     def _points_in_square(self, x1, y1):
         x0, y0 = self._master
@@ -344,48 +356,36 @@ class MiniMap(Shape):
         """
         super().__init__(coo, color, size)
         self._width, self._height = size
-        self._points = []  # Lista de pontos no formato [(x, y)]
+        self._points = []
         self._player = (0, 0)
+        self._surface = None
 
     def add_point(self, point):
         self._points.append(point)
+        self._surface = None
 
     def set_player_position(self, player):
         self._player = player
 
-    def draw(self, surface):
-        # coordinates and dimensions of the minimap rectangle
-        rect_x = self._x - self._width // 2
-        rect_y = self._y - self._height // 2
-        rect_width = self._width
-        rect_height = self._height
-
-        #border_color = (100, 100, 100)
+    def _render_background(self):
+        # the track never changes, so it is rendered only once
         border_width = 1
-
-        # draw border
-        #pygame.draw.rect(surface, border_color,
-        #                 (rect_x, rect_y, rect_width, rect_height), border_width)
-
-        # draw background
-        pygame.draw.rect(surface, self._color,
-                         (rect_x + border_width, rect_y + border_width,
-                          rect_width - 2 * border_width, rect_height - 2 * border_width))
-
-        # draw track
-        point_color = (0, 0, 0)
+        self._surface = pygame.Surface((self._width, self._height), pygame.SRCALPHA)
+        pygame.draw.rect(self._surface, self._color,
+                         (border_width, border_width, self._width - 2 * border_width, self._height - 2 * border_width))
+        half_w, half_h = self._width // 2, self._height // 2
         for px, py in self._points:
-            # normalize the point coordinates
-            x = int(self._x + px * (self._width // 2))
-            y = int(self._y + py * (self._height // 2))
-            pygame.draw.circle(surface, point_color, (x, y), 1)
+            pygame.draw.circle(self._surface, (0, 0, 0), (int(half_w + px * half_w), int(half_h + py * half_h)), 1)
+
+    def draw(self, surface):
+        if self._surface is None:
+            self._render_background()
+        surface.blit(self._surface, (self._x - self._width // 2, self._y - self._height // 2))
 
         # draw player position
-        player_color = (200, 0, 0)
         x = int(self._x + self._player[0] * (self._width // 2))
         y = int(self._y - self._player[1] * (self._height // 2))
-
-        pygame.draw.circle(surface, player_color, (x, y), 5)
+        pygame.draw.circle(surface, (200, 0, 0), (x, y), 5)
 
 class Track(Shape):
     """
@@ -404,7 +404,13 @@ class Track(Shape):
         self.screen_size = screen_size
         self.__visible = visible
         self.__point_spacing = point_spacing
-        self._center = (0, 0) #(self.screen_size[0] // 1.5, self.screen_size[1] // 2)
+        self._center = (0, 0)
+
+        # offsets of the grid cells inside the visibility circle
+        r = int(math.ceil(visible))
+        di, dj = np.mgrid[-r:r + 1, -r:r + 1]
+        inside = di ** 2 + dj ** 2 < visible ** 2
+        self.__circle_offsets = np.column_stack((di[inside], dj[inside]))
 
         # initializes the matrix of points and walls
         self.wall = Wall()
@@ -446,20 +452,21 @@ class Track(Shape):
             y = j * self.__point_spacing + d[1]
             x, y = self.rotate_around_pivot((x, y))
 
-            self.matrix[i][j].set_coordinates((x, y))
-            self.matrix[i][j].set_angle(self._angle)
-            self.matrix[i][j].draw(surface)
+            obj = self.matrix[i][j]
+            obj.set_coordinates((x, y))
+            obj.set_angle(self._angle)
+            obj.draw(surface)
 
         # update the elements
         for i, j in points:
             self.matrix[i][j].update()
 
     def __points_in_circle(self, x0, y0):
-        # returns the points within a circle of visibility
+        # returns the grid cells within the circle of visibility
         rows, cols = self._size
-        x, y = np.ogrid[:rows, :cols]
-        dist_sq = (x - x0) ** 2 + (y - y0) ** 2
-        return np.argwhere(dist_sq < self.__visible ** 2)
+        cells = self.__circle_offsets + (x0, y0)
+        valid = (cells[:, 0] >= 0) & (cells[:, 0] < rows) & (cells[:, 1] >= 0) & (cells[:, 1] < cols)
+        return cells[valid].tolist()
 
 class Checkbox:
     def __init__(self, x, y, size, label="", font_size=24):
@@ -493,6 +500,7 @@ class Display(Shape):
     """
     __len_data = 100
     __saturation = 100
+    __max_checked = 4
 
     # initializes the display
     def __init__(self, coo=(0, 0), size=(10, 10), color=(75, 75, 75), horizontal_div=3, vertical_div=1.1):
@@ -506,20 +514,19 @@ class Display(Shape):
             vertical_div (int): number of vertical divisions
         """
         self.font = pygame.font.SysFont("courier", 12, bold=True)
-
-        # limits of y axis
-        self.__max_value = self.__saturation
-        self.__min_value = -self.__saturation
+        self.title_font = pygame.font.SysFont(None, 20)
+        self.__text_cache = {}
 
         # center and deslocation of display
         middle = (size[0] // horizontal_div, int(size[1] // (2*vertical_div)))
         offset = 40
-        
+
         coo = (coo[0] - (middle[0]//2 * horizontal_div) + offset, coo[1] - middle[1])
         super().__init__(coo, color, (size[0] // (horizontal_div), int(size[1] // (vertical_div))))
 
         self.__graph_data = {}
         self.__graph_colors = {}
+        self.__graph_range = {}
 
         self.__checbox_arr = {}
 
@@ -528,43 +535,59 @@ class Display(Shape):
         self.__len_data = int(fps)
 
     def verify_checkbox(self, event):
-        for graph_name, checkbox in self.__checbox_arr.items():
+        for checkbox in self.__checbox_arr.values():
             checkbox.handle_event(event)
 
     # adds a new graph with a specific line name
-    def add_graph(self, graph_name):
+    def add_graph(self, graph_name, y_range=None, checked=None):
         if graph_name not in self.__graph_data:
             self.__graph_data[graph_name] = {}
             self.__graph_colors[graph_name] = {}
+            self.__graph_range[graph_name] = y_range or (-self.__saturation, self.__saturation)
 
             # create checkboxes for each line in the graph
             self.__checbox_arr[graph_name] = Checkbox(0, 0, 30, graph_name)
-
-            if len(self.__graph_data) <= 4:
-                self.__checbox_arr[graph_name].checked = True
+            if checked is None:
+                checked = sum(c.checked for c in self.__checbox_arr.values()) < self.__max_checked
+            self.__checbox_arr[graph_name].checked = checked
 
     # removes a graph from the display
     def remove_graph(self, graph_name):
         if graph_name in self.__graph_data:
             del self.__graph_data[graph_name]
             del self.__graph_colors[graph_name]
+            del self.__graph_range[graph_name]
+            del self.__checbox_arr[graph_name]
+
+    def has_graph(self, graph_name):
+        return graph_name in self.__graph_data
 
     # adds a new line to an existing graph
     def add_line_to_graph(self, graph_name, line_name, color=(0, 200, 0)):
         if graph_name in self.__graph_data:
-            self.__graph_data[graph_name][line_name] = [0 for _ in range(self.__len_data)]
+            self.__graph_data[graph_name][line_name] = [0] * self.__len_data
             self.__graph_colors[graph_name][line_name] = color
 
     # updates the data for a specific line in a graph
     def update_graph_data(self, graph_name, line_name, new_value):
         if graph_name in self.__graph_data and line_name in self.__graph_data[graph_name]:
-            self.__graph_data[graph_name][line_name].append(new_value)
-            if len(self.__graph_data[graph_name][line_name]) > self.__len_data:
-                self.__graph_data[graph_name][line_name].pop(0)
+            data = self.__graph_data[graph_name][line_name]
+            data.append(new_value)
+            if len(data) > self.__len_data:
+                del data[0]
 
     # update the array of data for a specific graph
     def set_graph_data(self, graph_name, line_name, data):
         self.__graph_data[graph_name][line_name] = data
+
+    def _text(self, text, font=None):
+        # renders static text only once
+        key = (text, font)
+        surface = self.__text_cache.get(key)
+        if surface is None:
+            surface = (font or self.font).render(text, True, (0, 0, 0))
+            self.__text_cache[key] = surface
+        return surface
 
     # draws the display as a rectangle with rounded corners, including graphs and text
     def draw(self, surface):
@@ -572,36 +595,25 @@ class Display(Shape):
         rect = pygame.Rect(self._x, self._y, self._size[0], self._size[1])
         pygame.draw.rect(surface, self._color, rect, border_radius=15)
 
-        # calculate the height of each graph useing the number of selected graphs
-        selected = sum(1 for checkbox in self.__checbox_arr.values() if checkbox.checked)
-        graph_height = (self._size[1] - 30) // selected if selected > 0 else 0
-
-        # draw each graph
+        # draw the checkbox for all graps
         selected = []
-        for idx, (graph_name, lines) in enumerate(self.__graph_data.items()):
-
-            # draw the checkbox for all graps
-            checkbox = self.__checbox_arr[graph_name]
-            x = self._x + self._size[0] + 5
-            y = self._y + idx * 20
-            checkbox.set_coordinates((x, y))
+        for idx, (graph_name, checkbox) in enumerate(self.__checbox_arr.items()):
+            checkbox.set_coordinates((self._x + self._size[0] + 5, self._y + idx * 20))
             checkbox.draw(surface)
-
             if checkbox.checked:
                 selected.append(graph_name)
 
-        for i in range(len(selected)):
-            graph_name = selected[i]
-            lines = self.__graph_data[graph_name]
+        if not selected:
+            return
 
-            # calculate the position of the graph
+        # calculate the height of each graph useing the number of selected graphs
+        graph_height = (self._size[1] - 30) // len(selected)
+        for i, graph_name in enumerate(selected):
             graph_x = self._x + 15
             graph_y = self._y + i * graph_height + 15
             graph_width = self._size[0] - 30
             graph_height_ = graph_height - 15 if i < len(selected) - 1 else graph_height
-
-            # draw the graph
-            self.draw_graph(surface, lines, (graph_x, graph_y, graph_width, graph_height_), graph_name)
+            self.draw_graph(surface, self.__graph_data[graph_name], (graph_x, graph_y, graph_width, graph_height_), graph_name)
 
     # draw grid lines
     def __draw_grid(self, surface, graph_width, graph_height, graph_x, graph_y):
@@ -612,75 +624,60 @@ class Display(Shape):
             pygame.draw.line(surface, grid_color, (graph_x, graph_y + i), (graph_x + graph_width, graph_y + i))
 
     # draw axis values
-    def __draw_axis_values(self, surface, graph_height, graph_x, graph_y):
+    def __draw_axis_values(self, surface, graph_height, graph_x, graph_y, y_range):
         num_divisions = 5
+        y_min, y_max = y_range
         for i in range(num_divisions + 1):
-            value = self.__max_value - (i * (self.__max_value - self.__min_value) // num_divisions)
-            y_pos = graph_y + (i * graph_height // (num_divisions))
-            label = self.font.render(str(value), True, (0, 0, 0))
-            surface.blit(label, (graph_x - 45, y_pos - 10))
+            value = y_max - i * (y_max - y_min) / num_divisions
+            label = self._text(f"{value:g}")
+            surface.blit(label, (graph_x - 45, graph_y + (i * graph_height // num_divisions) - 10))
 
-    # draw title 
+    # draw title
     def __draw_title(self, surface, title, graph_width, graph_x, graph_y):
-        font = pygame.font.SysFont(None, 20)
-        title_label = font.render(title, True, (0, 0, 0))
+        title_label = self._text(title, self.title_font)
         text_width = title_label.get_width()
         text_height = title_label.get_height()
 
-        # Centraliza o retângulo e o texto
-        rect_x = graph_x + graph_width // 2 - text_width // 2 - 10  # 10 de padding
+        rect_x = graph_x + graph_width // 2 - text_width // 2 - 10
         rect_y = graph_y + 10
-        rect_width = text_width + 20  # 10 de padding em cada lado
-        rect_height = text_height + 10
-
-        pygame.draw.rect(surface, (255, 255, 255), (rect_x, rect_y, rect_width, rect_height))
+        pygame.draw.rect(surface, (255, 255, 255), (rect_x, rect_y, text_width + 20, text_height + 10))
         surface.blit(title_label, (graph_x + graph_width // 2 - text_width // 2, rect_y + 5))
 
-    # draw each line in the graph
-    def __draw_graph_separate(self, surface, lines, title, graph_width, graph_height, graph_x, graph_y):
+    # draw each line in the graph as a step polyline
+    def __draw_graph_separate(self, surface, lines, title, graph_width, graph_height, graph_x, graph_y, y_range):
+        y_min, y_max = y_range
         for line_name, data in lines.items():
-            normalized_data = [
-                graph_height - (graph_height * (value - self.__min_value) / (self.__max_value - self.__min_value))
-                for value in data
-            ]
-            step_width = graph_width / len(data)
-            color = self.__graph_colors[title][line_name]
+            n = len(data)
+            if n == 0:
+                continue
+            values = np.clip(np.asarray(data, dtype=float), y_min, y_max)
+            ys = graph_y + graph_height * (y_max - values) / (y_max - y_min)
+            xs = graph_x + np.arange(n + 1) * (graph_width / n)
 
-            for i in range(len(normalized_data)):
-                x1 = graph_x + i * step_width
-                y1 = graph_y + normalized_data[i]
-                x2 = graph_x + (i + 1) * step_width
-                y2 = graph_y + normalized_data[i + 1] if i < len(normalized_data) - 1 else y1
-                # draw the horizontal step
-                pygame.draw.line(surface, color, (x1, y1), (x2, y1), 2)
-                # draw the vertical connection to the next step
-                pygame.draw.line(surface, color, (x2, y1), (x2, y2), 2)
+            # (x0, y0) (x1, y0) (x1, y1) (x2, y1) ... (xn, y_{n-1})
+            pts = np.empty((2 * n, 2))
+            pts[0::2, 0] = xs[:-1]
+            pts[1::2, 0] = xs[1:]
+            pts[0::2, 1] = ys
+            pts[1::2, 1] = ys
+            pygame.draw.lines(surface, self.__graph_colors[title][line_name], False, pts.tolist(), 2)
 
     # draw legend
     def __draw_legend(self, surface, graph_x, graph_y, title):
         legend_x = graph_x + 10
         legend_y = graph_y + 10
         for idx, (line_name, color) in enumerate(self.__graph_colors[title].items()):
-            # draw a background rectangle
-            #pygame.draw.rect(surface, (255, 255, 255), (graph_x, graph_y + idx * 23, 100, 25))
             pygame.draw.rect(surface, color, (legend_x, legend_y + idx * 20, 10, 10))
-            legend_label = self.font.render(line_name, True, (0, 0, 0))
-            surface.blit(legend_label, (legend_x + 15, legend_y + idx * 20 - 5))
+            surface.blit(self._text(line_name), (legend_x + 15, legend_y + idx * 20 - 5))
 
     # draw label for y values
-    def __draw_label_last_y(self, surface, graph_x, graph_y, graph_height, graph_width, lines):
-        # draw the last value of each line
+    def __draw_label_last_y(self, surface, graph_x, graph_y, graph_height, lines):
         for i, (line_name, data) in enumerate(lines.items()):
-            # draw a background rectangle
-            #pygame.draw.rect(surface, (200, 200, 200), (graph_x, graph_y + graph_height - 25 - i * 23, 100, 25))
-            # round 2 decimal places
-            value = round(data[-1], 2)
-            label = self.font.render(f"{line_name}: {value}", True, (0, 0, 0))
-            # draw the label
-            x = graph_x + 10
-            y = graph_y + graph_height - 20 - i * 20
-            surface.blit(label, (x, y))
-            
+            if len(data) == 0:
+                continue
+            label = self.font.render(f"{line_name}: {float(data[-1]):.2f}", True, (0, 0, 0))
+            surface.blit(label, (graph_x + 10, graph_y + graph_height - 20 - i * 20))
+
     # helper function to draw a graph with multiple lines
     def draw_graph(self, surface, lines, rect, title):
         """
@@ -688,27 +685,15 @@ class Display(Shape):
         """
         graph_width, graph_height = int(rect[2]), int(rect[3])
         graph_x, graph_y = int(rect[0]), int(rect[1])
+        y_range = self.__graph_range[title]
 
-        # draw white background for the graph
         pygame.draw.rect(surface, (255, 255, 255), (graph_x, graph_y, graph_width, graph_height), border_radius=10)
-
-        # draw grid lines
         self.__draw_grid(surface, graph_width, graph_height, graph_x, graph_y)
-
-        # draw each line in the graph
-        self.__draw_graph_separate(surface, lines, title, graph_width, graph_height, graph_x, graph_y)
-
-        # draw axes values
-        self.__draw_axis_values(surface, graph_height, graph_x, graph_y)
-
-        # draw title
+        self.__draw_graph_separate(surface, lines, title, graph_width, graph_height, graph_x, graph_y, y_range)
+        self.__draw_axis_values(surface, graph_height, graph_x, graph_y, y_range)
         self.__draw_title(surface, title, graph_width, graph_x, graph_y)
-
-        # draw legend
         self.__draw_legend(surface, graph_x, graph_y, title)
-
-        # draw label for y values
-        self.__draw_label_last_y(surface, graph_x, graph_y, graph_height, graph_width, lines)
+        self.__draw_label_last_y(surface, graph_x, graph_y, graph_height, lines)
 
 class Statistics(Shape):
     """
@@ -727,6 +712,7 @@ class Statistics(Shape):
         super().__init__(coo, color, size, angle)
         self.text = "_____"
         self._offset = 1
+        self._rendered = None
         # set the font for the text
         if not Statistics._font:
             Statistics._font = pygame.font.SysFont("courier", 20, bold=True)
@@ -738,7 +724,7 @@ class Statistics(Shape):
 
     def set_offset(self, offset):
         # sets the offset for the text
-        self._offset = offset 
+        self._offset = offset
 
     def set_text(self, text):
         # updates the text to be displayed
@@ -746,18 +732,21 @@ class Statistics(Shape):
 
     def draw(self, surface):
         """
-        draws the text on the given surface
+        draws the text on the given surface (re-rendered only when the text changes)
         args:
             surface (pygame.Surface): the surface to draw on
         """
-        text_surface = self._font.render(self.text, True, self._color)
-        x = self._x - text_surface.get_width() // self._offset
-        surface.blit(text_surface, (x, self._y))
+        if self._rendered is None or self._rendered[0] != self.text or self._rendered[1] is not self._font:
+            self._rendered = (self.text, self._font, self._font.render(self.text, True, self._color))
+        text_surface = self._rendered[2]
+        surface.blit(text_surface, (self._x - text_surface.get_width() // self._offset, self._y))
 
 class Compass(Shape):
     """
     represents a compass object on the simulator
     """
+    _directions = {"N": (0, -1), "E": (1, 0), "S": (0, 1), "W": (-1, 0)}
+
     def __init__(self, coo, color=(0, 0, 0), size=40, angle=0):
         """
         initializes the compass object
@@ -767,43 +756,29 @@ class Compass(Shape):
             size (int): size of the compass object
             angle (float): initial angle of the compass in radians
         """
-        #coo = (coo[0] - 2 * size, coo[1] - 2 * size)
         super().__init__(coo, color, size, angle)
+        font = pygame.font.Font(None, 24)
+        self._labels = []
+        for direction, (dx, dy) in self._directions.items():
+            color_ = (200, 0, 0) if direction == "N" else self._color
+            text_surface = font.render(direction, True, color_)
+            center = (self._x + dx * self._size * 1.3, self._y + dy * self._size * 1.3)
+            self._labels.append((text_surface, text_surface.get_rect(center=center)))
 
     def draw(self, surface):
         # Draw the outer circle
         pygame.draw.circle(surface, self._color, (self._x, self._y), self._size, 2)
 
-        # Points for the star
+        # Points for the star: 4 major (N, E, S, W) and 4 minor (NE, SE, SW, NW)
         star_points = []
-        num_points = 8  # 4 major (N, E, S, W) and 4 minor (NE, SE, SW, NW)
-        for i in range(num_points):
+        for i in range(8):
             angle = self._angle + (math.pi / 4) * i
             radius = self._size if i % 2 == 0 else self._size * 0.4
-            x = self._x + radius * math.cos(angle)
-            y = self._y + radius * math.sin(angle)
-            star_points.append((x, y))
-
-        # Draw the star
+            star_points.append((self._x + radius * math.cos(angle), self._y + radius * math.sin(angle)))
         pygame.draw.polygon(surface, self._color, star_points, 2)
 
         # Draw cardinal direction labels
-        directions = {
-            "N": (0, -1),
-            "E": (1, 0),
-            "S": (0, 1),
-            "W": (-1, 0),
-        }
-
-        font = pygame.font.Font(None, 24)
-        for direction, (dx, dy) in directions.items():
-            end_x = self._x + dx * self._size * 1.3
-            end_y = self._y + dy * self._size * 1.3
-            color = self._color
-            if direction in ["N"]:
-                color = (200, 0, 0)
-            text_surface = font.render(direction, True, color)
-            text_rect = text_surface.get_rect(center=(end_x, end_y))
+        for text_surface, text_rect in self._labels:
             surface.blit(text_surface, text_rect)
 
         # Draw a line indicating the current angle
@@ -828,20 +803,16 @@ class LineSensor(Shape):
 
     def draw(self, surface):
         # Draw the line sensor as a line
-        end_x = self._x + self._size/2
-        end_y = self._y
-        begin_x = self._x - self._size/2
-        begin_y = self._y
-        pygame.draw.line(surface, self._color, (begin_x, begin_y), (end_x, end_y), 2)
+        pygame.draw.line(surface, self._color, (self._x - self._size/2, self._y), (self._x + self._size/2, self._y), 2)
 
     def get_y(self):
         # returns the y coordinate of the line sensor
         return self._y
-    
+
     def get_x(self):
         # returns the x coordinate of the line sensor
         return self._x
-    
+
     def get_size(self):
         # returns the size of the line sensor
         return self._size
@@ -862,30 +833,34 @@ class Simulator:
 
         # set the window size based on mode
         if win == FULL:
-            info = pygame.display.Info()
-            width = info.current_w
-            height = info.current_h
+            width, height = pygame.display.get_desktop_sizes()[0]
         elif win == MEDIUM:
             width = 1400
             height = 750
         elif win == SMALL:
             width = 800
             height = 600
+        else:
+            raise ValueError(f"Invalid screen size: {win}")
 
         self.__width = width
         self.__height = height
         self.__FPS = FPS
         self.__objects = []
+        self.__clock = pygame.time.Clock()
 
     def start(self):
-
-        if self.win == 'FULL':
+        if self.win == FULL:
             self.screen = pygame.display.set_mode((self.__width, self.__height),  pygame.FULLSCREEN | pygame.HWSURFACE | pygame.DOUBLEBUF)
         else:
             self.screen = pygame.display.set_mode((self.__width, self.__height))
 
         pygame.display.set_caption("SIMULATOR")
-        self.__clock = pygame.time.Clock()
+
+    def tick(self, limit=True):
+        # waits to keep the frame rate (without busy waiting) and returns the measured fps
+        self.__clock.tick(self.__FPS if limit else 0)
+        return self.__clock.get_fps()
 
     def set_FPS(self, FPS):
         # sets the frames per second for the simulator
@@ -911,17 +886,12 @@ class Simulator:
         # removes an object from the simulator environment
         self.__objects.remove(obj)
 
-    def __verify_objects(self):
-        # verifies if there are objects to update or draw
-        return len(self.__objects) > 0
-
     def draw(self):
         # draws all objects on the simulator screen
-        if not self.__verify_objects():
+        if not self.__objects:
             return
         self.screen.fill((255, 255, 255))  # background color
         for obj in self.__objects:
             obj.draw(self.screen)
 
         pygame.display.flip()
-        #self.__clock.tick(self.__FPS)

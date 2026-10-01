@@ -1,0 +1,754 @@
+"""
+configuration and results screens drawn with pygame (same window of the simulation)
+
+the configuration screen is generated from a schema of sections and fields (see config.py)
+"""
+import math
+import time
+
+import numpy as np
+import pygame
+
+BG          = (243, 244, 247)
+PANEL       = (255, 255, 255)
+SIDEBAR     = (36, 40, 48)
+SIDEBAR_HI  = (52, 58, 70)
+SIDEBAR_TXT = (205, 210, 220)
+ACCENT      = (0, 110, 230)
+ACCENT_TXT  = (255, 255, 255)
+TEXT        = (30, 32, 38)
+MUTED       = (115, 120, 130)
+BORDER      = (200, 204, 212)
+ERROR       = (205, 45, 45)
+OK          = (20, 140, 70)
+TRACK       = (190, 194, 202)
+PATH        = (0, 110, 230)
+
+class Theme:
+    def __init__(self, size):
+        w, h = size
+        s = max(0.72, min(1.6, min(h / 820, w / 1300)))
+        self.s = s
+        face = "segoeui,arial,helvetica"
+        self.font = pygame.font.SysFont(face, int(17 * s))
+        self.bold = pygame.font.SysFont(face, int(17 * s), bold=True)
+        self.small = pygame.font.SysFont(face, int(14 * s))
+        self.title = pygame.font.SysFont(face, int(28 * s), bold=True)
+        self.subtitle = pygame.font.SysFont(face, int(20 * s), bold=True)
+        self.mono = pygame.font.SysFont("consolas,couriernew,courier", int(16 * s))
+        self.row_h = int(38 * s)
+        self.pad = int(14 * s)
+        self.radius = max(3, int(6 * s))
+
+def text(surface, font, value, pos, color=TEXT, anchor="topleft"):
+    img = font.render(str(value), True, color)
+    rect = img.get_rect(**{anchor: pos})
+    surface.blit(img, rect)
+    return rect
+
+def fit(font, value, width):
+    # cuts the text to fit in the width
+    value = str(value)
+    if font.size(value)[0] <= width:
+        return value
+    while value and font.size(value + "...")[0] > width:
+        value = value[:-1]
+    return value + "..."
+
+# --- widgets --- #
+
+class Widget:
+    def __init__(self):
+        self.rect = pygame.Rect(0, 0, 0, 0)
+
+    def handle(self, event, screen):
+        return False
+
+    def draw(self, surface, theme):
+        pass
+
+class Button(Widget):
+    def __init__(self, label, callback, primary=False, enabled=True):
+        super().__init__()
+        self.label = label
+        self.callback = callback
+        self.primary = primary
+        self.enabled = enabled
+
+    def handle(self, event, screen):
+        if self.enabled and event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.rect.collidepoint(event.pos):
+            self.callback()
+            return True
+        return False
+
+    def draw(self, surface, theme):
+        hover = self.rect.collidepoint(pygame.mouse.get_pos())
+        if self.primary:
+            color = tuple(max(0, c - 25) for c in ACCENT) if hover else ACCENT
+            pygame.draw.rect(surface, color if self.enabled else BORDER, self.rect, border_radius=theme.radius)
+            text(surface, theme.bold, self.label, self.rect.center, ACCENT_TXT, "center")
+        else:
+            pygame.draw.rect(surface, (232, 235, 240) if hover else PANEL, self.rect, border_radius=theme.radius)
+            pygame.draw.rect(surface, BORDER, self.rect, 1, border_radius=theme.radius)
+            text(surface, theme.font, self.label, self.rect.center, TEXT if self.enabled else MUTED, "center")
+
+class TextInput(Widget):
+    """
+    text box: click to edit, Enter / Tab / click outside commits, Esc cancels
+    """
+    def __init__(self, get, set, allowed=None):
+        super().__init__()
+        self.get = get
+        self.set = set
+        self.allowed = allowed or (lambda ch: ch.isprintable())
+        self.editing = False
+        self.fresh = False
+        self.error = False
+        self.text = self.format(get())
+
+    def format(self, value):
+        return str(value)
+
+    def parse(self, value):
+        return value
+
+    def refresh(self):
+        if not self.editing:
+            self.text = self.format(self.get())
+
+    def begin(self):
+        self.editing = True
+        self.fresh = True
+        self.error = False
+        self.text = self.format(self.get())
+
+    def commit(self):
+        try:
+            self.set(self.parse(self.text.strip()))
+            self.error = False
+        except (ValueError, TypeError):
+            self.error = True
+        self.editing = False
+        self.text = self.format(self.get())
+
+    def cancel(self):
+        self.editing = False
+        self.text = self.format(self.get())
+
+    def handle(self, event, screen):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.rect.collidepoint(event.pos):
+            screen.set_focus(self)
+            return True
+        if event.type == pygame.KEYDOWN and screen.focus is self:
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                screen.set_focus(None)
+            elif event.key == pygame.K_TAB:
+                screen.focus_next(self, -1 if event.mod & pygame.KMOD_SHIFT else 1)
+            elif event.key == pygame.K_ESCAPE:
+                self.cancel()
+                screen.focus = None
+            elif event.key == pygame.K_BACKSPACE:
+                self.text = "" if self.fresh else self.text[:-1]
+                self.fresh = False
+            elif event.unicode and self.allowed(event.unicode):
+                self.text = event.unicode if self.fresh else self.text + event.unicode
+                self.fresh = False
+            return True
+        return False
+
+    def draw(self, surface, theme):
+        color = ERROR if self.error else (ACCENT if self.editing else BORDER)
+        pygame.draw.rect(surface, PANEL, self.rect, border_radius=theme.radius)
+        pygame.draw.rect(surface, color, self.rect, 2 if self.editing or self.error else 1, border_radius=theme.radius)
+        inner = self.rect.inflate(-2 * theme.pad // 2, 0)
+        value = fit(theme.mono, self.text, inner.width - 6)
+        if self.editing and self.fresh:
+            sel = theme.mono.size(value)
+            pygame.draw.rect(surface, (200, 222, 255), (inner.x, self.rect.centery - sel[1] // 2, sel[0], sel[1]))
+        r = text(surface, theme.mono, value, (inner.x, self.rect.centery), TEXT, "midleft")
+        if self.editing and int(time.time() * 2) % 2 == 0:
+            pygame.draw.line(surface, TEXT, (r.right + 1, r.top + 2), (r.right + 1, r.bottom - 2), 1)
+
+class NumberInput(TextInput):
+    def __init__(self, get, set, kind="float"):
+        self.kind = kind
+        super().__init__(get, set, allowed=lambda ch: ch in "0123456789.-+eE")
+
+    def format(self, value):
+        return str(int(value)) if self.kind == "int" else f"{value:g}"
+
+    def parse(self, value):
+        return int(round(float(value))) if self.kind == "int" else float(value)
+
+class Choice(Widget):
+    """
+    selector: click on the left half goes to the previous option, on the right half to the next one
+    """
+    def __init__(self, options, get, set):
+        super().__init__()
+        self.options = options
+        self.get = get
+        self.set = set
+
+    def _move(self, step, screen):
+        values = [o[0] for o in self.options]
+        i = values.index(self.get()) if self.get() in values else 0
+        self.set(values[(i + step) % len(values)])
+        screen.changed()
+
+    def handle(self, event, screen):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.rect.collidepoint(event.pos):
+            self._move(-1 if event.pos[0] < self.rect.centerx - self.rect.width // 4 else 1, screen)
+            return True
+        return False
+
+    def draw(self, surface, theme):
+        hover = self.rect.collidepoint(pygame.mouse.get_pos())
+        pygame.draw.rect(surface, (238, 242, 250) if hover else PANEL, self.rect, border_radius=theme.radius)
+        pygame.draw.rect(surface, BORDER, self.rect, 1, border_radius=theme.radius)
+        label = dict(self.options).get(self.get(), str(self.get()))
+        arrow_w = theme.font.size("<")[0] + theme.pad
+        text(surface, theme.bold, "<", (self.rect.x + theme.pad // 2, self.rect.centery), ACCENT, "midleft")
+        text(surface, theme.bold, ">", (self.rect.right - theme.pad // 2, self.rect.centery), ACCENT, "midright")
+        text(surface, theme.font, fit(theme.font, label, self.rect.width - 2 * arrow_w), self.rect.center, TEXT, "center")
+
+class Toggle(Widget):
+    def __init__(self, get, set):
+        super().__init__()
+        self.get = get
+        self.set = set
+
+    def handle(self, event, screen):
+        if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.rect.collidepoint(event.pos):
+            self.set(not self.get())
+            screen.changed()
+            return True
+        return False
+
+    def draw(self, surface, theme):
+        on = self.get()
+        h = int(self.rect.height * 0.7)
+        w = int(h * 1.9)
+        track = pygame.Rect(self.rect.x, self.rect.centery - h // 2, w, h)
+        pygame.draw.rect(surface, ACCENT if on else BORDER, track, border_radius=h // 2)
+        knob_x = track.right - h // 2 if on else track.x + h // 2
+        pygame.draw.circle(surface, PANEL, (knob_x, track.centery), h // 2 - 3)
+        text(surface, theme.font, "on" if on else "off", (track.right + theme.pad, self.rect.centery), MUTED, "midleft")
+
+# --- screens --- #
+
+class Screen:
+    """
+    base of the screens: focus of the text inputs and the event loop
+    """
+    def __init__(self):
+        self.focus = None
+        self.action = None
+        self.widgets = []
+        self.theme = None
+        self.size = None
+        self.dirty = True
+
+    def set_focus(self, widget):
+        if self.focus is widget:
+            return
+        if self.focus is not None:
+            self.focus.commit()
+            self.changed()
+        self.focus = widget
+        if widget is not None:
+            widget.begin()
+
+    def focus_next(self, widget, step):
+        inputs = [w for w in self.widgets if isinstance(w, TextInput)]
+        i = inputs.index(widget) if widget in inputs else -1
+        self.set_focus(inputs[(i + step) % len(inputs)] if inputs else None)
+
+    def changed(self):
+        # a value changed: rebuild the layout (the visibility of the fields can depend on it)
+        self.dirty = True
+
+    def build(self, surface):
+        raise NotImplementedError
+
+    def draw(self, surface):
+        raise NotImplementedError
+
+    def on_event(self, event):
+        return False
+
+    def loop(self):
+        clock = pygame.time.Clock()
+        pygame.key.set_repeat(400, 35)
+        pygame.event.clear()
+        while self.action is None:
+            surface = pygame.display.get_surface()
+            if surface.get_size() != self.size:
+                self.size = surface.get_size()
+                self.theme = Theme(self.size)
+                self.dirty = True
+            if self.dirty:
+                self.dirty = False
+                self.build(surface)
+
+            for event in pygame.event.get():
+                if event.type == pygame.QUIT:
+                    self.action = "quit"
+                    break
+                if event.type == pygame.MOUSEBUTTONDOWN and event.button == 1 and self.focus is not None \
+                        and not self.focus.rect.collidepoint(event.pos):
+                    self.set_focus(None)
+                if self.on_event(event):
+                    continue
+                for widget in list(self.widgets):
+                    if widget.handle(event, self):
+                        break
+
+            self.draw(surface)
+            pygame.display.flip()
+            clock.tick(60)
+        pygame.key.set_repeat()
+        return self.action
+
+class ConfigScreen(Screen):
+    """
+    one page for each section of the schema (menu on the left), the fields are edited in place
+    returns "play" or "quit"; the configuration dict is changed in place
+    """
+    def __init__(self, cfg, schema, coerce, defaults, title="Line Follower Simulator", subtitle=None, message=None, check=None):
+        super().__init__()
+        self.check = check or (lambda cfg: [])
+        self.cfg = cfg
+        self.schema = schema
+        self.coerce = coerce
+        self.defaults = defaults
+        self.title = title
+        self.subtitle = subtitle or (lambda cfg: "")
+        self.message = message
+        self.section = schema[0].key
+        self.scroll = 0
+        self.rows = []
+
+    def sections(self):
+        return [s for s in self.schema if s.visible(self.cfg)]
+
+    def _binding(self, section, field, index=None):
+        values = self.cfg[section.key]
+
+        def get():
+            return values[field.key][index] if index is not None else values[field.key]
+
+        def set(value):
+            if index is not None:
+                vector = list(values[field.key])
+                vector[index] = value
+                value = vector
+            values[field.key] = self.coerce(field, value)
+        return get, set
+
+    def _reset_section(self):
+        self.set_focus(None)
+        self.cfg[self.section] = self.defaults()[self.section]
+        self.changed()
+
+    def _reset_all(self):
+        self.set_focus(None)
+        self.cfg.clear()
+        self.cfg.update(self.defaults())
+        self.changed()
+
+    def _play(self):
+        self.set_focus(None)
+        errors = self.check(self.cfg)
+        if errors:
+            self.message = ("cannot play: " + "; ".join(errors), ERROR)
+            return
+        self.action = "play"
+
+    def _quit(self):
+        self.action = "quit"
+
+    def _select(self, key):
+        def select():
+            self.set_focus(None)
+            self.section = key
+            self.scroll = 0
+            self.changed()
+        return select
+
+    def build(self, surface):
+        t = self.theme
+        w, h = surface.get_size()
+        focus_key = getattr(self.focus, "key", None)
+        self.focus = None
+        self.widgets = []
+
+        sections = self.sections()
+        if self.section not in [s.key for s in sections]:
+            self.section = sections[0].key
+
+        self.header = pygame.Rect(0, 0, w, int(78 * t.s))
+        self.footer = pygame.Rect(0, h - int(74 * t.s), w, int(74 * t.s))
+        self.sidebar = pygame.Rect(0, self.header.bottom, max(int(210 * t.s), w // 7), self.footer.top - self.header.bottom)
+        self.panel = pygame.Rect(self.sidebar.right + 2 * t.pad, self.header.bottom + t.pad,
+                                 w - self.sidebar.right - 4 * t.pad, self.footer.top - self.header.bottom - 2 * t.pad)
+
+        # menu of the sections
+        self.menu = []
+        y = self.sidebar.y + t.pad
+        for s in sections:
+            rect = pygame.Rect(self.sidebar.x, y, self.sidebar.width, int(t.row_h * 1.15))
+            button = Button(s.title, self._select(s.key))
+            button.rect = rect
+            self.menu.append((s, button))
+            self.widgets.append(button)
+            y += rect.height
+
+        # fields of the current section
+        section = next(s for s in sections if s.key == self.section)
+        label_w = min(int(self.panel.width * 0.42), int(330 * t.s))
+        field_w = min(self.panel.width - label_w - 2 * t.pad, int(420 * t.s))
+        self.content_top = self.panel.y + int(t.row_h * 1.9)
+        y = self.content_top - self.scroll
+        self.rows = []
+        for field in section.fields:
+            if not field.visible(self.cfg):
+                continue
+            row = pygame.Rect(self.panel.x, y, self.panel.width, t.row_h)
+            box = pygame.Rect(self.panel.x + label_w, y + int(t.row_h * 0.12), field_w, int(t.row_h * 0.76))
+            widgets = []
+            if field.kind in ("int", "float"):
+                widgets.append(NumberInput(*self._binding(section, field), kind=field.kind))
+                widgets[-1].rect = pygame.Rect(box.x, box.y, min(box.width, int(200 * t.s)), box.height)
+            elif field.kind == "bool":
+                widgets.append(Toggle(*self._binding(section, field)))
+                widgets[-1].rect = box
+            elif field.kind == "choice":
+                widgets.append(Choice(field.options, *self._binding(section, field)))
+                widgets[-1].rect = box
+            elif field.kind == "vector":
+                gap = t.pad // 2
+                cell = (box.width - gap * (field.size - 1)) // field.size
+                for i in range(field.size):
+                    widget = NumberInput(*self._binding(section, field, i))
+                    widget.rect = pygame.Rect(box.x + i * (cell + gap), box.y, cell, box.height)
+                    widgets.append(widget)
+            for i, widget in enumerate(widgets):
+                widget.key = (field.key, i)
+            self.rows.append((field, row, widgets))
+            self.widgets.extend(widgets)
+            y += t.row_h
+
+        self.clip = pygame.Rect(self.panel.x - t.pad, self.content_top, self.panel.width + 2 * t.pad, self.panel.bottom - self.content_top)
+
+        # scroll limits
+        content_h = len(self.rows) * t.row_h
+        visible_h = self.panel.bottom - self.content_top
+        self.max_scroll = max(0, content_h - visible_h)
+        if self.scroll > self.max_scroll:
+            self.scroll = self.max_scroll
+            self.dirty = True
+
+        # footer buttons
+        bw, bh = int(150 * t.s), int(44 * t.s)
+        y = self.footer.centery - bh // 2
+        x = w - t.pad * 2
+        self.buttons = []
+        for label, callback, primary in (("Play  >", self._play, True), ("Quit", self._quit, False),
+                                         ("Reset all", self._reset_all, False), ("Reset page", self._reset_section, False)):
+            button = Button(label, callback, primary)
+            button.rect = pygame.Rect(x - bw, y, bw, bh)
+            x -= bw + t.pad
+            self.buttons.append(button)
+            self.widgets.append(button)
+
+        # keep the focus of the text input that was being edited
+        if focus_key is not None:
+            for widget in self.widgets:
+                if getattr(widget, "key", None) == focus_key and isinstance(widget, TextInput):
+                    self.focus = widget
+                    widget.begin()
+
+    def on_event(self, event):
+        if event.type == pygame.MOUSEWHEEL:
+            if self.panel.collidepoint(pygame.mouse.get_pos()) and self.max_scroll > 0:
+                self.scroll = min(self.max_scroll, max(0, self.scroll - event.y * self.theme.row_h))
+                self.set_focus(None)
+                self.changed()
+                return True
+        if event.type == pygame.KEYDOWN and self.focus is None:
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._play()
+                return True
+            if event.key == pygame.K_ESCAPE:
+                self._quit()
+                return True
+            if event.key in (pygame.K_UP, pygame.K_DOWN, pygame.K_PAGEUP, pygame.K_PAGEDOWN):
+                keys = [s.key for s in self.sections()]
+                step = -1 if event.key in (pygame.K_UP, pygame.K_PAGEUP) else 1
+                self._select(keys[(keys.index(self.section) + step) % len(keys)])()
+                return True
+        # the fields outside of the visible area of the panel do not receive clicks
+        if event.type == pygame.MOUSEBUTTONDOWN and not self.clip.collidepoint(event.pos):
+            for _, button in self.menu:
+                if button.handle(event, self):
+                    return True
+            for button in self.buttons:
+                if button.handle(event, self):
+                    return True
+            return True
+        return False
+
+    def draw(self, surface):
+        t = self.theme
+        surface.fill(BG)
+
+        # header
+        pygame.draw.rect(surface, PANEL, self.header)
+        pygame.draw.line(surface, BORDER, self.header.bottomleft, self.header.bottomright)
+        text(surface, t.title, self.title, (2 * t.pad, self.header.centery), TEXT, "midleft")
+        text(surface, t.font, self.subtitle(self.cfg), (self.header.right - 2 * t.pad, self.header.centery), MUTED, "midright")
+
+        # menu
+        pygame.draw.rect(surface, SIDEBAR, self.sidebar)
+        mouse = pygame.mouse.get_pos()
+        for s, button in self.menu:
+            active = s.key == self.section
+            if active or button.rect.collidepoint(mouse):
+                pygame.draw.rect(surface, SIDEBAR_HI, button.rect)
+            if active:
+                pygame.draw.rect(surface, ACCENT, (button.rect.x, button.rect.y, max(3, int(4 * t.s)), button.rect.height))
+            text(surface, t.bold if active else t.font, s.title, (button.rect.x + 2 * t.pad, button.rect.centery),
+                 (255, 255, 255) if active else SIDEBAR_TXT, "midleft")
+
+        # panel
+        card = self.panel.inflate(2 * t.pad, 2 * t.pad)
+        pygame.draw.rect(surface, PANEL, card, border_radius=t.radius * 2)
+        pygame.draw.rect(surface, BORDER, card, 1, border_radius=t.radius * 2)
+        section = next(s for s in self.schema if s.key == self.section)
+        text(surface, t.subtitle, section.title, (self.panel.x, self.panel.y), TEXT)
+        text(surface, t.small, section.help, (self.panel.x, self.panel.y + int(t.row_h * 0.85)), MUTED)
+
+        hovered = None
+        clip = self.clip
+        surface.set_clip(clip)
+        for i, (field, row, widgets) in enumerate(self.rows):
+            if row.collidepoint(mouse) and clip.collidepoint(mouse):
+                hovered = field
+                pygame.draw.rect(surface, (246, 248, 252), row)
+            elif i % 2:
+                pygame.draw.rect(surface, (250, 251, 253), row)
+            text(surface, t.font, fit(t.font, field.label, widgets[0].rect.x - row.x - t.pad), (row.x + t.pad // 2, row.centery), TEXT, "midleft")
+            for widget in widgets:
+                widget.draw(surface, t)
+        surface.set_clip(None)
+
+        # scroll bar
+        if self.max_scroll > 0:
+            total = len(self.rows) * t.row_h
+            bar_h = max(20, clip.height * clip.height // total)
+            bar_y = clip.y + (clip.height - bar_h) * self.scroll // self.max_scroll
+            pygame.draw.rect(surface, BORDER, (clip.right - 6, bar_y, 4, bar_h), border_radius=2)
+
+        # footer
+        pygame.draw.rect(surface, PANEL, self.footer)
+        pygame.draw.line(surface, BORDER, self.footer.topleft, self.footer.topright)
+        left = self.buttons[-1].rect.x - 2 * t.pad
+        if hovered is not None and hovered.help:
+            info, color = hovered.help, MUTED
+        elif self.message:
+            info, color = self.message if isinstance(self.message, tuple) else (self.message, TEXT)
+        else:
+            info, color = "Enter: play  |  Esc: quit  |  Up/Down: pages  |  Tab: next field", MUTED
+        text(surface, t.small, fit(t.small, info, left - 2 * t.pad), (2 * t.pad, self.footer.centery), color, "midleft")
+        for button in self.buttons:
+            button.draw(surface, t)
+
+class ResultsScreen(Screen):
+    """
+    summary of the run, trajectory and lateral error; returns "again", "config" or "quit"
+    save(name) must save the run and return the path
+    """
+    REASONS = {"finished": "track completed", "esc": "stopped (Esc)", "quit": "window closed", "time": "max time reached", None: "stopped"}
+
+    def __init__(self, result, default_name, save):
+        super().__init__()
+        self.result = result
+        self.name = default_name
+        self.save_fn = save
+        self.message = None
+        self.saved_path = None
+        rows = result.logger.rows
+        self.t = np.array([r["t"] for r in rows])
+        self.x = np.array([r["x"] for r in rows])
+        self.y = np.array([r["y"] for r in rows])
+        self.e = np.array([r["lateral_error"] for r in rows]) * 100
+
+    def _save(self):
+        self.set_focus(None)
+        try:
+            self.saved_path = self.save_fn(self.name)
+            self.message = (f"saved: {self.saved_path}", OK)
+        except OSError as error:
+            self.message = (f"error: {error}", ERROR)
+
+    def _set_name(self, value):
+        value = "".join(ch for ch in value if ch.isalnum() or ch in "-_.").strip(".")
+        if not value:
+            raise ValueError("empty name")
+        self.name = value
+
+    def _action(self, action):
+        def run():
+            self.set_focus(None)
+            self.action = action
+        return run
+
+    def build(self, surface):
+        t = self.theme
+        w, h = surface.get_size()
+        self.widgets = []
+        self.focus = None
+        self.header = pygame.Rect(0, 0, w, int(78 * t.s))
+        self.footer = pygame.Rect(0, h - int(74 * t.s), w, int(74 * t.s))
+        body = pygame.Rect(2 * t.pad, self.header.bottom + 2 * t.pad, w - 4 * t.pad, self.footer.top - self.header.bottom - 4 * t.pad)
+        self.metrics_rect = pygame.Rect(body.x, body.y, min(int(420 * t.s), body.width // 3), body.height)
+        right = pygame.Rect(self.metrics_rect.right + 2 * t.pad, body.y, body.right - self.metrics_rect.right - 2 * t.pad, body.height)
+        self.path_rect = pygame.Rect(right.x, right.y, right.width, int(right.height * 0.62))
+        self.error_rect = pygame.Rect(right.x, self.path_rect.bottom + 2 * t.pad, right.width, right.bottom - self.path_rect.bottom - 2 * t.pad)
+
+        bh = int(44 * t.s)
+        y = self.footer.centery - bh // 2
+        name = TextInput(lambda: self.name, self._set_name, allowed=lambda ch: ch.isalnum() or ch in "-_.")
+        name.rect = pygame.Rect(2 * t.pad + int(110 * t.s), y, int(320 * t.s), bh)
+        save = Button("Save", self._save, primary=True)
+        save.rect = pygame.Rect(name.rect.right + t.pad, y, int(120 * t.s), bh)
+        self.name_input = name
+        self.widgets = [name, save]
+
+        bw = int(170 * t.s)
+        x = w - 2 * t.pad
+        for label, action, primary in (("Quit", "quit", False), ("Configuration", "config", False), ("Run again", "again", False)):
+            button = Button(label, self._action(action), primary)
+            button.rect = pygame.Rect(x - bw, y, bw, bh)
+            x -= bw + t.pad
+            self.widgets.append(button)
+
+    def on_event(self, event):
+        if event.type == pygame.KEYDOWN and self.focus is None:
+            if event.key == pygame.K_ESCAPE:
+                self._action("config")()
+                return True
+            if event.key in (pygame.K_RETURN, pygame.K_KP_ENTER):
+                self._action("again")()
+                return True
+        return False
+
+    def _card(self, surface, rect, title):
+        t = self.theme
+        card = rect.inflate(2 * t.pad, 2 * t.pad)
+        pygame.draw.rect(surface, PANEL, card, border_radius=t.radius * 2)
+        pygame.draw.rect(surface, BORDER, card, 1, border_radius=t.radius * 2)
+        text(surface, t.bold, title, (rect.x, rect.y), TEXT)
+        return pygame.Rect(rect.x, rect.y + int(t.row_h * 0.9), rect.width, rect.height - int(t.row_h * 0.9))
+
+    def _metrics(self):
+        m = self.result.metrics
+        if not m:
+            return [("Steps", "0")]
+        rows = [
+            ("Result", self.REASONS.get(m["stop_reason"], m["stop_reason"])),
+            ("Time", f"{m['time_s']:.2f} s"),
+            ("Coverage", f"{m['coverage_%']:.1f} %"),
+            ("Lateral error RMS", f"{m['lat_rms_cm']:.3f} cm"),
+            ("Lateral error max", f"{m['lat_max_cm']:.2f} cm"),
+            ("Mean speed", f"{m['speed_mean_m_s']:.2f} m/s"),
+            ("Solver mean", f"{m['solve_mean_ms']:.2f} ms"),
+            ("Solver max", f"{m['solve_max_ms']:.2f} ms"),
+        ]
+        if m["qp_mean"] > 0:
+            rows += [("QPs per step", f"{m['qp_mean']:.2f}"), ("rho mismatch", f"{m['rho_err_mean']:.4f}")]
+        rows.append(("Steps", f"{len(self.t)}"))
+        return rows
+
+    def _draw_path(self, surface, rect):
+        t = self.theme
+        tx, ty = self.result.track
+        xs = np.concatenate((tx, self.x)) if len(self.x) else tx
+        ys = np.concatenate((ty, self.y)) if len(self.y) else ty
+        x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
+        scale = min(rect.width / max(x1 - x0, 1e-6), rect.height / max(y1 - y0, 1e-6)) * 0.95
+        cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
+        # the track coordinates have y pointing down (screen), as in the simulator
+        to_px = lambda x, y: np.column_stack((rect.centerx + (x - cx) * scale, rect.centery + (y - cy) * scale))
+
+        step = max(1, len(tx) // 3000)
+        pts = to_px(tx[::step], ty[::step])
+        pygame.draw.lines(surface, TRACK, True, pts.tolist(), max(3, int(6 * t.s)))
+        if len(self.x) > 1:
+            step = max(1, len(self.x) // 3000)
+            pts = to_px(self.x[::step], self.y[::step])
+            pygame.draw.lines(surface, PATH, False, pts.tolist(), max(1, int(2 * t.s)))
+            pygame.draw.circle(surface, OK, pts[0].tolist(), int(6 * t.s))
+            pygame.draw.circle(surface, ERROR, pts[-1].tolist(), int(6 * t.s))
+
+    def _draw_error(self, surface, rect):
+        t = self.theme
+        if len(self.t) < 2:
+            return
+        plot = pygame.Rect(rect.x + int(60 * t.s), rect.y, rect.width - int(70 * t.s), rect.height - int(26 * t.s))
+        lim = max(0.5, float(np.max(np.abs(self.e))) * 1.1)
+        pygame.draw.rect(surface, (250, 251, 253), plot)
+        for v in (-lim, -lim / 2, 0, lim / 2, lim):
+            y = plot.centery - v / lim * plot.height / 2
+            pygame.draw.line(surface, BORDER if v else MUTED, (plot.x, y), (plot.right, y), 1)
+            text(surface, t.small, f"{v:.2g}", (plot.x - 6, y), MUTED, "midright")
+        t_end = max(self.t[-1], 1e-6)
+        for i in range(6):
+            x = plot.x + plot.width * i / 5
+            text(surface, t.small, f"{t_end * i / 5:.3g}", (x, plot.bottom + 4), MUTED, "midtop")
+        step = max(1, len(self.t) // plot.width)
+        xs = plot.x + self.t[::step] / t_end * plot.width
+        ys = plot.centery - np.clip(self.e[::step], -lim, lim) / lim * plot.height / 2
+        pygame.draw.lines(surface, PATH, False, np.column_stack((xs, ys)).tolist(), max(1, int(2 * t.s)))
+        text(surface, t.small, "[cm]  x  [s]", (plot.right, plot.y), MUTED, "topright")
+
+    def draw(self, surface):
+        t = self.theme
+        surface.fill(BG)
+        pygame.draw.rect(surface, PANEL, self.header)
+        pygame.draw.line(surface, BORDER, self.header.bottomleft, self.header.bottomright)
+        reason = self.REASONS.get(self.result.stop_reason, self.result.stop_reason)
+        text(surface, t.title, f"Run finished: {reason}", (2 * t.pad, self.header.centery), TEXT, "midleft")
+        text(surface, t.font, self.result.controller, (self.header.right - 2 * t.pad, self.header.centery), MUTED, "midright")
+
+        inner = self._card(surface, self.metrics_rect, "Summary")
+        y = inner.y
+        for label, value in self._metrics():
+            text(surface, t.font, label, (inner.x, y), MUTED)
+            text(surface, t.bold, value, (inner.right, y), TEXT, "topright")
+            y += int(t.row_h * 0.85)
+
+        self._draw_path(surface, self._card(surface, self.path_rect, "Trajectory (track in gray, start in green, end in red)"))
+        self._draw_error(surface, self._card(surface, self.error_rect, "Lateral error"))
+
+        pygame.draw.rect(surface, PANEL, self.footer)
+        pygame.draw.line(surface, BORDER, self.footer.topleft, self.footer.topright)
+        text(surface, t.font, "File name", (2 * t.pad, self.footer.centery), TEXT, "midleft")
+        for widget in self.widgets:
+            widget.draw(surface, t)
+        if self.message:
+            msg, color = self.message
+            right = self.widgets[-1].rect.x - t.pad
+            left = self.widgets[1].rect.right + t.pad
+            text(surface, t.small, fit(t.small, msg, right - left), (left, self.footer.centery), color, "midleft")
+
+def open_window(screen_size, sizes):
+    """
+    opens (or resizes) the window; sizes = {screen_size: (w, h) or None for full screen}
+    """
+    pygame.init()
+    size = sizes.get(screen_size)
+    if size is None:
+        return pygame.display.set_mode(pygame.display.get_desktop_sizes()[0], pygame.FULLSCREEN)
+    return pygame.display.set_mode(size)

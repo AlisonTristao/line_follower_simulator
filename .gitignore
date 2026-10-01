@@ -12,3 +12,5 @@ __pycache__/
 *.fdb_latexmk
 *.bbl
 .vscode/
+runs/
+last_config.json
