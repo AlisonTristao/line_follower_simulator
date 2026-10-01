@@ -25,7 +25,8 @@ class Theme:
         self.subtitle = style.font(19 * s, bold=True)
         self.mono = style.font(15 * s, mono=True)
         self.row_h = int(40 * s)
-        self.pad = int(14 * s)
+        self.pad = int(14 * s)          # inside the cards
+        self.gap = int(18 * s)          # around and between the cards
         self.radius = max(4, int(7 * s))
 
 # --- widgets --- #
@@ -360,12 +361,13 @@ class ConfigScreen(Screen):
         self.header = pygame.Rect(0, 0, w, int(78 * t.s))
         self.footer = pygame.Rect(0, h - int(74 * t.s), w, int(74 * t.s))
         self.sidebar = pygame.Rect(0, self.header.bottom, max(int(210 * t.s), w // 7), self.footer.top - self.header.bottom)
-        self.panel = pygame.Rect(self.sidebar.right + 2 * t.pad, self.header.bottom + t.pad,
-                                 w - self.sidebar.right - 4 * t.pad, self.footer.top - self.header.bottom - 2 * t.pad)
+        self.card_rect = pygame.Rect(self.sidebar.right + t.gap, self.header.bottom + t.gap,
+                                     w - self.sidebar.right - 2 * t.gap, self.footer.top - self.header.bottom - 2 * t.gap)
+        self.panel = self.card_rect.inflate(-2 * t.pad, -2 * t.pad)
 
         # menu of the sections
         self.menu = []
-        y = self.sidebar.y + t.pad
+        y = self.sidebar.y + t.gap
         for s in sections:
             rect = pygame.Rect(self.sidebar.x, y, self.sidebar.width, int(t.row_h * 1.15))
             button = Button(s.title, self._select(s.key))
@@ -376,20 +378,21 @@ class ConfigScreen(Screen):
 
         # fields of the current section
         section = next(s for s in sections if s.key == self.section)
-        label_w = min(int(self.panel.width * 0.42), int(330 * t.s))
-        field_w = min(self.panel.width - label_w - 2 * t.pad, int(420 * t.s))
+        label_w = min(int(self.panel.width * 0.42), int(300 * t.s))
+        field_w = min(self.panel.width - label_w - 2 * t.pad, int(440 * t.s))
+        row_w = label_w + field_w + t.pad
         self.content_top = self.panel.y + int(t.row_h * 1.9)
         y = self.content_top - self.scroll
         self.rows = []
         for field in section.fields:
             if not field.visible(self.cfg):
                 continue
-            row = pygame.Rect(self.panel.x, y, self.panel.width, t.row_h)
+            row = pygame.Rect(self.panel.x, y, row_w, t.row_h)
             box = pygame.Rect(self.panel.x + label_w, y + int(t.row_h * 0.12), field_w, int(t.row_h * 0.76))
             widgets = []
             if field.kind in ("int", "float"):
                 widgets.append(NumberInput(*self._binding(section, field), kind=field.kind))
-                widgets[-1].rect = pygame.Rect(box.x, box.y, min(box.width, int(200 * t.s)), box.height)
+                widgets[-1].rect = box
             elif field.kind == "bool":
                 widgets.append(Toggle(*self._binding(section, field)))
                 widgets[-1].rect = box
@@ -397,7 +400,7 @@ class ConfigScreen(Screen):
                 widgets.append(Choice(field.options, *self._binding(section, field)))
                 widgets[-1].rect = box
             elif field.kind == "vector":
-                gap = t.pad // 2
+                gap = int(8 * t.s)
                 cell = (box.width - gap * (field.size - 1)) // field.size
                 for i in range(field.size):
                     widget = NumberInput(*self._binding(section, field, i))
@@ -409,7 +412,7 @@ class ConfigScreen(Screen):
             self.widgets.extend(widgets)
             y += t.row_h
 
-        self.clip = pygame.Rect(self.panel.x - t.pad, self.content_top, self.panel.width + 2 * t.pad, self.panel.bottom - self.content_top)
+        self.clip = pygame.Rect(self.card_rect.x + 1, self.content_top, self.card_rect.width - 2, self.panel.bottom - self.content_top)
 
         # scroll limits
         content_h = len(self.rows) * t.row_h
@@ -422,13 +425,13 @@ class ConfigScreen(Screen):
         # footer buttons
         bw, bh = int(150 * t.s), int(44 * t.s)
         y = self.footer.centery - bh // 2
-        x = w - t.pad * 2
+        x = w - t.gap
         self.buttons = []
         for label, callback, primary in (("Play  >", self._play, True), ("Quit", self._quit, False),
                                          ("Reset all", self._reset_all, False), ("Reset page", self._reset_section, False)):
             button = Button(label, callback, primary)
             button.rect = pygame.Rect(x - bw, y, bw, bh)
-            x -= bw + t.pad
+            x -= bw + int(10 * t.s)
             self.buttons.append(button)
             self.widgets.append(button)
 
@@ -476,8 +479,8 @@ class ConfigScreen(Screen):
         # header
         pygame.draw.rect(surface, PANEL, self.header)
         pygame.draw.line(surface, BORDER, self.header.bottomleft, self.header.bottomright)
-        text(surface, t.title, self.title, (2 * t.pad, self.header.centery), TEXT, "midleft")
-        text(surface, t.font, self.subtitle(self.cfg), (self.header.right - 2 * t.pad, self.header.centery), MUTED, "midright")
+        text(surface, t.title, self.title, (t.gap, self.header.centery), TEXT, "midleft")
+        text(surface, t.font, self.subtitle(self.cfg), (self.header.right - t.gap, self.header.centery), MUTED, "midright")
 
         # menu
         pygame.draw.rect(surface, SIDEBAR, self.sidebar)
@@ -489,11 +492,11 @@ class ConfigScreen(Screen):
             if active:
                 bar = max(3, int(4 * t.s))
                 style.rounded_rect(surface, (button.rect.x, button.rect.y + bar, bar, button.rect.height - 2 * bar), ACCENT, bar // 2)
-            text(surface, t.bold if active else t.font, s.title, (button.rect.x + 2 * t.pad, button.rect.centery),
+            text(surface, t.bold if active else t.font, s.title, (button.rect.x + t.gap, button.rect.centery),
                  (255, 255, 255) if active else SIDEBAR_TXT, "midleft")
 
         # panel
-        style.card(surface, self.panel.inflate(2 * t.pad, 2 * t.pad), t.radius * 2)
+        style.card(surface, self.card_rect, t.radius * 2)
         section = next(s for s in self.schema if s.key == self.section)
         text(surface, t.subtitle, section.title, (self.panel.x, self.panel.y), TEXT)
         text(surface, t.small, section.help, (self.panel.x, self.panel.y + int(t.row_h * 0.85)), MUTED)
@@ -507,7 +510,7 @@ class ConfigScreen(Screen):
                 style.rounded_rect(surface, row, (244, 247, 252), t.radius)
             elif i % 2:
                 style.rounded_rect(surface, row, (250, 251, 253), t.radius)
-            text(surface, t.font, fit(t.font, field.label, widgets[0].rect.x - row.x - t.pad), (row.x + t.pad // 2, row.centery), TEXT, "midleft")
+            text(surface, t.font, fit(t.font, field.label, widgets[0].rect.x - row.x - t.pad), (row.x + int(10 * t.s), row.centery), TEXT, "midleft")
             for widget in widgets:
                 widget.draw(surface, t)
         surface.set_clip(None)
@@ -517,19 +520,19 @@ class ConfigScreen(Screen):
             total = len(self.rows) * t.row_h
             bar_h = max(20, clip.height * clip.height // total)
             bar_y = clip.y + (clip.height - bar_h) * self.scroll // self.max_scroll
-            style.rounded_rect(surface, (clip.right - 6, bar_y, 4, bar_h), BORDER, 2)
+            style.rounded_rect(surface, (self.card_rect.right - int(8 * t.s), bar_y, 4, bar_h), BORDER, 2)
 
         # footer
         pygame.draw.rect(surface, PANEL, self.footer)
         pygame.draw.line(surface, BORDER, self.footer.topleft, self.footer.topright)
-        left = self.buttons[-1].rect.x - 2 * t.pad
+        left = self.buttons[-1].rect.x - t.gap
         if hovered is not None and hovered.help:
             info, color = hovered.help, MUTED
         elif self.message:
             info, color = self.message if isinstance(self.message, tuple) else (self.message, TEXT)
         else:
             info, color = "Enter: play  |  Esc: quit  |  Up/Down: pages  |  Tab: next field", MUTED
-        text(surface, t.small, fit(t.small, info, left - 2 * t.pad), (2 * t.pad, self.footer.centery), color, "midleft")
+        text(surface, t.small, fit(t.small, info, left - t.gap), (t.gap, self.footer.centery), color, "midleft")
         for button in self.buttons:
             button.draw(surface, t)
 
@@ -580,27 +583,29 @@ class ResultsScreen(Screen):
         self.focus = None
         self.header = pygame.Rect(0, 0, w, int(78 * t.s))
         self.footer = pygame.Rect(0, h - int(74 * t.s), w, int(74 * t.s))
-        body = pygame.Rect(2 * t.pad, self.header.bottom + 2 * t.pad, w - 4 * t.pad, self.footer.top - self.header.bottom - 4 * t.pad)
+        # outer rectangles of the cards, with the same gap around and between them
+        g = t.gap
+        body = pygame.Rect(g, self.header.bottom + g, w - 2 * g, self.footer.top - self.header.bottom - 2 * g)
         self.metrics_rect = pygame.Rect(body.x, body.y, min(int(420 * t.s), body.width // 3), body.height)
-        right = pygame.Rect(self.metrics_rect.right + 2 * t.pad, body.y, body.right - self.metrics_rect.right - 2 * t.pad, body.height)
-        self.path_rect = pygame.Rect(right.x, right.y, right.width, int(right.height * 0.6))
-        self.error_rect = pygame.Rect(right.x, self.path_rect.bottom + 3 * t.pad, right.width, right.bottom - self.path_rect.bottom - 3 * t.pad)
+        right = pygame.Rect(self.metrics_rect.right + g, body.y, body.right - self.metrics_rect.right - g, body.height)
+        self.path_rect = pygame.Rect(right.x, right.y, right.width, int((right.height - g) * 0.6))
+        self.error_rect = pygame.Rect(right.x, self.path_rect.bottom + g, right.width, right.bottom - self.path_rect.bottom - g)
 
         bh = int(44 * t.s)
         y = self.footer.centery - bh // 2
         name = TextInput(lambda: self.name, self._set_name, allowed=lambda ch: ch.isalnum() or ch in "-_.")
-        name.rect = pygame.Rect(2 * t.pad + int(110 * t.s), y, int(320 * t.s), bh)
+        name.rect = pygame.Rect(t.gap + t.font.size("File name")[0] + t.pad, y, int(320 * t.s), bh)
         save = Button("Save", self._save, primary=True)
-        save.rect = pygame.Rect(name.rect.right + t.pad, y, int(120 * t.s), bh)
+        save.rect = pygame.Rect(name.rect.right + int(10 * t.s), y, int(120 * t.s), bh)
         self.name_input = name
         self.widgets = [name, save]
 
         bw = int(170 * t.s)
-        x = w - 2 * t.pad
+        x = w - t.gap
         for label, action, primary in (("Quit", "quit", False), ("Configuration", "config", False), ("Run again", "again", False)):
             button = Button(label, self._action(action), primary)
             button.rect = pygame.Rect(x - bw, y, bw, bh)
-            x -= bw + t.pad
+            x -= bw + int(10 * t.s)
             self.widgets.append(button)
 
     def on_event(self, event):
@@ -614,10 +619,13 @@ class ResultsScreen(Screen):
         return False
 
     def _card(self, surface, rect, title):
+        # draws the card (outer rectangle) and returns the area below the title
         t = self.theme
-        style.card(surface, rect.inflate(2 * t.pad, 2 * t.pad), t.radius * 2)
-        text(surface, t.bold, title, (rect.x, rect.y), TEXT)
-        return pygame.Rect(rect.x, rect.y + int(t.row_h * 0.9), rect.width, rect.height - int(t.row_h * 0.9))
+        style.card(surface, rect, t.radius * 2)
+        inner = rect.inflate(-2 * t.pad, -2 * t.pad)
+        text(surface, t.bold, title, (inner.x, inner.y), TEXT)
+        top = int(t.row_h * 0.95)
+        return pygame.Rect(inner.x, inner.y + top, inner.width, inner.height - top)
 
     def _metrics(self):
         m = self.result.metrics
@@ -698,8 +706,8 @@ class ResultsScreen(Screen):
         pygame.draw.rect(surface, PANEL, self.header)
         pygame.draw.line(surface, BORDER, self.header.bottomleft, self.header.bottomright)
         reason = self.REASONS.get(self.result.stop_reason, self.result.stop_reason)
-        text(surface, t.title, f"Run finished: {reason}", (2 * t.pad, self.header.centery), TEXT, "midleft")
-        text(surface, t.font, self.result.controller, (self.header.right - 2 * t.pad, self.header.centery), MUTED, "midright")
+        text(surface, t.title, f"Run finished: {reason}", (t.gap, self.header.centery), TEXT, "midleft")
+        text(surface, t.font, self.result.controller, (self.header.right - t.gap, self.header.centery), MUTED, "midright")
 
         inner = self._card(surface, self.metrics_rect, "Summary")
         y = inner.y
@@ -709,16 +717,16 @@ class ResultsScreen(Screen):
             y += int(t.row_h * 0.85)
 
         self._draw_path(surface, self._card(surface, self.path_rect, "Trajectory"))
-        legend = self.path_rect.right
+        legend = self.path_rect.right - t.pad
         for label, color in (("end", ERROR), ("start", OK), ("car", style.PREDICTION), ("track", style.TRACK_SOFT)):
-            r = text(surface, t.small, label, (legend, self.path_rect.y + 2), MUTED, "topright")
+            r = text(surface, t.small, label, (legend, self.path_rect.y + t.pad + 2), MUTED, "topright")
             style.circle(surface, color, (r.x - 9 * t.s, r.centery), 5 * t.s)
             legend = r.x - int(26 * t.s)
         self._draw_error(surface, self._card(surface, self.error_rect, "Lateral error"))
 
         pygame.draw.rect(surface, PANEL, self.footer)
         pygame.draw.line(surface, BORDER, self.footer.topleft, self.footer.topright)
-        text(surface, t.font, "File name", (2 * t.pad, self.footer.centery), TEXT, "midleft")
+        text(surface, t.font, "File name", (t.gap, self.footer.centery), TEXT, "midleft")
         for widget in self.widgets:
             widget.draw(surface, t)
         if self.message:
