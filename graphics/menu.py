@@ -318,6 +318,8 @@ class ConfigScreen(Screen):
                 vector[index] = value
                 value = vector
             values[field.key] = self.coerce(field, value)
+            if field.on_change is not None:
+                field.on_change(self.cfg)
         return get, set
 
     def _reset_section(self):
@@ -462,6 +464,11 @@ class ConfigScreen(Screen):
     def on_event(self, event):
         if event.type in (getattr(pygame, "WINDOWFOCUSGAINED", -1), getattr(pygame, "WINDOWRESTORED", -1)):
             # back from another window (e.g. the track editor): options such as the track files may have changed
+            callback = self.actions.get("on_focus")
+            if callback is not None:
+                message = callback(self.cfg)
+                if message:
+                    self.message = message
             self.changed()
             return False
         if event.type == pygame.MOUSEWHEEL:

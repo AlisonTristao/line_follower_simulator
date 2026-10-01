@@ -23,6 +23,20 @@ def track_files():
 def track_path(name):
     return os.path.join(TRACKS_FOLDER, name) if name else None
 
+def track_error(name):
+    # None when the track file can be used by the simulator, otherwise the reason
+    path = track_path(name)
+    if path is None or not os.path.exists(path):
+        return "choose a track file (tracks/*.tfg)"
+    try:
+        from track_editor import tfg
+        track, _ = tfg.load(path)
+    except Exception as error:
+        return f"{name} is not a valid track ({error})"
+    if not track.segments:
+        return f"{name} has no segments"
+    return None
+
 class Field:
     """
     kind: "int" | "float" | "bool" | "choice" | "vector" (list of floats with `size` elements)
@@ -30,7 +44,8 @@ class Field:
     options: list of (value, label) for "choice", or a function that returns it
     visible: function(cfg) -> bool
     """
-    def __init__(self, key, label, kind, default, help="", min=None, max=None, options=None, size=None, visible=None, action=None):
+    def __init__(self, key, label, kind, default, help="", min=None, max=None, options=None, size=None, visible=None, action=None,
+                 on_change=None):
         self.key = key
         self.label = label
         self.kind = kind
@@ -41,6 +56,7 @@ class Field:
         self.options = options
         self.size = size
         self.action = action
+        self.on_change = on_change      # function(cfg) called after the user changes the value
         self.visible = visible or (lambda cfg: True)
 
     def choices(self):
@@ -71,6 +87,10 @@ def _is_file(cfg):
 
 def _is_generated(cfg):
     return not _is_file(cfg)
+
+def _use_file(cfg):
+    # choosing a file means that the track comes from it
+    cfg["track"]["track_type"] = TRACK_FILE
 
 SCHEDULING = [("frozen", "Frozen"), ("warm_start", "Warm start"), ("taylor", "Taylor"), ("iterative", "Iterative")]
 
@@ -124,10 +144,12 @@ SCHEMA = [
         Field("track_type", "Shape", "choice", LEMNISCATE,
               options=[(LEMNISCATE, "Lemniscate"), (CIRCLE, "Circle"), (TRACK_FILE, "File (track editor)")],
               help="random track or a track made in the track editor (tracks/*.tfg)"),
-        Field("file", "Track file", "choice", "track_01.tfg", options=track_files, visible=_is_file,
-              help="tracks saved in the tracks/ folder"),
+        Field("file", "Track file", "choice", "track_01.tfg", options=track_files, on_change=_use_file,
+              help="tracks of the tracks/ folder; choosing one uses it as the track (Shape = File)"),
+        Field("browse", "Other file", "action", "Browse...", action="browse_track",
+              help="chooses a .tfg file anywhere (it is copied to the tracks/ folder) and uses it as the track"),
         Field("editor", "Track editor", "action", "Open editor", action="open_editor",
-              help="opens the track editor with the selected file (the list is updated when you come back)"),
+              help="opens the track editor with the selected file; the track saved there is selected when you come back"),
         Field("file_spacing", "Points spacing [m]", "float", 0.01, min=0.001, max=0.1, visible=_is_file,
               help="the track of the file is sampled with this spacing (the reference spacing counts these points)"),
         Field("seed", "Seed", "int", 1112, min=-1, max=2 ** 31 - 1, visible=_is_generated, help="random seed of the track (-1 = random)"),
@@ -258,9 +280,9 @@ def check(cfg):
     if cfg["controller"]["type"] == "gpc" and cfg["gpc"]["control_horizon"] > cfg["controller"]["horizon"]:
         errors.append("GPC control horizon Nu must be <= N")
     if _is_file(cfg):
-        path = track_path(cfg["track"]["file"])
-        if path is None or not os.path.exists(path):
-            errors.append("choose a track file (tracks/*.tfg)")
+        error = track_error(cfg["track"]["file"])
+        if error:
+            errors.append(error)
     return errors
 
 def apply_spec(cfg, spec):
