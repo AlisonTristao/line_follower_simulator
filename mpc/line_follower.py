@@ -39,9 +39,10 @@ class LineFollowerController:
     contouring = False: Q = [theta, X, Y] (errors in the car frame)
     """
     def __init__(self, model: LineFollowerQLPV, horizon, Q, R, Rd, Q_N=None, u_min=-100, u_max=100,
-                 scheduling="taylor", disturbance_filter=0.2, contouring=True, **scheduling_kwargs):
+                 scheduling="taylor", disturbance_filter=0.2, contouring=True, weight_growth=1.0, **scheduling_kwargs):
         self.model = model
-        self.mpc = QLPVMPC(model, horizon, Q, R, Rd, Q_N, u_min, u_max, scheduling, **scheduling_kwargs)
+        self.mpc = QLPVMPC(model, horizon, Q, R, Rd, Q_N, u_min, u_max, scheduling, weight_growth, **scheduling_kwargs)
+        self.weight_growth = weight_growth
         self.Q = np.asarray(Q, dtype=float)
         self.Q_N = self.Q if Q_N is None else np.asarray(Q_N, dtype=float)
         self.contouring = contouring
@@ -70,7 +71,8 @@ class LineFollowerController:
 
     @property
     def name(self):
-        return f"qLPV MPC ({self.model.embedding}, {self.mpc.scheduling})"
+        growth = f", g={self.weight_growth:g}" if self.weight_growth != 1 else ""
+        return f"qLPV MPC ({self.model.embedding}, {self.mpc.scheduling}{growth})"
 
     @property
     def stats(self):

@@ -26,7 +26,8 @@ def make_controller(cfg):
         g = cfg["gpc"]
         return LineFollowerGPC(*params, horizon=ctrl["horizon"], control_horizon=g["control_horizon"],
                                q_theta=g["q_theta"], q_distance=g["q_distance"], lamb=g["lamb"], d0=g["d0"],
-                               theta_reference=g["theta_reference"], u_min=ctrl["u_min"], u_max=ctrl["u_max"])
+                               theta_reference=g["theta_reference"], u_min=ctrl["u_min"], u_max=ctrl["u_max"],
+                               weight_growth=g["weight_growth"])
 
     q = cfg["qlpv"]
     kwargs = {}
@@ -34,7 +35,8 @@ def make_controller(cfg):
         kwargs = {"l_max": q["l_max"], "eps": q["eps"], "initial": q["initial"], "relaxation": q["relaxation"]}
     model = LineFollowerQLPV(*params, embedding=q["embedding"])
     return LineFollowerController(model, ctrl["horizon"], q["Q"], q["R"], q["Rd"], q["Q_N"], ctrl["u_min"], ctrl["u_max"],
-                                  q["scheduling"], disturbance_filter=q["disturbance_filter"], contouring=q["contouring"], **kwargs)
+                                  q["scheduling"], disturbance_filter=q["disturbance_filter"], contouring=q["contouring"],
+                                  weight_growth=q["weight_growth"], **kwargs)
 
 @dataclass
 class RunResult:

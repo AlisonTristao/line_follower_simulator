@@ -4,6 +4,15 @@ from scipy.optimize import minimize
 
 from .scheduling import make_scheduling
 
+def horizon_profile(horizon, growth):
+    """
+    exponential weighting along the horizon: w_j = growth^(j / (N-1)), j = 0..N-1
+    (w_0 = 1 and the last step weights `growth` times the first; growth = 1 is constant)
+    """
+    if horizon < 2 or growth == 1:
+        return np.ones(horizon)
+    return growth ** (np.arange(horizon) / (horizon - 1))
+
 def solve_box_qp(H, g, lb, ub, x0=None, max_iter=50):
     """
     min 1/2 x'Hx + g'x  s.t.  lb <= x <= ub   (H positive definite)
@@ -46,10 +55,12 @@ class QLPVMPC:
     model:      qLPV model (see mpc.model.LineFollowerQLPV)
     horizon:    N
     Q, Q_N:     output weights (diagonal, length ny); step() also accepts full stage weights W (N, ny, ny)
+    weight_growth: exponential weighting of Q along the horizon, Q(k+j) = Q growth^(j/(N-1)) (Q_N is kept)
     R, Rd:      input and input variation weights (diagonal, length nu)
     scheduling: strategy name or object (see mpc.scheduling)
     """
-    def __init__(self, model, horizon, Q, R, Rd, Q_N=None, u_min=-100, u_max=100, scheduling="taylor", **scheduling_kwargs):
+    def __init__(self, model, horizon, Q, R, Rd, Q_N=None, u_min=-100, u_max=100, scheduling="taylor", weight_growth=1.0,
+                 **scheduling_kwargs):
         self.model = model
         self.N = horizon
         self.scheduling = make_scheduling(scheduling, **scheduling_kwargs)
@@ -62,6 +73,9 @@ class QLPVMPC:
         Q = np.diag(np.broadcast_to(np.asarray(Q, dtype=float), (ny,)))
         Q_N = Q if Q_N is None else np.diag(np.broadcast_to(np.asarray(Q_N, dtype=float), (ny,)))
         self.W = np.concatenate((np.tile(Q, (N - 1, 1, 1)), Q_N[None]))
+        # stage scale: exponential profile on the steps 0..N-2, the terminal weight Q_N is not scaled
+        self.profile = horizon_profile(N, weight_growth)
+        self.profile[-1] = 1.0
         self.r = np.tile(np.broadcast_to(np.asarray(R, dtype=float), (nu,)), N)
         rd = np.tile(np.broadcast_to(np.asarray(Rd, dtype=float), (nu,)), N)
         self.rd = rd
@@ -110,7 +124,7 @@ class QLPVMPC:
 
     def solve_qp(self, P, x0, ref, d, U0=None, W=None):
         N, nu = self.N, self.model.nu
-        W = self.W if W is None else W
+        W = (self.W if W is None else W) * self.profile[:, None, None]
         free, Gamma = self.predict(P, x0, d)
 
         Gy = Gamma[:, self.out, :]                                  # (N, ny, N*nu)

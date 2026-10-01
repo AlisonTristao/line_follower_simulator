@@ -23,17 +23,19 @@ class LineFollowerGPC:
         d_r(j) = y_j
 
     the control law is the unconstrained GPC: Delta U = K (r - f), the input is saturated afterwards.
+    weight_growth: exponential weighting of the errors along the horizon, q(k+j) = q growth^((j-1)/(N-1))
     """
     def __init__(self, Ts, wheels_radius, wheels_distance, wheels_RPM, ke_l, ke_r, accommodation_time_l, accommodation_time_r,
                  horizon=45, control_horizon=5, q_theta=0.5, q_distance=1.0, lamb=1e-3, d0=0.3,
-                 theta_reference="lookahead", u_min=-100, u_max=100):
+                 theta_reference="lookahead", u_min=-100, u_max=100, weight_growth=1.0):
         self.Ts = Ts
         self.N = horizon
         self.Nu = control_horizon
         self.d0 = d0
         self.theta_reference = theta_reference
         self.u_min, self.u_max = u_min, u_max
-        self.name = f"GPC (N={horizon}, Nu={control_horizon}, {theta_reference})"
+        growth = f", g={weight_growth:g}" if weight_growth != 1 else ""
+        self.name = f"GPC (N={horizon}, Nu={control_horizon}, {theta_reference}{growth})"
 
         Ke = 2 * math.pi * wheels_RPM / 6000
         alpha = np.array([math.exp(-5 * Ts / accommodation_time_l), math.exp(-5 * Ts / accommodation_time_r)])
@@ -57,7 +59,9 @@ class LineFollowerGPC:
             [self.c_theta * G[0], -self.c_theta * G[1]],
             [self.c_d * G[0], self.c_d * G[1]],
         ])
-        Q = np.diag(np.concatenate((np.full(horizon, q_theta / horizon), np.full(horizon, q_distance / horizon))))
+        # exponential weighting along the horizon (the last step weights weight_growth times the first)
+        profile = weight_growth ** (np.arange(horizon) / max(horizon - 1, 1))
+        Q = np.diag(np.concatenate((profile * q_theta / horizon, profile * q_distance / horizon)))
         R = np.eye(2 * control_horizon) * lamb / control_horizon
         K = np.linalg.solve(self.G.T @ Q @ self.G + R, self.G.T @ Q)
         self.K = K
