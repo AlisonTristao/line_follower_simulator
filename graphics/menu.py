@@ -286,9 +286,12 @@ class ConfigScreen(Screen):
     one page for each section of the schema (menu on the left), the fields are edited in place
     returns "play" or "quit"; the configuration dict is changed in place
     """
-    def __init__(self, cfg, schema, coerce, defaults, title="Line Follower Simulator", subtitle=None, message=None, check=None):
+    def __init__(self, cfg, schema, coerce, defaults, title="Line Follower Simulator", subtitle=None, message=None, check=None,
+                 actions=None):
         super().__init__()
         self.check = check or (lambda cfg: [])
+        # callbacks of the "action" fields: name -> function(cfg) (may return a message)
+        self.actions = actions or {}
         self.cfg = cfg
         self.schema = schema
         self.coerce = coerce
@@ -338,6 +341,17 @@ class ConfigScreen(Screen):
 
     def _quit(self):
         self.action = "quit"
+
+    def _action(self, name):
+        def run():
+            self.set_focus(None)
+            callback = self.actions.get(name)
+            if callback is not None:
+                message = callback(self.cfg)
+                if message:
+                    self.message = message
+            self.changed()
+        return run
 
     def _select(self, key):
         def select():
@@ -397,8 +411,11 @@ class ConfigScreen(Screen):
                 widgets.append(Toggle(*self._binding(section, field)))
                 widgets[-1].rect = box
             elif field.kind == "choice":
-                widgets.append(Choice(field.options, *self._binding(section, field)))
+                widgets.append(Choice(field.choices(), *self._binding(section, field)))
                 widgets[-1].rect = box
+            elif field.kind == "action":
+                widgets.append(Button(str(field.default or field.label), self._action(field.action)))
+                widgets[-1].rect = pygame.Rect(box.x, box.y, min(box.width, int(220 * t.s)), box.height)
             elif field.kind == "vector":
                 gap = int(8 * t.s)
                 cell = (box.width - gap * (field.size - 1)) // field.size
@@ -443,6 +460,10 @@ class ConfigScreen(Screen):
                     widget.begin()
 
     def on_event(self, event):
+        if event.type in (getattr(pygame, "WINDOWFOCUSGAINED", -1), getattr(pygame, "WINDOWRESTORED", -1)):
+            # back from another window (e.g. the track editor): options such as the track files may have changed
+            self.changed()
+            return False
         if event.type == pygame.MOUSEWHEEL:
             if self.panel.collidepoint(pygame.mouse.get_pos()) and self.max_scroll > 0:
                 self.scroll = min(self.max_scroll, max(0, self.scroll - event.y * self.theme.row_h))

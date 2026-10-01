@@ -35,12 +35,14 @@ DISPLAY_DEFAULTS = {
     "show_sensor": True,
 }
 
-# shape of the generated track
+# shape of the generated track (or the file of the track editor when track_type is TRACK_FILE)
 TRACK_DEFAULTS = {
     "noise_level": 0.225,   # noise of the checkpoints (fraction of the radius)
     "checkpoints": 36,      # number of random checkpoints
     "resolution": 500,      # points of the spline between checkpoints
     "track_rad": 30,        # radius of the track [m]
+    "file": None,           # .tfg file
+    "spacing": 0.01,        # spacing of the points of a .tfg track [m]
 }
 
 class SimulatorController:
@@ -115,7 +117,13 @@ class SimulatorController:
         opt = self.options
 
         # generate trajectory
-        self.x_track, self.y_track = generate_track(self.track_type, **self.track_options)
+        options = dict(self.track_options)
+        file, spacing = options.pop("file"), options.pop("spacing")
+        if self.track_type == TRACK_FILE:
+            from track_editor.tfg import load_points
+            self.x_track, self.y_track = load_points(file, spacing)
+        else:
+            self.x_track, self.y_track = generate_track(self.track_type, **options)
         self.win = len(self.x_track)
 
         # create car

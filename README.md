@@ -13,7 +13,7 @@ The car can be controlled by (`controller_type` in `main.py`):
 
 ## Features
 - Simulation of line-following robots.
-- Generation of tracks in different formats (circle, lemniscate).
+- Generation of tracks in different formats (circle, lemniscate) or tracks made in the track editor.
 - Graphical visualization of the robot's behavior (reference in red, MPC prediction in blue).
 - qLPV MPC with box constraints on the inputs and offset-free tracking (input disturbance estimate).
 - Scheduling trajectory estimation: `frozen`, `warm_start`, `taylor` and `iterative`.
@@ -51,6 +51,18 @@ python compare_controllers.py 100 gpc frozen warm_start taylor iterative --save 
 python compare_controllers.py 40 --perturbation 10 20 gpc taylor
 ```
 
+## Track editor
+```
+python -m track_editor [tracks/file.tfg]
+```
+Tracks made of straights and curves (with continuous tangent), side markings at the end of each segment and the
+area of the track. The editor shows if the track is closed and **Close track** adds curve + straight + curve from
+the end to the start. The files are saved in `tracks/` (`.tfg`, everything in meters; the files of the first
+version of the editor are converted when opened).
+
+In the simulator, choose **Track > Shape > File (track editor)** and the file; **Open editor** opens the editor
+with the selected file.
+
 ## Saved data
 Saved from the results screen (or with `--save` in `compare_controllers.py`):
 - `runs/<name>.csv`: one row per step (time, pose of the car in the track coordinates, speeds, inputs,
@@ -77,6 +89,8 @@ plt.plot(track.x, track.y); plt.plot(df.x, df.y); plt.axis("equal"); plt.show()
 - `mpc/qlpv_mpc.py`: qLPV MPC (condensed prediction and box constrained QP).
 - `mpc/line_follower.py`: reference from the track, contouring weights and disturbance estimate.
 - `mpc/gpc.py`: GPC linearized at `theta = 0`.
+- `track_editor/`: track editor (tkinter) and the `.tfg` files (`model.py`, `geometry.py`, `tfg.py`, `app.py`, `canvas.py`).
+- `tracks/`: tracks made in the editor.
 - `car_modeling/car_dynamics.py`: modeling of the car's dynamics.
 - `graphics/track_generator.py`: track generation.
 - `graphics/graphics_elements.py`: graphical elements for rendering.

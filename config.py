@@ -4,21 +4,33 @@ settings of a run: default values and the schema used by the configuration scree
 the configuration is a dict {section: {key: value}}; the last one is saved in last_config.json
 """
 import copy
+import glob
 import json
 import os
 
 from graphics.graphics_elements import FULL, MEDIUM, SMALL
-from graphics.track_generator import LEMNISCATE, CIRCLE
+from graphics.track_generator import LEMNISCATE, CIRCLE, TRACK_FILE
 
-LAST_CONFIG = os.path.join(os.path.dirname(os.path.abspath(__file__)), "last_config.json")
+ROOT = os.path.dirname(os.path.abspath(__file__))
+LAST_CONFIG = os.path.join(ROOT, "last_config.json")
+TRACKS_FOLDER = os.path.join(ROOT, "tracks")
+
+def track_files():
+    # .tfg files of the tracks folder (names relative to the folder)
+    files = sorted(os.path.basename(p) for p in glob.glob(os.path.join(TRACKS_FOLDER, "*.tfg")))
+    return [(f, f) for f in files] or [("", "no .tfg file in tracks/")]
+
+def track_path(name):
+    return os.path.join(TRACKS_FOLDER, name) if name else None
 
 class Field:
     """
     kind: "int" | "float" | "bool" | "choice" | "vector" (list of floats with `size` elements)
-    options: list of (value, label) for "choice"
+          | "action" (button with the text `default`, `action` is the name of the callback given to the screen)
+    options: list of (value, label) for "choice", or a function that returns it
     visible: function(cfg) -> bool
     """
-    def __init__(self, key, label, kind, default, help="", min=None, max=None, options=None, size=None, visible=None):
+    def __init__(self, key, label, kind, default, help="", min=None, max=None, options=None, size=None, visible=None, action=None):
         self.key = key
         self.label = label
         self.kind = kind
@@ -28,7 +40,11 @@ class Field:
         self.max = max
         self.options = options
         self.size = size
+        self.action = action
         self.visible = visible or (lambda cfg: True)
+
+    def choices(self):
+        return self.options() if callable(self.options) else self.options
 
 class Section:
     def __init__(self, key, title, fields, visible=None, help=""):
@@ -49,6 +65,12 @@ def _is_iterative(cfg):
 
 def _perturbation_on(cfg):
     return cfg["perturbation"]["enabled"]
+
+def _is_file(cfg):
+    return cfg["track"]["track_type"] == TRACK_FILE
+
+def _is_generated(cfg):
+    return not _is_file(cfg)
 
 SCHEDULING = [("frozen", "Frozen"), ("warm_start", "Warm start"), ("taylor", "Taylor"), ("iterative", "Iterative")]
 
@@ -99,12 +121,22 @@ SCHEMA = [
     ], visible=_is_gpc, help="generalized predictive control linearized at theta = 0"),
 
     Section("track", "Track", [
-        Field("track_type", "Shape", "choice", LEMNISCATE, options=[(LEMNISCATE, "Lemniscate"), (CIRCLE, "Circle")]),
-        Field("seed", "Seed", "int", 1112, min=-1, max=2 ** 31 - 1, help="random seed of the track (-1 = random)"),
-        Field("track_rad", "Radius [m]", "float", 30, min=5, max=45, help="size of the track"),
-        Field("noise_level", "Noise", "float", 0.225, min=0, max=1, help="random deviation of the checkpoints (fraction of the radius)"),
-        Field("checkpoints", "Checkpoints", "int", 36, min=4, max=300, help="number of random checkpoints of the track"),
-        Field("resolution", "Points per checkpoint", "int", 500, min=20, max=5000, help="resolution of the spline (spacing of the points)"),
+        Field("track_type", "Shape", "choice", LEMNISCATE,
+              options=[(LEMNISCATE, "Lemniscate"), (CIRCLE, "Circle"), (TRACK_FILE, "File (track editor)")],
+              help="random track or a track made in the track editor (tracks/*.tfg)"),
+        Field("file", "Track file", "choice", "track_01.tfg", options=track_files, visible=_is_file,
+              help="tracks saved in the tracks/ folder"),
+        Field("editor", "Track editor", "action", "Open editor", action="open_editor",
+              help="opens the track editor with the selected file (the list is updated when you come back)"),
+        Field("file_spacing", "Points spacing [m]", "float", 0.01, min=0.001, max=0.1, visible=_is_file,
+              help="the track of the file is sampled with this spacing (the reference spacing counts these points)"),
+        Field("seed", "Seed", "int", 1112, min=-1, max=2 ** 31 - 1, visible=_is_generated, help="random seed of the track (-1 = random)"),
+        Field("track_rad", "Radius [m]", "float", 30, min=5, max=45, visible=_is_generated, help="size of the track"),
+        Field("noise_level", "Noise", "float", 0.225, min=0, max=1, visible=_is_generated,
+              help="random deviation of the checkpoints (fraction of the radius)"),
+        Field("checkpoints", "Checkpoints", "int", 36, min=4, max=300, visible=_is_generated, help="number of random checkpoints of the track"),
+        Field("resolution", "Points per checkpoint", "int", 500, min=20, max=5000, visible=_is_generated,
+              help="resolution of the spline (spacing of the points)"),
         Field("track_length", "Line width [m]", "float", 0.02, min=0.002, max=0.2),
         Field("future_spacing", "Reference spacing [points]", "int", 3, min=1, max=50,
               help="track points between two steps of the reference (sets the reference speed)"),
@@ -178,8 +210,10 @@ def coerce(field, value):
         return float(clamp(float(value)))
     if field.kind == "bool":
         return bool(value)
+    if field.kind == "action":
+        return field.default
     if field.kind == "choice":
-        values = [o[0] for o in field.options]
+        values = [o[0] for o in field.choices()]
         if value not in values:
             raise ValueError(f"{value} not in {values}")
         return value
@@ -223,6 +257,10 @@ def check(cfg):
         errors.append("input min must be lower than input max")
     if cfg["controller"]["type"] == "gpc" and cfg["gpc"]["control_horizon"] > cfg["controller"]["horizon"]:
         errors.append("GPC control horizon Nu must be <= N")
+    if _is_file(cfg):
+        path = track_path(cfg["track"]["file"])
+        if path is None or not os.path.exists(path):
+            errors.append("choose a track file (tracks/*.tfg)")
     return errors
 
 def apply_spec(cfg, spec):

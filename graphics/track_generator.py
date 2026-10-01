@@ -5,6 +5,7 @@ from scipy.interpolate import splprep, splev
 
 LEMNISCATE = 0
 CIRCLE = 1
+TRACK_FILE = 2      # track made in the track editor (.tfg file)
 
 def circle_checkpoints(ckeckpoints_number, track_radius, noise):
     checkpoints = []

@@ -123,7 +123,8 @@ def run(cfg, headless=False, screen_size=None):
                        track_length=track["track_length"], sensor_spacing=car["sensor_spacing"],
                        headless=headless, real_time=sim["real_time"] and not headless,
                        display={k: v for k, v in disp.items() if k.startswith("show_")},
-                       track={k: track[k] for k in ("noise_level", "checkpoints", "resolution", "track_rad")},
+                       track={**{k: track[k] for k in ("noise_level", "checkpoints", "resolution", "track_rad")},
+                              "file": C.track_path(track["file"]), "spacing": track["file_spacing"]},
                        perturbation_key_step=pert["key_step"])
     S.set_car_dynamics(car["wheels_radius"], car["wheels_distance"], car["wheels_RPM"], motors["ke_l"], motors["ke_r"],
                        motors["accommodation_time_l"], motors["accommodation_time_r"], car["sensor_distance"], car["sensor_count"])

@@ -5,6 +5,8 @@ configuration screen -> Play -> simulation -> results (save the run) -> configur
 all the settings are on the configuration screen (the last ones are kept in last_config.json)
 """
 import os
+import subprocess
+import sys
 import time
 
 import pygame
@@ -26,6 +28,18 @@ def save_run(result, name):
         i += 1
     return result.logger.save(path)
 
+def open_editor(cfg):
+    """
+    opens the track editor (another window) with the selected track file
+    """
+    path = C.track_path(cfg["track"]["file"])
+    args = [sys.executable, "-m", "track_editor"] + ([path] if path and os.path.exists(path) else [])
+    subprocess.Popen(args, cwd=C.ROOT)
+    if pygame.display.get_surface() is not None and pygame.display.get_surface().get_flags() & pygame.FULLSCREEN:
+        # in full screen the editor would stay behind the simulator
+        pygame.display.iconify()
+    return "track editor opened: save the track in tracks/ and come back"
+
 def default_name(cfg):
     ctrl = "gpc" if cfg["controller"]["type"] == "gpc" else f"qlpv_{cfg['qlpv']['scheduling']}"
     return f"{ctrl}_{time.strftime('%Y%m%d_%H%M%S')}"
@@ -36,7 +50,8 @@ def main():
     message = None
 
     while True:
-        screen = ConfigScreen(cfg, C.SCHEMA, C.coerce, C.defaults, subtitle=C.describe, message=message, check=C.check)
+        screen = ConfigScreen(cfg, C.SCHEMA, C.coerce, C.defaults, subtitle=C.describe, message=message, check=C.check,
+                              actions={"open_editor": open_editor})
         if screen.loop() == "quit":
             break
         C.save(cfg)
