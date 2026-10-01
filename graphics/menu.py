@@ -9,51 +9,24 @@ import time
 import numpy as np
 import pygame
 
-BG          = (243, 244, 247)
-PANEL       = (255, 255, 255)
-SIDEBAR     = (36, 40, 48)
-SIDEBAR_HI  = (52, 58, 70)
-SIDEBAR_TXT = (205, 210, 220)
-ACCENT      = (0, 110, 230)
-ACCENT_TXT  = (255, 255, 255)
-TEXT        = (30, 32, 38)
-MUTED       = (115, 120, 130)
-BORDER      = (200, 204, 212)
-ERROR       = (205, 45, 45)
-OK          = (20, 140, 70)
-TRACK       = (190, 194, 202)
-PATH        = (0, 110, 230)
+from graphics import style
+from graphics.style import (BG, PANEL, SIDEBAR, SIDEBAR_HI, SIDEBAR_TXT, ACCENT, ACCENT_DARK, ACCENT_SOFT, ACCENT_TXT,
+                            TEXT, MUTED, BORDER, GRID, ERROR, OK, text, fit)
 
 class Theme:
     def __init__(self, size):
         w, h = size
-        s = max(0.72, min(1.6, min(h / 820, w / 1300)))
+        s = max(0.72, min(1.8, min(h / 820, w / 1300)))
         self.s = s
-        face = "segoeui,arial,helvetica"
-        self.font = pygame.font.SysFont(face, int(17 * s))
-        self.bold = pygame.font.SysFont(face, int(17 * s), bold=True)
-        self.small = pygame.font.SysFont(face, int(14 * s))
-        self.title = pygame.font.SysFont(face, int(28 * s), bold=True)
-        self.subtitle = pygame.font.SysFont(face, int(20 * s), bold=True)
-        self.mono = pygame.font.SysFont("consolas,couriernew,courier", int(16 * s))
-        self.row_h = int(38 * s)
+        self.font = style.font(16 * s)
+        self.bold = style.font(16 * s, bold=True)
+        self.small = style.font(13 * s)
+        self.title = style.font(26 * s, bold=True)
+        self.subtitle = style.font(19 * s, bold=True)
+        self.mono = style.font(15 * s, mono=True)
+        self.row_h = int(40 * s)
         self.pad = int(14 * s)
-        self.radius = max(3, int(6 * s))
-
-def text(surface, font, value, pos, color=TEXT, anchor="topleft"):
-    img = font.render(str(value), True, color)
-    rect = img.get_rect(**{anchor: pos})
-    surface.blit(img, rect)
-    return rect
-
-def fit(font, value, width):
-    # cuts the text to fit in the width
-    value = str(value)
-    if font.size(value)[0] <= width:
-        return value
-    while value and font.size(value + "...")[0] > width:
-        value = value[:-1]
-    return value + "..."
+        self.radius = max(4, int(7 * s))
 
 # --- widgets --- #
 
@@ -84,12 +57,11 @@ class Button(Widget):
     def draw(self, surface, theme):
         hover = self.rect.collidepoint(pygame.mouse.get_pos())
         if self.primary:
-            color = tuple(max(0, c - 25) for c in ACCENT) if hover else ACCENT
-            pygame.draw.rect(surface, color if self.enabled else BORDER, self.rect, border_radius=theme.radius)
+            color = (ACCENT_DARK if hover else ACCENT) if self.enabled else BORDER
+            style.rounded_rect(surface, self.rect, color, theme.radius)
             text(surface, theme.bold, self.label, self.rect.center, ACCENT_TXT, "center")
         else:
-            pygame.draw.rect(surface, (232, 235, 240) if hover else PANEL, self.rect, border_radius=theme.radius)
-            pygame.draw.rect(surface, BORDER, self.rect, 1, border_radius=theme.radius)
+            style.rounded_rect(surface, self.rect, (240, 242, 246) if hover else PANEL, theme.radius, BORDER, 1)
             text(surface, theme.font, self.label, self.rect.center, TEXT if self.enabled else MUTED, "center")
 
 class TextInput(Widget):
@@ -158,13 +130,12 @@ class TextInput(Widget):
 
     def draw(self, surface, theme):
         color = ERROR if self.error else (ACCENT if self.editing else BORDER)
-        pygame.draw.rect(surface, PANEL, self.rect, border_radius=theme.radius)
-        pygame.draw.rect(surface, color, self.rect, 2 if self.editing or self.error else 1, border_radius=theme.radius)
+        style.rounded_rect(surface, self.rect, PANEL, theme.radius, color, 2 if self.editing or self.error else 1)
         inner = self.rect.inflate(-2 * theme.pad // 2, 0)
         value = fit(theme.mono, self.text, inner.width - 6)
         if self.editing and self.fresh:
             sel = theme.mono.size(value)
-            pygame.draw.rect(surface, (200, 222, 255), (inner.x, self.rect.centery - sel[1] // 2, sel[0], sel[1]))
+            pygame.draw.rect(surface, ACCENT_SOFT, (inner.x, self.rect.centery - sel[1] // 2, sel[0], sel[1]))
         r = text(surface, theme.mono, value, (inner.x, self.rect.centery), TEXT, "midleft")
         if self.editing and int(time.time() * 2) % 2 == 0:
             pygame.draw.line(surface, TEXT, (r.right + 1, r.top + 2), (r.right + 1, r.bottom - 2), 1)
@@ -204,8 +175,7 @@ class Choice(Widget):
 
     def draw(self, surface, theme):
         hover = self.rect.collidepoint(pygame.mouse.get_pos())
-        pygame.draw.rect(surface, (238, 242, 250) if hover else PANEL, self.rect, border_radius=theme.radius)
-        pygame.draw.rect(surface, BORDER, self.rect, 1, border_radius=theme.radius)
+        style.rounded_rect(surface, self.rect, (244, 247, 252) if hover else PANEL, theme.radius, BORDER, 1)
         label = dict(self.options).get(self.get(), str(self.get()))
         arrow_w = theme.font.size("<")[0] + theme.pad
         text(surface, theme.bold, "<", (self.rect.x + theme.pad // 2, self.rect.centery), ACCENT, "midleft")
@@ -230,9 +200,9 @@ class Toggle(Widget):
         h = int(self.rect.height * 0.7)
         w = int(h * 1.9)
         track = pygame.Rect(self.rect.x, self.rect.centery - h // 2, w, h)
-        pygame.draw.rect(surface, ACCENT if on else BORDER, track, border_radius=h // 2)
+        style.rounded_rect(surface, track, ACCENT if on else BORDER, h // 2)
         knob_x = track.right - h // 2 if on else track.x + h // 2
-        pygame.draw.circle(surface, PANEL, (knob_x, track.centery), h // 2 - 3)
+        style.circle(surface, PANEL, (knob_x, track.centery), h // 2 - max(2, h // 8))
         text(surface, theme.font, "on" if on else "off", (track.right + theme.pad, self.rect.centery), MUTED, "midleft")
 
 # --- screens --- #
@@ -517,14 +487,13 @@ class ConfigScreen(Screen):
             if active or button.rect.collidepoint(mouse):
                 pygame.draw.rect(surface, SIDEBAR_HI, button.rect)
             if active:
-                pygame.draw.rect(surface, ACCENT, (button.rect.x, button.rect.y, max(3, int(4 * t.s)), button.rect.height))
+                bar = max(3, int(4 * t.s))
+                style.rounded_rect(surface, (button.rect.x, button.rect.y + bar, bar, button.rect.height - 2 * bar), ACCENT, bar // 2)
             text(surface, t.bold if active else t.font, s.title, (button.rect.x + 2 * t.pad, button.rect.centery),
                  (255, 255, 255) if active else SIDEBAR_TXT, "midleft")
 
         # panel
-        card = self.panel.inflate(2 * t.pad, 2 * t.pad)
-        pygame.draw.rect(surface, PANEL, card, border_radius=t.radius * 2)
-        pygame.draw.rect(surface, BORDER, card, 1, border_radius=t.radius * 2)
+        style.card(surface, self.panel.inflate(2 * t.pad, 2 * t.pad), t.radius * 2)
         section = next(s for s in self.schema if s.key == self.section)
         text(surface, t.subtitle, section.title, (self.panel.x, self.panel.y), TEXT)
         text(surface, t.small, section.help, (self.panel.x, self.panel.y + int(t.row_h * 0.85)), MUTED)
@@ -535,9 +504,9 @@ class ConfigScreen(Screen):
         for i, (field, row, widgets) in enumerate(self.rows):
             if row.collidepoint(mouse) and clip.collidepoint(mouse):
                 hovered = field
-                pygame.draw.rect(surface, (246, 248, 252), row)
+                style.rounded_rect(surface, row, (244, 247, 252), t.radius)
             elif i % 2:
-                pygame.draw.rect(surface, (250, 251, 253), row)
+                style.rounded_rect(surface, row, (250, 251, 253), t.radius)
             text(surface, t.font, fit(t.font, field.label, widgets[0].rect.x - row.x - t.pad), (row.x + t.pad // 2, row.centery), TEXT, "midleft")
             for widget in widgets:
                 widget.draw(surface, t)
@@ -548,7 +517,7 @@ class ConfigScreen(Screen):
             total = len(self.rows) * t.row_h
             bar_h = max(20, clip.height * clip.height // total)
             bar_y = clip.y + (clip.height - bar_h) * self.scroll // self.max_scroll
-            pygame.draw.rect(surface, BORDER, (clip.right - 6, bar_y, 4, bar_h), border_radius=2)
+            style.rounded_rect(surface, (clip.right - 6, bar_y, 4, bar_h), BORDER, 2)
 
         # footer
         pygame.draw.rect(surface, PANEL, self.footer)
@@ -614,8 +583,8 @@ class ResultsScreen(Screen):
         body = pygame.Rect(2 * t.pad, self.header.bottom + 2 * t.pad, w - 4 * t.pad, self.footer.top - self.header.bottom - 4 * t.pad)
         self.metrics_rect = pygame.Rect(body.x, body.y, min(int(420 * t.s), body.width // 3), body.height)
         right = pygame.Rect(self.metrics_rect.right + 2 * t.pad, body.y, body.right - self.metrics_rect.right - 2 * t.pad, body.height)
-        self.path_rect = pygame.Rect(right.x, right.y, right.width, int(right.height * 0.62))
-        self.error_rect = pygame.Rect(right.x, self.path_rect.bottom + 2 * t.pad, right.width, right.bottom - self.path_rect.bottom - 2 * t.pad)
+        self.path_rect = pygame.Rect(right.x, right.y, right.width, int(right.height * 0.6))
+        self.error_rect = pygame.Rect(right.x, self.path_rect.bottom + 3 * t.pad, right.width, right.bottom - self.path_rect.bottom - 3 * t.pad)
 
         bh = int(44 * t.s)
         y = self.footer.centery - bh // 2
@@ -646,9 +615,7 @@ class ResultsScreen(Screen):
 
     def _card(self, surface, rect, title):
         t = self.theme
-        card = rect.inflate(2 * t.pad, 2 * t.pad)
-        pygame.draw.rect(surface, PANEL, card, border_radius=t.radius * 2)
-        pygame.draw.rect(surface, BORDER, card, 1, border_radius=t.radius * 2)
+        style.card(surface, rect.inflate(2 * t.pad, 2 * t.pad), t.radius * 2)
         text(surface, t.bold, title, (rect.x, rect.y), TEXT)
         return pygame.Rect(rect.x, rect.y + int(t.row_h * 0.9), rect.width, rect.height - int(t.row_h * 0.9))
 
@@ -671,47 +638,59 @@ class ResultsScreen(Screen):
         rows.append(("Steps", f"{len(self.t)}"))
         return rows
 
+    def _cached(self, key, rect, draw):
+        # static images of the plots are rendered once (supersampled) for each size
+        cache = self.__dict__.setdefault("_images", {})
+        key = (key, tuple(rect))
+        if key not in cache:
+            cache[key] = style.smooth(draw, rect.size, 3)
+        return cache[key]
+
     def _draw_path(self, surface, rect):
         t = self.theme
         tx, ty = self.result.track
         xs = np.concatenate((tx, self.x)) if len(self.x) else tx
         ys = np.concatenate((ty, self.y)) if len(self.y) else ty
         x0, x1, y0, y1 = xs.min(), xs.max(), ys.min(), ys.max()
-        scale = min(rect.width / max(x1 - x0, 1e-6), rect.height / max(y1 - y0, 1e-6)) * 0.95
+        scale = min(rect.width / max(x1 - x0, 1e-6), rect.height / max(y1 - y0, 1e-6)) * 0.94
         cx, cy = (x0 + x1) / 2, (y0 + y1) / 2
-        # the track coordinates have y pointing down (screen), as in the simulator
-        to_px = lambda x, y: np.column_stack((rect.centerx + (x - cx) * scale, rect.centery + (y - cy) * scale))
 
-        step = max(1, len(tx) // 3000)
-        pts = to_px(tx[::step], ty[::step])
-        pygame.draw.lines(surface, TRACK, True, pts.tolist(), max(3, int(6 * t.s)))
-        if len(self.x) > 1:
-            step = max(1, len(self.x) // 3000)
-            pts = to_px(self.x[::step], self.y[::step])
-            pygame.draw.lines(surface, PATH, False, pts.tolist(), max(1, int(2 * t.s)))
-            pygame.draw.circle(surface, OK, pts[0].tolist(), int(6 * t.s))
-            pygame.draw.circle(surface, ERROR, pts[-1].tolist(), int(6 * t.s))
+        def draw(big, k):
+            # the track coordinates have y pointing down (screen), as in the simulator
+            to_px = lambda x, y: np.column_stack((k * (rect.width / 2 + (x - cx) * scale), k * (rect.height / 2 + (y - cy) * scale)))
+            step = max(1, len(tx) // 4000)
+            pygame.draw.lines(big, style.TRACK_SOFT, True, to_px(tx[::step], ty[::step]).tolist(), int(7 * t.s * k))
+            if len(self.x) > 1:
+                step = max(1, len(self.x) // 4000)
+                pts = to_px(self.x[::step], self.y[::step])
+                pygame.draw.lines(big, style.PREDICTION, False, pts.tolist(), max(k, int(2.5 * t.s * k)))
+                for p, color in ((pts[0], OK), (pts[-1], ERROR)):
+                    style.circle(big, PANEL, p, 8 * t.s * k)
+                    style.circle(big, color, p, 6 * t.s * k)
+        surface.blit(self._cached("path", rect, draw), rect)
 
     def _draw_error(self, surface, rect):
         t = self.theme
         if len(self.t) < 2:
             return
-        plot = pygame.Rect(rect.x + int(60 * t.s), rect.y, rect.width - int(70 * t.s), rect.height - int(26 * t.s))
+        plot = pygame.Rect(rect.x + int(54 * t.s), rect.y + int(4 * t.s), rect.width - int(60 * t.s), rect.height - int(30 * t.s))
         lim = max(0.5, float(np.max(np.abs(self.e))) * 1.1)
-        pygame.draw.rect(surface, (250, 251, 253), plot)
         for v in (-lim, -lim / 2, 0, lim / 2, lim):
             y = plot.centery - v / lim * plot.height / 2
-            pygame.draw.line(surface, BORDER if v else MUTED, (plot.x, y), (plot.right, y), 1)
-            text(surface, t.small, f"{v:.2g}", (plot.x - 6, y), MUTED, "midright")
+            pygame.draw.line(surface, BORDER if v == 0 else GRID, (plot.x, y), (plot.right, y), 1)
+            text(surface, t.small, f"{v:.2g}", (plot.x - 8, y), MUTED, "midright")
         t_end = max(self.t[-1], 1e-6)
         for i in range(6):
             x = plot.x + plot.width * i / 5
-            text(surface, t.small, f"{t_end * i / 5:.3g}", (x, plot.bottom + 4), MUTED, "midtop")
-        step = max(1, len(self.t) // plot.width)
-        xs = plot.x + self.t[::step] / t_end * plot.width
-        ys = plot.centery - np.clip(self.e[::step], -lim, lim) / lim * plot.height / 2
-        pygame.draw.lines(surface, PATH, False, np.column_stack((xs, ys)).tolist(), max(1, int(2 * t.s)))
-        text(surface, t.small, "[cm]  x  [s]", (plot.right, plot.y), MUTED, "topright")
+            text(surface, t.small, f"{t_end * i / 5:.3g}", (x, plot.bottom + 6), MUTED, "midtop")
+        text(surface, t.small, "lateral error [cm] x time [s]", (plot.right, rect.y - int(t.row_h * 0.9)), MUTED, "topright")
+
+        def draw(big, k):
+            step = max(1, len(self.t) // (2 * plot.width))
+            xs = k * self.t[::step] / t_end * plot.width
+            ys = k * (plot.height / 2 - np.clip(self.e[::step], -lim, lim) / lim * plot.height / 2)
+            pygame.draw.lines(big, style.PREDICTION, False, np.column_stack((xs, ys)).tolist(), max(k, int(2 * t.s * k)))
+        surface.blit(self._cached("error", plot, draw), plot)
 
     def draw(self, surface):
         t = self.theme
@@ -729,7 +708,12 @@ class ResultsScreen(Screen):
             text(surface, t.bold, value, (inner.right, y), TEXT, "topright")
             y += int(t.row_h * 0.85)
 
-        self._draw_path(surface, self._card(surface, self.path_rect, "Trajectory (track in gray, start in green, end in red)"))
+        self._draw_path(surface, self._card(surface, self.path_rect, "Trajectory"))
+        legend = self.path_rect.right
+        for label, color in (("end", ERROR), ("start", OK), ("car", style.PREDICTION), ("track", style.TRACK_SOFT)):
+            r = text(surface, t.small, label, (legend, self.path_rect.y + 2), MUTED, "topright")
+            style.circle(surface, color, (r.x - 9 * t.s, r.centery), 5 * t.s)
+            legend = r.x - int(26 * t.s)
         self._draw_error(surface, self._card(surface, self.error_rect, "Lateral error"))
 
         pygame.draw.rect(surface, PANEL, self.footer)
